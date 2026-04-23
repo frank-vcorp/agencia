@@ -1,7 +1,7 @@
 # Alcance Inicial de la Agencia
 
 **ID:** ARCH-20260423-03  
-**Proyecto:** Agencia de Marketing AI-First  
+**Proyecto:** VectorIA (nombre de trabajo)  
 **Fecha:** 2026-04-23  
 **Estado:** Definicion inicial de alcance
 
