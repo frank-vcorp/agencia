@@ -1,7 +1,7 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** ARCH-20260505-19  
+**ID activo:** ARCH-20260505-21  
 **Fecha de actualizacion:** 2026-05-05  
 **Estado general:** V1 ejecutable publicada con dashboard operativo, tenancy inicial real y conexion activa con Supabase y Vercel
 
@@ -66,6 +66,8 @@
 10. context/checkpoints/CHECKPOINT_IMPL-20260505-02.md
 11. supabase/migrations/20260505180500_init_tenants_and_runtime_settings.sql
 12. context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md
+13. context/IDENTIDAD_Y_MEMBERSHIPS_V1.md
+14. context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md
 
 ## Decisiones Ya Tomadas
 
@@ -80,6 +82,7 @@
 9. El conocimiento derivado no sustituye a la fuente primaria.
 10. La primera prueba de valor debe verse en produccion, no solo en documentos.
 11. El agente de briefing madura el brief en 3 etapas obligatorias, usa un catalogo comercial configurable y la aprobacion final siempre pasa por revision humana.
+12. La siguiente capa obligatoria es identidad minima operativa con users, memberships, actor tecnico y actor efectivo.
 
 ## Backlog Estructural Priorizado
 
@@ -98,11 +101,12 @@
 11. Implementar base Next.js y Supabase.
 12. Implementar tenancy publica inicial y lectura real del tenant por defecto.
 13. Cerrar arquitectura operativa del agente de briefing persistido con revision humana y orientacion comercial.
+14. Cerrar arquitectura operativa de identidad minima con memberships, users y actor efectivo.
 
 ### [~] Planificado para el siguiente corte
 
-1. Implementar briefs como primer objeto persistido del piloto.
-2. Extender esquema con memberships, users y clients.
+1. Implementar memberships, users y actor efectivo minimo.
+2. Extender esquema con clients y projects.
 3. Mostrar tenant snapshot real en mas superficies del shell.
 4. Pasar de dashboard informativo a dashboard accionable.
 
