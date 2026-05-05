@@ -1,12 +1,12 @@
 /**
- * IMPL-20260505-03
- * Respaldo: context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, context/BRIEFING_ESTRUCTURADO_CLAUDE_V1.md, PROYECTO.md
+ * IMPL-20260505-21
+ * Respaldo: context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md, context/IDENTIDAD_Y_MEMBERSHIPS_V1.md, context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, PROYECTO.md
  */
 import { revalidatePath } from "next/cache";
 
 import {
   advanceBriefStage,
-  appendBriefMessage,
+  appendClientBriefMessage,
   briefingStages,
   buildAssistantGuidance,
   createBriefForDefaultTenant,
@@ -19,6 +19,7 @@ import {
   type BriefVersion,
   type StructuredBriefSummary
 } from "@/lib/briefing";
+import { getTenantIdentityContext } from "@/lib/identity";
 
 const summarySections: Array<{
   title: string;
@@ -95,21 +96,13 @@ async function addMessageAction(formData: FormData) {
 
   const briefId = String(formData.get("briefId") ?? "");
   const versionId = String(formData.get("versionId") ?? "");
-  const stage = String(formData.get("stage") ?? "discovery") as BriefVersion["stage"];
   const messageText = String(formData.get("messageText") ?? "").trim();
 
   if (!messageText) {
     return;
   }
 
-  await appendBriefMessage({
-    briefId,
-    versionId,
-    stage,
-    authorRole: "client",
-    actorLabel: "Cliente demo",
-    messageText
-  });
+  await appendClientBriefMessage({ briefId, versionId }, messageText);
   revalidatePath("/briefs");
 }
 
@@ -209,6 +202,7 @@ function stageLabel(stage: BriefVersion["stage"]) {
 
 export default async function BriefsPage() {
   const brief = await getBriefWorkspace();
+  const identity = await getTenantIdentityContext();
   const currentVersion = brief?.currentVersion ?? null;
   const missingFields = currentVersion ? getCriticalMissingFields(currentVersion.structuredSummary) : [];
 
@@ -275,6 +269,28 @@ export default async function BriefsPage() {
               );
             })}
           </div>
+
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            <div className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Operator membership</div>
+              <div className="mt-2 font-medium">{identity?.operatorMembership?.displayName ?? "Operador demo pendiente"}</div>
+              <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">{identity?.operatorMembership?.email ?? "Sin membership activa de operador."}</p>
+            </div>
+            <div className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Client membership</div>
+              <div className="mt-2 font-medium">{identity?.clientMembership?.displayName ?? "Cliente demo pendiente"}</div>
+              <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">{identity?.clientMembership?.email ?? "Sin membership activa de cliente."}</p>
+            </div>
+            <div className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Actor tecnico</div>
+              <div className="mt-2 font-medium">{identity?.serviceAgent?.name ?? "Agente tecnico pendiente"}</div>
+              <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
+                {identity?.serviceAgent?.scopes[0]
+                  ? `${identity.serviceAgent.scopes[0].resourceType} · ${identity.serviceAgent.scopes[0].operation}`
+                  : "Sin scope inicial de briefing."}
+              </p>
+            </div>
+          </div>
         </article>
 
         <aside className="panel rounded-[30px] px-6 py-6">
@@ -326,7 +342,6 @@ export default async function BriefsPage() {
           <form action={addMessageAction} className="mt-5 space-y-3">
             <input name="briefId" type="hidden" value={brief.id} />
             <input name="versionId" type="hidden" value={currentVersion.id} />
-            <input name="stage" type="hidden" value={currentVersion.stage} />
             <label className="block text-sm font-medium">Agregar mensaje fuente del cliente</label>
             <textarea
               className="min-h-28 w-full rounded-[24px] border border-[color:var(--line)] bg-white/80 px-4 py-4 text-sm outline-none"
@@ -433,6 +448,9 @@ export default async function BriefsPage() {
         <article className="panel rounded-[30px] px-6 py-6">
           <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">Revision humana minima</p>
           <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight">Decision del operador</h2>
+          <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
+            La revision usa la membership activa de operador del tenant cuando existe. El actor tecnico queda reservado para eventos automatizados del flujo.
+          </p>
           <form action={operatorReviewAction} className="mt-5 space-y-4">
             <input name="briefId" type="hidden" value={brief.id} />
             <input name="versionId" type="hidden" value={currentVersion.id} />

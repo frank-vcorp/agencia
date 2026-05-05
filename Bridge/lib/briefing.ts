@@ -1,8 +1,9 @@
 /**
- * IMPL-20260505-03
- * Respaldo: context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, context/BRIEFING_ESTRUCTURADO_CLAUDE_V1.md, context/MODELO_DATOS_MULTITENANT_V1.md, context/CONTRATOS_AGENTES_Y_VSCODE_V1.md
+ * IMPL-20260505-21
+ * Respaldo: context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md, context/IDENTIDAD_Y_MEMBERSHIPS_V1.md, context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, context/MODELO_DATOS_MULTITENANT_V1.md, context/CONTRATOS_AGENTES_Y_VSCODE_V1.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
+import { getTenantIdentityContextByTenantId, resolveActorTrace } from "./identity";
 
 export const briefingStages = ["discovery", "precision", "commercial_fit"] as const;
 
@@ -53,6 +54,11 @@ export type BriefMessage = {
   stage: BriefingStage;
   authorRole: "client" | "assistant" | "operator";
   actorLabel: string;
+  actorUserId: string | null;
+  actorMembershipId: string | null;
+  actorAgentId: string | null;
+  effectiveUserId: string | null;
+  effectiveMembershipId: string | null;
   messageText: string;
   createdAt: string;
 };
@@ -63,6 +69,11 @@ export type BriefReviewEvent = {
   eventType: "submitted" | "review_started" | "approved" | "returned" | "reconducted" | "derived_version";
   note: string;
   createdByLabel: string;
+  actorUserId: string | null;
+  actorMembershipId: string | null;
+  actorAgentId: string | null;
+  effectiveUserId: string | null;
+  effectiveMembershipId: string | null;
   recommendedProductSlotKey: string;
   createdAt: string;
 };
@@ -132,6 +143,11 @@ type BriefMessageRow = {
   stage_key: BriefingStage;
   author_role: "client" | "assistant" | "operator";
   actor_label: string;
+  actor_user_id: string | null;
+  actor_membership_id: string | null;
+  actor_agent_id: string | null;
+  effective_user_id: string | null;
+  effective_membership_id: string | null;
   message_text: string;
   created_at: string;
 };
@@ -142,6 +158,11 @@ type BriefReviewEventRow = {
   event_type: BriefReviewEvent["eventType"];
   note: string | null;
   created_by_label: string;
+  actor_user_id: string | null;
+  actor_membership_id: string | null;
+  actor_agent_id: string | null;
+  effective_user_id: string | null;
+  effective_membership_id: string | null;
   recommended_product_slot_key: string | null;
   created_at: string;
 };
@@ -393,7 +414,7 @@ async function getLatestBriefVersionRow(briefId: string): Promise<BriefVersionRo
 
 async function getBriefMessages(versionId: string): Promise<BriefMessage[]> {
   const params = new URLSearchParams({
-    select: "id,brief_version_id,stage_key,author_role,actor_label,message_text,created_at",
+    select: "id,brief_version_id,stage_key,author_role,actor_label,actor_user_id,actor_membership_id,actor_agent_id,effective_user_id,effective_membership_id,message_text,created_at",
     brief_version_id: `eq.${versionId}`,
     order: "created_at.asc"
   });
@@ -407,6 +428,11 @@ async function getBriefMessages(versionId: string): Promise<BriefMessage[]> {
     stage: row.stage_key,
     authorRole: row.author_role,
     actorLabel: row.actor_label,
+    actorUserId: row.actor_user_id,
+    actorMembershipId: row.actor_membership_id,
+    actorAgentId: row.actor_agent_id,
+    effectiveUserId: row.effective_user_id,
+    effectiveMembershipId: row.effective_membership_id,
     messageText: row.message_text,
     createdAt: row.created_at
   }));
@@ -414,7 +440,7 @@ async function getBriefMessages(versionId: string): Promise<BriefMessage[]> {
 
 async function getBriefReviewEvents(versionId: string): Promise<BriefReviewEvent[]> {
   const params = new URLSearchParams({
-    select: "id,brief_version_id,event_type,note,created_by_label,recommended_product_slot_key,created_at",
+    select: "id,brief_version_id,event_type,note,created_by_label,actor_user_id,actor_membership_id,actor_agent_id,effective_user_id,effective_membership_id,recommended_product_slot_key,created_at",
     brief_version_id: `eq.${versionId}`,
     order: "created_at.desc"
   });
@@ -428,6 +454,11 @@ async function getBriefReviewEvents(versionId: string): Promise<BriefReviewEvent
     eventType: row.event_type,
     note: row.note ?? "",
     createdByLabel: row.created_by_label,
+    actorUserId: row.actor_user_id,
+    actorMembershipId: row.actor_membership_id,
+    actorAgentId: row.actor_agent_id,
+    effectiveUserId: row.effective_user_id,
+    effectiveMembershipId: row.effective_membership_id,
     recommendedProductSlotKey: row.recommended_product_slot_key ?? "",
     createdAt: row.created_at
   }));
@@ -477,6 +508,11 @@ async function insertReviewEvent(params: {
   eventType: BriefReviewEvent["eventType"];
   note?: string;
   createdByLabel: string;
+  actorUserId?: string | null;
+  actorMembershipId?: string | null;
+  actorAgentId?: string | null;
+  effectiveUserId?: string | null;
+  effectiveMembershipId?: string | null;
   recommendedProductSlotKey?: string;
 }) {
   await postgrest<BriefReviewEventRow[]>("brief_review_events", {
@@ -488,6 +524,11 @@ async function insertReviewEvent(params: {
       event_type: params.eventType,
       note: params.note ?? "",
       created_by_label: params.createdByLabel,
+      actor_user_id: params.actorUserId ?? null,
+      actor_membership_id: params.actorMembershipId ?? null,
+      actor_agent_id: params.actorAgentId ?? null,
+      effective_user_id: params.effectiveUserId ?? null,
+      effective_membership_id: params.effectiveMembershipId ?? null,
       recommended_product_slot_key: params.recommendedProductSlotKey ?? ""
     })
   });
@@ -560,12 +601,24 @@ export async function createBriefForDefaultTenant(tenantSlug = supabaseEnv.defau
     })
   });
 
+  const identity = await getTenantIdentityContextByTenantId(tenant.id);
+  const assistantTrace = resolveActorTrace({
+    fallbackLabel: "Bridge briefing",
+    technicalActor: identity?.serviceAgent,
+    effectiveMembership: identity?.operatorMembership
+  });
+
   await updateBriefStatus(briefRow.id, "stage_1_discovery", versionRow.id, 1);
   await appendBriefMessage({
     briefId: briefRow.id,
     versionId: versionRow.id,
     authorRole: "assistant",
-    actorLabel: "Bridge briefing",
+    actorLabel: assistantTrace.actorLabel,
+    actorUserId: assistantTrace.actorUserId,
+    actorMembershipId: assistantTrace.actorMembershipId,
+    actorAgentId: assistantTrace.actorAgentId,
+    effectiveUserId: assistantTrace.effectiveUserId,
+    effectiveMembershipId: assistantTrace.effectiveMembershipId,
     messageText: buildAssistantGuidance("discovery", emptyStructuredBriefSummary()),
     stage: "discovery"
   });
@@ -584,6 +637,11 @@ export async function appendBriefMessage(params: {
   versionId: string;
   authorRole: BriefMessage["authorRole"];
   actorLabel: string;
+  actorUserId?: string | null;
+  actorMembershipId?: string | null;
+  actorAgentId?: string | null;
+  effectiveUserId?: string | null;
+  effectiveMembershipId?: string | null;
   messageText: string;
   stage: BriefingStage;
 }) {
@@ -603,8 +661,42 @@ export async function appendBriefMessage(params: {
       stage_key: params.stage,
       author_role: params.authorRole,
       actor_label: params.actorLabel,
+      actor_user_id: params.actorUserId ?? null,
+      actor_membership_id: params.actorMembershipId ?? null,
+      actor_agent_id: params.actorAgentId ?? null,
+      effective_user_id: params.effectiveUserId ?? null,
+      effective_membership_id: params.effectiveMembershipId ?? null,
       message_text: params.messageText
     })
+  });
+}
+
+export async function appendClientBriefMessage(context: MutationContext, messageText: string): Promise<void> {
+  const brief = await getBriefRowById(context.briefId);
+  const version = await getBriefVersionRow(context.versionId);
+
+  if (!brief || !version) {
+    throw new Error("brief_not_found");
+  }
+
+  const identity = await getTenantIdentityContextByTenantId(brief.tenant_id);
+  const clientTrace = resolveActorTrace({
+    fallbackLabel: "Cliente demo",
+    effectiveMembership: identity?.clientMembership
+  });
+
+  await appendBriefMessage({
+    briefId: context.briefId,
+    versionId: context.versionId,
+    stage: version.stage_key,
+    authorRole: "client",
+    actorLabel: clientTrace.actorLabel,
+    actorUserId: clientTrace.actorUserId,
+    actorMembershipId: clientTrace.actorMembershipId,
+    actorAgentId: clientTrace.actorAgentId,
+    effectiveUserId: clientTrace.effectiveUserId,
+    effectiveMembershipId: clientTrace.effectiveMembershipId,
+    messageText
   });
 }
 
@@ -659,6 +751,14 @@ export async function advanceBriefStage(context: MutationContext): Promise<Brief
     throw new Error("final_stage_reached");
   }
 
+  const brief = await getBriefRowById(context.briefId);
+  const identity = brief ? await getTenantIdentityContextByTenantId(brief.tenant_id) : null;
+  const assistantTrace = resolveActorTrace({
+    fallbackLabel: "Bridge briefing",
+    technicalActor: identity?.serviceAgent,
+    effectiveMembership: identity?.operatorMembership
+  });
+
   await updateVersionRecord(context.versionId, {
     stage_key: upcomingStage,
     status: statusFromStage(upcomingStage)
@@ -670,7 +770,12 @@ export async function advanceBriefStage(context: MutationContext): Promise<Brief
     briefId: context.briefId,
     versionId: context.versionId,
     authorRole: "assistant",
-    actorLabel: "Bridge briefing",
+    actorLabel: assistantTrace.actorLabel,
+    actorUserId: assistantTrace.actorUserId,
+    actorMembershipId: assistantTrace.actorMembershipId,
+    actorAgentId: assistantTrace.actorAgentId,
+    effectiveUserId: assistantTrace.effectiveUserId,
+    effectiveMembershipId: assistantTrace.effectiveMembershipId,
     messageText: buildAssistantGuidance(upcomingStage, currentSummary),
     stage: upcomingStage
   });
@@ -705,6 +810,13 @@ export async function submitBriefForOperatorReview(context: MutationContext): Pr
     throw new Error("brief_not_found");
   }
 
+  const identity = await getTenantIdentityContextByTenantId(brief.tenant_id);
+  const submittedTrace = resolveActorTrace({
+    fallbackLabel: "Bridge briefing",
+    technicalActor: identity?.serviceAgent,
+    effectiveMembership: identity?.operatorMembership
+  });
+
   await updateVersionRecord(context.versionId, {
     status: "pending_operator_review",
     final_summary_text: finalSummaryText
@@ -716,7 +828,12 @@ export async function submitBriefForOperatorReview(context: MutationContext): Pr
     versionId: context.versionId,
     eventType: "submitted",
     note: finalSummaryText,
-    createdByLabel: "Bridge briefing",
+    createdByLabel: submittedTrace.actorLabel,
+    actorUserId: submittedTrace.actorUserId,
+    actorMembershipId: submittedTrace.actorMembershipId,
+    actorAgentId: submittedTrace.actorAgentId,
+    effectiveUserId: submittedTrace.effectiveUserId,
+    effectiveMembershipId: submittedTrace.effectiveMembershipId,
     recommendedProductSlotKey: summary.recommendedProductSlotKey
   });
 
@@ -741,6 +858,17 @@ export async function reviewBriefVersion(
   if (!version || !brief) {
     throw new Error("brief_not_found");
   }
+
+  const identity = await getTenantIdentityContextByTenantId(brief.tenant_id);
+
+  if (!identity?.operatorMembership) {
+    throw new Error("membership_required:operator");
+  }
+
+  const operatorTrace = resolveActorTrace({
+    fallbackLabel: "Operador Bridge",
+    effectiveMembership: identity.operatorMembership
+  });
 
   let nextStatus: BriefingStatus = version.status;
   let eventType: BriefReviewEvent["eventType"] = "review_started";
@@ -782,7 +910,12 @@ export async function reviewBriefVersion(
     versionId: context.versionId,
     eventType,
     note,
-    createdByLabel: "Operador Bridge",
+    createdByLabel: operatorTrace.actorLabel,
+    actorUserId: operatorTrace.actorUserId,
+    actorMembershipId: operatorTrace.actorMembershipId,
+    actorAgentId: operatorTrace.actorAgentId,
+    effectiveUserId: operatorTrace.effectiveUserId,
+    effectiveMembershipId: operatorTrace.effectiveMembershipId,
     recommendedProductSlotKey
   });
 
@@ -807,6 +940,22 @@ export async function createDerivedBriefVersion(context: MutationContext): Promi
     throw new Error("version_must_be_approved");
   }
 
+  const identity = await getTenantIdentityContextByTenantId(brief.tenant_id);
+
+  if (!identity?.operatorMembership) {
+    throw new Error("membership_required:operator");
+  }
+
+  const operatorTrace = resolveActorTrace({
+    fallbackLabel: "Operador Bridge",
+    effectiveMembership: identity.operatorMembership
+  });
+  const assistantTrace = resolveActorTrace({
+    fallbackLabel: "Bridge briefing",
+    technicalActor: identity.serviceAgent,
+    effectiveMembership: identity.operatorMembership
+  });
+
   const [derived] = await postgrest<BriefVersionRow[]>("brief_versions", {
     method: "POST",
     body: JSON.stringify({
@@ -828,14 +977,24 @@ export async function createDerivedBriefVersion(context: MutationContext): Promi
     versionId: derived.id,
     eventType: "derived_version",
     note: "Nueva version derivada desde una version aprobada por cambio material del brief.",
-    createdByLabel: "Operador Bridge",
+    createdByLabel: operatorTrace.actorLabel,
+    actorUserId: operatorTrace.actorUserId,
+    actorMembershipId: operatorTrace.actorMembershipId,
+    actorAgentId: operatorTrace.actorAgentId,
+    effectiveUserId: operatorTrace.effectiveUserId,
+    effectiveMembershipId: operatorTrace.effectiveMembershipId,
     recommendedProductSlotKey: normalizeSummary(version.structured_summary_json).recommendedProductSlotKey
   });
   await appendBriefMessage({
     briefId: context.briefId,
     versionId: derived.id,
     authorRole: "assistant",
-    actorLabel: "Bridge briefing",
+    actorLabel: assistantTrace.actorLabel,
+    actorUserId: assistantTrace.actorUserId,
+    actorMembershipId: assistantTrace.actorMembershipId,
+    actorAgentId: assistantTrace.actorAgentId,
+    effectiveUserId: assistantTrace.effectiveUserId,
+    effectiveMembershipId: assistantTrace.effectiveMembershipId,
     messageText: "Se abrio una nueva version derivada. Revalida los cambios materiales desde discovery antes de volver a revision.",
     stage: "discovery"
   });

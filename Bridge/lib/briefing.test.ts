@@ -1,6 +1,6 @@
 /**
- * IMPL-20260505-03
- * Respaldo: context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, context/BRIEFING_ESTRUCTURADO_CLAUDE_V1.md
+ * IMPL-20260505-21
+ * Respaldo: context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md, context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, context/IDENTIDAD_Y_MEMBERSHIPS_V1.md
  */
 import { describe, expect, it } from "vitest";
 
