@@ -1,7 +1,7 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** ARCH-20260505-21  
+**ID activo:** ARCH-20260505-22  
 **Fecha de actualizacion:** 2026-05-05  
 **Estado general:** V1 ejecutable publicada con dashboard operativo, tenancy inicial real y conexion activa con Supabase y Vercel
 
@@ -68,6 +68,8 @@
 12. context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md
 13. context/IDENTIDAD_Y_MEMBERSHIPS_V1.md
 14. context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md
+15. context/CLIENTS_Y_PROJECTS_V1.md
+16. context/SPECs/SPEC_ARCH-20260505-22_clients_y_projects_v1.md
 
 ## Decisiones Ya Tomadas
 
@@ -83,6 +85,7 @@
 10. La primera prueba de valor debe verse en produccion, no solo en documentos.
 11. El agente de briefing madura el brief en 3 etapas obligatorias, usa un catalogo comercial configurable y la aprobacion final siempre pasa por revision humana.
 12. La siguiente capa obligatoria es identidad minima operativa con users, memberships, actor tecnico y actor efectivo.
+13. El tenant no reemplaza al cliente ni al proyecto; briefs, cotizaciones y activos deben vivir dentro de un contenedor client-project.
 
 ## Backlog Estructural Priorizado
 
@@ -102,11 +105,12 @@
 12. Implementar tenancy publica inicial y lectura real del tenant por defecto.
 13. Cerrar arquitectura operativa del agente de briefing persistido con revision humana y orientacion comercial.
 14. Cerrar arquitectura operativa de identidad minima con memberships, users y actor efectivo.
+15. Cerrar arquitectura operativa de clients y projects como contenedor del brief.
 
 ### [~] Planificado para el siguiente corte
 
-1. Implementar memberships, users y actor efectivo minimo.
-2. Extender esquema con clients y projects.
+1. Implementar clients y projects como contenedor operativo del brief.
+2. Mostrar ese contenedor en el workspace de briefs.
 3. Mostrar tenant snapshot real en mas superficies del shell.
 4. Pasar de dashboard informativo a dashboard accionable.
 
