@@ -1,6 +1,6 @@
 /**
- * IMPL-20260505-21
- * Respaldo: context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md, context/IDENTIDAD_Y_MEMBERSHIPS_V1.md, context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, PROYECTO.md
+ * IMPL-20260505-22
+ * Respaldo: context/CLIENTS_Y_PROJECTS_V1.md, context/SPECs/SPEC_ARCH-20260505-22_clients_y_projects_v1.md, context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md, context/IDENTIDAD_Y_MEMBERSHIPS_V1.md, context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, PROYECTO.md
  */
 import { revalidatePath } from "next/cache";
 
@@ -205,6 +205,9 @@ export default async function BriefsPage() {
   const identity = await getTenantIdentityContext();
   const currentVersion = brief?.currentVersion ?? null;
   const missingFields = currentVersion ? getCriticalMissingFields(currentVersion.structuredSummary) : [];
+  const ownerLabel = brief?.container.project?.ownerMembershipId && brief.container.project.ownerMembershipId === identity?.operatorMembership?.id
+    ? identity.operatorMembership.displayName
+    : "Sin owner_membership operativa";
 
   if (!brief || !currentVersion) {
     return (
@@ -288,6 +291,36 @@ export default async function BriefsPage() {
                 {identity?.serviceAgent?.scopes[0]
                   ? `${identity.serviceAgent.scopes[0].resourceType} · ${identity.serviceAgent.scopes[0].operation}`
                   : "Sin scope inicial de briefing."}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            <div className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Client operativo</div>
+              <div className="mt-2 font-medium">{brief.container.client?.name ?? "Cliente demo controlado pendiente"}</div>
+              <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
+                {brief.container.client?.primaryContactChannel ?? brief.container.client?.legalName ?? "El brief aun no tiene contenedor client-project activo."}
+              </p>
+            </div>
+            <div className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Project operativo</div>
+              <div className="mt-2 font-medium">{brief.container.project?.name ?? "Proyecto demo controlado pendiente"}</div>
+              <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
+                {brief.container.project
+                  ? `${brief.container.project.projectType} · ${brief.container.project.status}`
+                  : "Sin project asociado al brief activo."}
+              </p>
+            </div>
+            <div className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Owner del proyecto</div>
+              <div className="mt-2 font-medium">{ownerLabel}</div>
+              <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
+                {brief.container.source === "brief"
+                  ? "Contenedor ligado directamente al caso activo."
+                  : brief.container.source === "tenant_active"
+                    ? "Contenedor demo activo heredado del tenant para iniciar el caso."
+                    : "No existe contenedor demo disponible todavia."}
               </p>
             </div>
           </div>

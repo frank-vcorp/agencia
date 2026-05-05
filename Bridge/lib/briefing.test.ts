@@ -1,6 +1,6 @@
 /**
- * IMPL-20260505-21
- * Respaldo: context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md, context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, context/IDENTIDAD_Y_MEMBERSHIPS_V1.md
+ * IMPL-20260505-22
+ * Respaldo: context/CLIENTS_Y_PROJECTS_V1.md, context/SPECs/SPEC_ARCH-20260505-22_clients_y_projects_v1.md, context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md, context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, context/IDENTIDAD_Y_MEMBERSHIPS_V1.md
  */
 import { describe, expect, it } from "vitest";
 
@@ -11,6 +11,7 @@ import {
   getCriticalMissingFields,
   mergeStructuredBriefSummary,
   nextStage,
+  selectPreferredProject,
   statusFromStage
 } from "./briefing";
 
@@ -51,5 +52,15 @@ describe("briefing", () => {
 
     expect(buildFinalSummaryText(summary)).toContain("Slot comercial sugerido: slot_lanzamiento_conversacional.");
     expect(buildAssistantGuidance("commercial_fit", summary)).toContain("slot_lanzamiento_conversacional");
+  });
+
+  it("prioriza el project activo como contenedor operativo por encima de otros estados", () => {
+    const selected = selectPreferredProject([
+      { id: "project-paused", status: "paused" as const },
+      { id: "project-active", status: "active" as const },
+      { id: "project-draft", status: "draft" as const }
+    ]);
+
+    expect(selected?.id).toBe("project-active");
   });
 });

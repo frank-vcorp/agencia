@@ -1,6 +1,6 @@
 /**
- * IMPL-20260505-21
- * Respaldo: context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md, context/IDENTIDAD_Y_MEMBERSHIPS_V1.md, context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, context/MODELO_DATOS_MULTITENANT_V1.md, context/CONTRATOS_AGENTES_Y_VSCODE_V1.md
+ * IMPL-20260505-22
+ * Respaldo: context/CLIENTS_Y_PROJECTS_V1.md, context/SPECs/SPEC_ARCH-20260505-22_clients_y_projects_v1.md, context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md, context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, context/MODELO_DATOS_MULTITENANT_V1.md, context/CONTRATOS_AGENTES_Y_VSCODE_V1.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 import { getTenantIdentityContextByTenantId, resolveActorTrace } from "./identity";
@@ -94,15 +94,48 @@ export type BriefVersion = {
   updatedAt: string;
 };
 
+export type BriefClientContainer = {
+  id: string;
+  tenantId: string;
+  name: string;
+  legalName: string | null;
+  status: "active" | "prospect" | "inactive";
+  primaryContactName: string | null;
+  primaryContactChannel: string | null;
+  notes: string | null;
+};
+
+export type BriefProjectContainer = {
+  id: string;
+  tenantId: string;
+  clientId: string;
+  projectType: "lanzamiento" | "presencia" | "contenido" | "campana" | "interno";
+  name: string;
+  objective: string | null;
+  status: "draft" | "active" | "paused" | "completed" | "archived";
+  ownerMembershipId: string | null;
+  startDate: string | null;
+  endDate: string | null;
+};
+
+export type BriefOperationalContainer = {
+  source: "brief" | "tenant_active" | "none";
+  client: BriefClientContainer | null;
+  project: BriefProjectContainer | null;
+};
+
 export type BriefRecord = {
   id: string;
   tenantId: string;
   tenantSlug: string;
+  clientId: string | null;
+  projectId: string | null;
   status: BriefingStatus;
   sourceChannel: string;
   currentVersionNumber: number;
   createdAt: string;
   updatedAt: string;
+  container: BriefOperationalContainer;
   currentVersion: BriefVersion | null;
 };
 
@@ -116,6 +149,8 @@ type TenantRecord = {
 type BriefRow = {
   id: string;
   tenant_id: string;
+  client_id: string | null;
+  project_id: string | null;
   status: BriefingStatus;
   source_channel: string;
   current_version_number: number;
@@ -165,6 +200,36 @@ type BriefReviewEventRow = {
   effective_membership_id: string | null;
   recommended_product_slot_key: string | null;
   created_at: string;
+};
+
+type ClientRow = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  legal_name: string | null;
+  status: BriefClientContainer["status"];
+  primary_contact_name: string | null;
+  primary_contact_channel: string | null;
+  notes: string | null;
+};
+
+type ProjectRow = {
+  id: string;
+  tenant_id: string;
+  client_id: string;
+  project_type: BriefProjectContainer["projectType"];
+  name: string;
+  objective: string | null;
+  status: BriefProjectContainer["status"];
+  owner_membership_id: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+  updated_at: string;
+  clients:
+    | ClientRow
+    | ClientRow[]
+    | null;
 };
 
 type MutationContext = {
@@ -326,6 +391,54 @@ export function buildAssistantGuidance(stage: BriefingStage, summary: Structured
     : "Necesito cerrar el encaje comercial. Si aun no hay un slot claro, deja una nota explicita de revision comercial para que el operador lo tome.";
 }
 
+export function selectPreferredProject<T extends { status: BriefProjectContainer["status"] }>(projects: T[]): T | null {
+  const priority: BriefProjectContainer["status"][] = ["active", "draft", "paused", "completed", "archived"];
+
+  for (const status of priority) {
+    const project = projects.find((candidate) => candidate.status === status);
+
+    if (project) {
+      return project;
+    }
+  }
+
+  return projects[0] ?? null;
+}
+
+function normalizeClientRow(row: ClientRow): BriefClientContainer {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    name: row.name,
+    legalName: row.legal_name,
+    status: row.status,
+    primaryContactName: row.primary_contact_name,
+    primaryContactChannel: row.primary_contact_channel,
+    notes: row.notes
+  };
+}
+
+function normalizeProjectContainer(row: ProjectRow): BriefOperationalContainer {
+  const client = Array.isArray(row.clients) ? row.clients[0] ?? null : row.clients;
+
+  return {
+    source: "brief",
+    client: client ? normalizeClientRow(client) : null,
+    project: {
+      id: row.id,
+      tenantId: row.tenant_id,
+      clientId: row.client_id,
+      projectType: row.project_type,
+      name: row.name,
+      objective: row.objective,
+      status: row.status,
+      ownerMembershipId: row.owner_membership_id,
+      startDate: row.start_date,
+      endDate: row.end_date
+    }
+  };
+}
+
 function getServerApiKey() {
   return process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseEnv.anonKey;
 }
@@ -373,7 +486,7 @@ async function getTenantRecord(slug = supabaseEnv.defaultTenant): Promise<Tenant
 
 async function getLatestBriefRow(tenantId: string): Promise<BriefRow | null> {
   const params = new URLSearchParams({
-    select: "id,tenant_id,status,source_channel,current_version_number,active_version_id,created_at,updated_at",
+    select: "id,tenant_id,client_id,project_id,status,source_channel,current_version_number,active_version_id,created_at,updated_at",
     tenant_id: `eq.${tenantId}`,
     order: "updated_at.desc",
     limit: "1"
@@ -396,6 +509,85 @@ async function getBriefVersionRow(versionId: string): Promise<BriefVersionRow | 
   });
 
   return rows[0] ?? null;
+}
+
+async function getClientRowById(clientId: string): Promise<ClientRow | null> {
+  const params = new URLSearchParams({
+    select: "id,tenant_id,name,legal_name,status,primary_contact_name,primary_contact_channel,notes",
+    id: `eq.${clientId}`,
+    limit: "1"
+  });
+  const rows = await postgrest<ClientRow[]>(`clients?${params.toString()}`, {
+    method: "GET"
+  });
+
+  return rows[0] ?? null;
+}
+
+async function getProjectContainerById(projectId: string): Promise<BriefOperationalContainer | null> {
+  const params = new URLSearchParams({
+    select: "id,tenant_id,client_id,project_type,name,objective,status,owner_membership_id,start_date,end_date,created_at,updated_at,clients!projects_client_id_fkey(id,tenant_id,name,legal_name,status,primary_contact_name,primary_contact_channel,notes)",
+    id: `eq.${projectId}`,
+    limit: "1"
+  });
+  const rows = await postgrest<ProjectRow[]>(`projects?${params.toString()}`, {
+    method: "GET"
+  });
+  const project = rows[0] ?? null;
+
+  return project ? normalizeProjectContainer(project) : null;
+}
+
+async function getTenantActiveContainer(tenantId: string): Promise<BriefOperationalContainer> {
+  const params = new URLSearchParams({
+    select: "id,tenant_id,client_id,project_type,name,objective,status,owner_membership_id,start_date,end_date,created_at,updated_at,clients!projects_client_id_fkey(id,tenant_id,name,legal_name,status,primary_contact_name,primary_contact_channel,notes)",
+    tenant_id: `eq.${tenantId}`,
+    order: "created_at.asc"
+  });
+  const rows = await postgrest<ProjectRow[]>(`projects?${params.toString()}`, {
+    method: "GET"
+  });
+  const selectedProject = selectPreferredProject(rows);
+
+  if (selectedProject) {
+    return {
+      ...normalizeProjectContainer(selectedProject),
+      source: "tenant_active"
+    };
+  }
+
+  return {
+    source: "none",
+    client: null,
+    project: null
+  };
+}
+
+async function resolveBriefOperationalContainer(brief: BriefRow): Promise<BriefOperationalContainer> {
+  if (brief.project_id) {
+    const projectContainer = await getProjectContainerById(brief.project_id);
+
+    if (projectContainer) {
+      return {
+        ...projectContainer,
+        source: "brief"
+      };
+    }
+  }
+
+  if (brief.client_id) {
+    const client = await getClientRowById(brief.client_id);
+
+    if (client) {
+      return {
+        source: "brief",
+        client: normalizeClientRow(client),
+        project: null
+      };
+    }
+  }
+
+  return getTenantActiveContainer(brief.tenant_id);
 }
 
 async function getLatestBriefVersionRow(briefId: string): Promise<BriefVersionRow | null> {
@@ -557,17 +749,21 @@ export async function getBriefWorkspace(tenantSlug = supabaseEnv.defaultTenant):
   const currentVersionRow = briefRow.active_version_id
     ? await getBriefVersionRow(briefRow.active_version_id)
     : await getLatestBriefVersionRow(briefRow.id);
+  const container = await resolveBriefOperationalContainer(briefRow);
   const currentVersion = currentVersionRow ? await serializeVersion(currentVersionRow) : null;
 
   return {
     id: briefRow.id,
     tenantId: briefRow.tenant_id,
     tenantSlug: tenant.slug,
+    clientId: briefRow.client_id,
+    projectId: briefRow.project_id,
     status: briefRow.status,
     sourceChannel: briefRow.source_channel,
     currentVersionNumber: briefRow.current_version_number,
     createdAt: briefRow.created_at,
     updatedAt: briefRow.updated_at,
+    container,
     currentVersion
   };
 }
@@ -579,10 +775,14 @@ export async function createBriefForDefaultTenant(tenantSlug = supabaseEnv.defau
     throw new Error("tenant_not_found");
   }
 
+  const activeContainer = await getTenantActiveContainer(tenant.id);
+
   const [briefRow] = await postgrest<BriefRow[]>("briefs", {
     method: "POST",
     body: JSON.stringify({
       tenant_id: tenant.id,
+      client_id: activeContainer.client?.id ?? null,
+      project_id: activeContainer.project?.id ?? null,
       status: "stage_1_discovery",
       source_channel: "bridge_web",
       current_version_number: 1
@@ -702,7 +902,7 @@ export async function appendClientBriefMessage(context: MutationContext, message
 
 async function getBriefRowById(briefId: string): Promise<BriefRow | null> {
   const params = new URLSearchParams({
-    select: "id,tenant_id,status,source_channel,current_version_number,active_version_id,created_at,updated_at",
+    select: "id,tenant_id,client_id,project_id,status,source_channel,current_version_number,active_version_id,created_at,updated_at",
     id: `eq.${briefId}`,
     limit: "1"
   });
