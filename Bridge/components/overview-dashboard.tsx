@@ -5,8 +5,21 @@
 import Link from "next/link";
 
 import { modulePages, p0Combinations, rolePages, strategicSignals } from "@/lib/bridge-data";
+import { getSupabaseHealth } from "@/lib/supabase-health";
 
-export function OverviewDashboard() {
+export async function OverviewDashboard() {
+  const supabaseHealth = await getSupabaseHealth();
+
+  const visibleSignals = strategicSignals.map((signal) =>
+    signal.label === "Preparacion de datos"
+      ? {
+          ...signal,
+          value: supabaseHealth.label,
+          detail: supabaseHealth.detail
+        }
+      : signal
+  );
+
   return (
     <div className="space-y-5">
       <section className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
@@ -25,10 +38,18 @@ export function OverviewDashboard() {
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {strategicSignals.map((signal) => (
+            {visibleSignals.map((signal) => (
               <article key={signal.label} className="panel-strong rounded-[24px] px-4 py-4">
                 <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">{signal.label}</div>
-                <div className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-bold tracking-tight">{signal.value}</div>
+                <div
+                  className={`mt-2 font-[family-name:var(--font-heading)] text-3xl font-bold tracking-tight ${
+                    signal.label === "Preparacion de datos" && supabaseHealth.connected
+                      ? "text-[color:var(--accent-deep)]"
+                      : ""
+                  }`}
+                >
+                  {signal.value}
+                </div>
                 <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">{signal.detail}</p>
               </article>
             ))}
