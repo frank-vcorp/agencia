@@ -1,7 +1,7 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** ARCH-20260505-17  
+**ID activo:** ARCH-20260505-19  
 **Fecha de actualizacion:** 2026-05-05  
 **Estado general:** V1 ejecutable publicada con dashboard operativo, tenancy inicial real y conexion activa con Supabase y Vercel
 
@@ -65,6 +65,7 @@
 9. context/MATRIZ_COMBINACIONES_ACTIVOS_P0.md
 10. context/checkpoints/CHECKPOINT_IMPL-20260505-02.md
 11. supabase/migrations/20260505180500_init_tenants_and_runtime_settings.sql
+12. context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md
 
 ## Decisiones Ya Tomadas
 
@@ -78,6 +79,7 @@
 8. La V1 se divide en P0 obligatorio para piloto y P1 diferible.
 9. El conocimiento derivado no sustituye a la fuente primaria.
 10. La primera prueba de valor debe verse en produccion, no solo en documentos.
+11. El agente de briefing madura el brief en 3 etapas obligatorias y la aprobacion final siempre pasa por revision humana.
 
 ## Backlog Estructural Priorizado
 
@@ -95,6 +97,7 @@
 10. Cerrar politica de archivos y evidencias.
 11. Implementar base Next.js y Supabase.
 12. Implementar tenancy publica inicial y lectura real del tenant por defecto.
+13. Cerrar arquitectura operativa del agente de briefing persistido con revision humana y orientacion comercial.
 
 ### [~] Planificado para el siguiente corte
 
