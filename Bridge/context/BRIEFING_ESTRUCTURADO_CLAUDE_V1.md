@@ -22,7 +22,7 @@ Sus funciones en V1:
 3. preguntar segun huecos, contradicciones o incertidumbre,
 4. estructurar el brief sin inventar datos,
 5. cerrar cada etapa con un resumen parcial o final,
-6. orientar el brief hacia uno de los productos comerciales configurados,
+6. orientar el brief hacia uno de los productos comerciales activos o hacia un slot comercial configurable,
 7. entregar el caso a revision humana antes de aprobacion final.
 
 ## Principio Conversacional
@@ -77,14 +77,14 @@ El agente debe cerrar como minimo:
 
 ### Etapa 3. Aterrizaje Comercial
 
-Objetivo: validar que el brief ya puede enmarcarse dentro de uno de los productos comerciales del sistema.
+Objetivo: validar que el brief ya puede enmarcarse dentro del catalogo comercial activo del sistema, incluso si los nombres finales de los productos aun no estan cerrados.
 
 El agente debe devolver:
 
 1. resumen estructurado del brief,
 2. faltantes todavia tolerables,
 3. contradicciones detectadas,
-4. producto recomendado,
+4. producto o slot comercial recomendado,
 5. razon de encaje,
 6. posibles observaciones de upsell o reconduccion,
 7. confirmacion del cliente sobre si el resumen refleja correctamente su necesidad.
@@ -118,7 +118,7 @@ El resumen debe incluir como minimo:
 6. que entregable espera,
 7. restricciones relevantes,
 8. observaciones o faltantes,
-9. producto recomendado por Bridge.
+9. producto o slot comercial recomendado por Bridge.
 
 El cliente no cierra operativamente el brief.
 
@@ -134,14 +134,14 @@ La revision humana existe para:
 2. detectar huecos que ameriten llamada o aclaracion adicional,
 3. preservar intervencion humana en el servicio,
 4. orientar comercialmente el caso,
-5. confirmar el encaje en uno de los productos ofertados.
+5. confirmar el encaje en un producto activo o en un slot comercial configurable.
 
 El operador puede:
 
 1. aprobar y bloquear la version,
 2. pedir aclaracion adicional por fuera del chat,
 3. devolver el brief a nueva iteracion,
-4. reconducirlo a otro producto,
+4. reconducirlo a otro producto o slot comercial,
 5. marcarlo como insuficiente para continuar.
 
 ## Estados Recomendados del Brief
@@ -204,13 +204,13 @@ Cambios materiales tipicos:
 
 ## Campos Comerciales P0
 
-1. `recommended_product_id`,
+1. `recommended_product_slot_key`,
 2. `recommended_product_confidence`,
 3. `commercial_fit_reason`,
 4. `upsell_signal`,
 5. `operator_review_note`.
 
-En V1, todo brief debe intentar orientarse hacia uno de los 3 productos comerciales activos del sistema.
+En V1, todo brief debe intentar orientarse hacia un producto comercial activo o hacia un slot comercial configurable mientras la definicion final del portafolio siga en revision.
 
 ## Politica de Faltantes
 
@@ -226,7 +226,7 @@ Campos criticos para cerrar la fase conversacional:
 4. plataforma,
 5. CTA,
 6. entregable esperado,
-7. producto recomendado o necesidad de revision comercial explicita.
+7. producto o slot comercial recomendado, o necesidad de revision comercial explicita.
 
 ## Formato de Respuesta del Agente
 
@@ -255,7 +255,7 @@ Bridge debe generar una vista corta reutilizable con:
 7. restricciones,
 8. faltantes,
 9. confianza,
-10. producto recomendado,
+10. producto o slot comercial recomendado,
 11. estado del brief,
 12. timestamp y version de origen.
 

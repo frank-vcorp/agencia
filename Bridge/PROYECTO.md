@@ -79,7 +79,7 @@
 8. La V1 se divide en P0 obligatorio para piloto y P1 diferible.
 9. El conocimiento derivado no sustituye a la fuente primaria.
 10. La primera prueba de valor debe verse en produccion, no solo en documentos.
-11. El agente de briefing madura el brief en 3 etapas obligatorias y la aprobacion final siempre pasa por revision humana.
+11. El agente de briefing madura el brief en 3 etapas obligatorias, usa un catalogo comercial configurable y la aprobacion final siempre pasa por revision humana.
 
 ## Backlog Estructural Priorizado
 

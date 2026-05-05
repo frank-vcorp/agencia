@@ -53,7 +53,7 @@ La arquitectura correcta combina:
 2. disciplina de proceso,
 3. trazabilidad,
 4. control humano,
-5. orientacion comercial hacia uno de los 3 productos activos.
+5. orientacion comercial hacia el catalogo comercial activo o hacia slots comerciales configurables.
 
 ## Flujo Operativo Requerido
 
@@ -98,7 +98,7 @@ El agente conecta el caso con la oferta de la agencia.
 Salida requerida:
 
 1. resumen final del brief,
-2. producto recomendado,
+2. producto o slot comercial recomendado,
 3. razon de encaje,
 4. posibles faltantes tolerables,
 5. señales de upsell o reconduccion,
@@ -183,7 +183,9 @@ Si el cliente cambia algo material, se crea una nueva version ligada a la anteri
 
 ## Regla Comercial
 
-Todo brief debe quedar orientado a uno de los 3 productos comerciales activos.
+Todo brief debe quedar orientado a un producto comercial activo o a un slot comercial configurable.
+
+Mientras la definicion final del portafolio siga en revision, la arquitectura no debe depender de nombres cerrados ni de un numero fijo de productos.
 
 Si el encaje no es claro, el agente debe dejarlo como `requiere revision comercial`, nunca inventar una clasificacion segura.
 
@@ -204,7 +206,7 @@ Si el encaje no es claro, el agente debe dejarlo como `requiere revision comerci
 
 ## Campos Comerciales P0
 
-1. producto recomendado,
+1. producto o slot comercial recomendado,
 2. confianza del encaje,
 3. razon de encaje,
 4. oportunidad de upsell,
