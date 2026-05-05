@@ -1,14 +1,19 @@
 /**
- * IMPL-20260505-01
+ * IMPL-20260505-02
  * Respaldo: context/00_ARQUITECTURA.md, context/DIRECCION_VISUAL_V1.md
  */
 import Link from "next/link";
 
 import { modulePages, p0Combinations, rolePages, strategicSignals } from "@/lib/bridge-data";
 import { getSupabaseHealth } from "@/lib/supabase-health";
+import { getTenantSnapshot } from "@/lib/tenant-runtime";
 
 export async function OverviewDashboard() {
   const supabaseHealth = await getSupabaseHealth();
+  const tenantSnapshot = await getTenantSnapshot();
+  const tenantConfig = tenantSnapshot?.config;
+  const dashboardTitle = tenantConfig?.dashboardHeadline ?? "Una sola superficie para coordinar el piloto real";
+  const dashboardSummary = tenantConfig?.dashboardSummary ?? "Bridge coordina el piloto mientras termina de poblar tenancy, configuracion y objetos operativos reales.";
 
   const visibleSignals = strategicSignals.map((signal) =>
     signal.label === "Preparacion de datos"
@@ -27,7 +32,8 @@ export async function OverviewDashboard() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">Dashboard principal</p>
-              <h2 className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-bold tracking-tight">Una sola superficie para coordinar el piloto real</h2>
+              <h2 className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-bold tracking-tight">{dashboardTitle}</h2>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--muted)]">{dashboardSummary}</p>
             </div>
             <Link
               href="/operador"
@@ -36,6 +42,32 @@ export async function OverviewDashboard() {
               Entrar a la cabina operativa
             </Link>
           </div>
+
+          {tenantSnapshot ? (
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              <article className="rounded-[22px] bg-white/72 px-4 py-4 ring-1 ring-[color:var(--line)]">
+                <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Tenant real</div>
+                <div className="mt-2 font-[family-name:var(--font-heading)] text-xl font-bold tracking-tight">{tenantSnapshot.name}</div>
+                <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">Slug {tenantSnapshot.slug} con estado {tenantSnapshot.status}.</p>
+              </article>
+              <article className="rounded-[22px] bg-white/72 px-4 py-4 ring-1 ring-[color:var(--line)]">
+                <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Canal primario</div>
+                <div className="mt-2 font-[family-name:var(--font-heading)] text-xl font-bold tracking-tight">
+                  {tenantConfig?.primaryContactChannel ?? "Pendiente"}
+                </div>
+                <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">Configuracion inicial obtenida desde Supabase cuando existe un registro sembrado.</p>
+              </article>
+              <article className="rounded-[22px] bg-white/72 px-4 py-4 ring-1 ring-[color:var(--line)]">
+                <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Modulos activos</div>
+                <div className="mt-2 font-[family-name:var(--font-heading)] text-xl font-bold tracking-tight">
+                  {tenantConfig?.activeModules.length ?? 0}
+                </div>
+                <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
+                  {(tenantConfig?.activeModules ?? []).join(" · ") || "Se mostraran aqui cuando la configuracion remota este disponible."}
+                </p>
+              </article>
+            </div>
+          ) : null}
 
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             {visibleSignals.map((signal) => (
