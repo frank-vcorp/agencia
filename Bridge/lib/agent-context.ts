@@ -522,6 +522,79 @@ export function buildTenantRemoteContext(snapshot: AgentContextSnapshot): Tenant
   };
 }
 
+// ─── IMPL-20260506-36: estadísticas resumidas derivadas ──────────────────────
+
+/**
+ * Resumen operativo compacto derivado del snapshot.
+ * Condensa señal real de todas las entidades en un objeto plano, reusable y trazable.
+ * Derivado de AgentContextSnapshot; no abre fuentes ni queries nuevas.
+ *
+ * IMPL-20260506-36
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-35_estadisticas_resumidas_datos_reales_v1.md
+ */
+export type TenantOperativeSummary = {
+  /** Fuente: derivado de AgentContextSnapshot — no de la fuente primaria */
+  source: "agent-context/buildTenantOperativeSummary";
+  /** ISO 8601 heredado del snapshot de origen */
+  snapshotAt: string;
+  /** Slug del tenant activo, o null */
+  tenantSlug: string | null;
+  /** Total de leads en el CRM */
+  totalLeads: number;
+  /** Leads activos (nuevo, en_seguimiento, propuesta_enviada) */
+  activeLeads: number;
+  /** Etiqueta de estado del brief activo, o null si no hay brief */
+  briefStatus: string | null;
+  /** Si el brief está consolidado; null si no hay brief */
+  briefIsConsolidated: boolean | null;
+  /** Etiqueta de estado de la cotización activa, o null si no hay cotización */
+  quotationStatus: string | null;
+  /** Total estimado de la cotización activa, o null */
+  quotationTotal: string | null;
+  /** Total de activos del proyecto */
+  totalAssets: number;
+  /** Activos entregados */
+  deliveredAssets: number;
+  /** Etiqueta de la siguiente acción recomendada */
+  nextActionLabel: string;
+  /** Href de la siguiente acción recomendada */
+  nextActionHref: string;
+  /** Entidades con datos presentes en el snapshot */
+  activeEntities: string[];
+};
+
+/**
+ * Deriva un resumen operativo compacto desde el snapshot existente.
+ * Función pura; no lanza queries adicionales. Reutilizable server-side.
+ *
+ * IMPL-20260506-36
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-35_estadisticas_resumidas_datos_reales_v1.md
+ */
+export function buildTenantOperativeSummary(snapshot: AgentContextSnapshot): TenantOperativeSummary {
+  const activeEntities: string[] = [];
+  if (snapshot.brief) activeEntities.push("brief");
+  if (snapshot.lead) activeEntities.push("lead");
+  if (snapshot.quotation) activeEntities.push("quotation");
+  if (snapshot.assets) activeEntities.push("assets");
+
+  return {
+    source: "agent-context/buildTenantOperativeSummary",
+    snapshotAt: snapshot.snapshotAt,
+    tenantSlug: snapshot.tenantSlug,
+    totalLeads: snapshot.crm.totalLeads,
+    activeLeads: snapshot.crm.activeLeads,
+    briefStatus: snapshot.brief?.statusLabel ?? null,
+    briefIsConsolidated: snapshot.brief?.isConsolidated ?? null,
+    quotationStatus: snapshot.quotation?.statusLabel ?? null,
+    quotationTotal: snapshot.quotation?.totalEstimado ?? null,
+    totalAssets: snapshot.assets?.total ?? 0,
+    deliveredAssets: snapshot.assets?.delivered ?? 0,
+    nextActionLabel: snapshot.nextAction.label,
+    nextActionHref: snapshot.nextAction.href,
+    activeEntities,
+  };
+}
+
 // ─── Función principal server-side ────────────────────────────────────────────
 
 /**

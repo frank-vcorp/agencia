@@ -3,15 +3,17 @@
  * IMPL-20260506-31
  * IMPL-20260506-32
  * IMPL-20260506-34
+ * IMPL-20260506-36
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-32_contratos_externos_minimos_objetos_vivos_v1.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-34_consumo_remoto_tenancy_reforzado_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-35_estadisticas_resumidas_datos_reales_v1.md
  *
  * Superficie humana del snapshot derivado para agentes y operadores.
  * Muestra el estado operativo resumido y trazable del tenant activo.
  * NOTA: este es un derivado. La fuente primaria vive en /briefs, /cotizaciones, /activos y /crm.
  */
-import { buildTenantRemoteContext, getAgentContextSnapshot, type AgentExternalContracts, type TenantRemoteContext } from "@/lib/agent-context";
+import { buildTenantRemoteContext, buildTenantOperativeSummary, getAgentContextSnapshot, type AgentExternalContracts, type TenantRemoteContext, type TenantOperativeSummary } from "@/lib/agent-context";
 
 export const dynamic = "force-dynamic";
 
@@ -146,6 +148,84 @@ function ExternalContractsSection({ contracts }: { contracts: AgentExternalContr
   );
 }
 
+// ─── IMPL-20260506-36: estadísticas resumidas derivadas ──────────────────────
+
+/**
+ * Sección compacta de estadísticas resumidas derivadas del snapshot.
+ * Lectura rápida del estado operativo real del tenant. No es la fuente primaria.
+ * Derivada de buildTenantOperativeSummary(); sin queries adicionales.
+ */
+function TenantOperativeSummarySection({ summary }: { summary: TenantOperativeSummary }) {
+  return (
+    <div>
+      <div className="mb-4">
+        <h2 className="text-sm font-semibold text-zinc-100 uppercase tracking-wide">
+          Estadísticas resumidas
+        </h2>
+        <p className="text-xs text-zinc-500 mt-1">
+          Lectura compacta derivada del snapshot. Sin queries adicionales. Complementaria — no
+          reemplaza la fuente primaria.{" "}
+          <span className="font-mono text-zinc-600">
+            fuente: {summary.source}
+          </span>
+        </p>
+      </div>
+      <div className="rounded-xl border border-zinc-700/60 bg-zinc-900/40 divide-y divide-zinc-800/60">
+        {/* CRM */}
+        <div className="px-5 py-3">
+          <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">CRM</p>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+            <Row label="Leads totales" value={String(summary.totalLeads)} />
+            <Row label="Leads activos" value={String(summary.activeLeads)} />
+          </div>
+        </div>
+        {/* Brief */}
+        <div className="px-5 py-3">
+          <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Brief</p>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+            <Row label="Estado" value={summary.briefStatus} />
+            <Row
+              label="Consolidado"
+              value={
+                summary.briefIsConsolidated === null
+                  ? null
+                  : summary.briefIsConsolidated
+                  ? "Sí"
+                  : "No"
+              }
+            />
+          </div>
+        </div>
+        {/* Cotización */}
+        <div className="px-5 py-3">
+          <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Cotización</p>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+            <Row label="Estado" value={summary.quotationStatus} />
+            <Row label="Total estimado" value={summary.quotationTotal} />
+          </div>
+        </div>
+        {/* Activos */}
+        <div className="px-5 py-3">
+          <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Activos</p>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+            <Row label="Total" value={String(summary.totalAssets)} />
+            <Row label="Entregados" value={String(summary.deliveredAssets)} />
+          </div>
+        </div>
+        {/* Siguiente acción + entidades */}
+        <div className="px-5 py-3">
+          <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Señal operativa</p>
+          <Row label="Siguiente acción" value={summary.nextActionLabel} />
+          <Row
+            label="Entidades activas"
+            value={summary.activeEntities.length > 0 ? summary.activeEntities.join(", ") : "—"}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── IMPL-20260506-34: consumo remoto con tenancy reforzado ──────────────────
 
 /**
@@ -213,6 +293,7 @@ function TenantRemoteContextSection({ ctx }: { ctx: TenantRemoteContext }) {
 export default async function ContextoAgentesPage() {
   const snapshot = await getAgentContextSnapshot();
   const remoteContext = buildTenantRemoteContext(snapshot);
+  const operativeSummary = buildTenantOperativeSummary(snapshot);
 
   const freshness = new Date(snapshot.snapshotAt).toLocaleString("es-MX", {
     day: "2-digit",
@@ -236,6 +317,9 @@ export default async function ContextoAgentesPage() {
           Este es un derivado de lectura. La fuente primaria vive en /briefs, /cotizaciones, /activos y /crm.
         </p>
       </div>
+
+      {/* Estadísticas resumidas derivadas (IMPL-20260506-36) */}
+      <TenantOperativeSummarySection summary={operativeSummary} />
 
       {/* Siguiente acción recomendada */}
       <Card>

@@ -16,6 +16,7 @@ import {
   buildAssetExternalContract,
   buildExternalContracts,
   buildTenantRemoteContext,
+  buildTenantOperativeSummary,
   deriveAssetSummary,
   deriveBriefSummary,
   deriveLeadSummary,
@@ -26,7 +27,8 @@ import {
   type AgentRemoteHandoffs,
   type BriefAgentSummary,
   type QuotationAgentSummary,
-  type TenantRemoteContext
+  type TenantRemoteContext,
+  type TenantOperativeSummary
 } from "./agent-context";
 import { type AssetsDashboardSummary, type BriefDashboardSummary, type NextAction, type QuotationDashboardSummary } from "./dashboard";
 import { type Lead } from "./crm";
@@ -674,6 +676,94 @@ describe("agent-context — buildTenantRemoteContext", () => {
     for (const entry of ctx.traceMap) {
       expect(entry.tenant).toBeNull();
     }
+  });
+});
+
+// ─── IMPL-20260506-36: buildTenantOperativeSummary ───────────────────────────
+
+/**
+ * Tests de la capa de estadísticas resumidas derivadas del snapshot.
+ * IMPL-20260506-36
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-35_estadisticas_resumidas_datos_reales_v1.md
+ */
+describe("agent-context — buildTenantOperativeSummary", () => {
+  it("tiene source literal correcto", () => {
+    const summary = buildTenantOperativeSummary(makeFullSnapshot());
+    expect(summary.source).toBe("agent-context/buildTenantOperativeSummary");
+  });
+
+  it("propaga snapshotAt y tenantSlug del snapshot", () => {
+    const summary = buildTenantOperativeSummary(makeFullSnapshot());
+    expect(summary.snapshotAt).toBe(SNAPSHOT_AT);
+    expect(summary.tenantSlug).toBe(TENANT_SLUG);
+  });
+
+  it("propaga métricas CRM desde crm del snapshot", () => {
+    const summary = buildTenantOperativeSummary(makeFullSnapshot());
+    expect(summary.totalLeads).toBe(1);
+    expect(summary.activeLeads).toBe(1);
+  });
+
+  it("propaga estado y consolidación del brief", () => {
+    const summary = buildTenantOperativeSummary(makeFullSnapshot());
+    expect(summary.briefStatus).toBe("Consolidado");
+    expect(summary.briefIsConsolidated).toBe(true);
+  });
+
+  it("propaga estado y total de la cotización", () => {
+    const summary = buildTenantOperativeSummary(makeFullSnapshot());
+    expect(summary.quotationStatus).toBe("Enviada");
+    expect(summary.quotationTotal).toBe("$8,000 MXN");
+  });
+
+  it("propaga totales de activos", () => {
+    const summary = buildTenantOperativeSummary(makeFullSnapshot());
+    expect(summary.totalAssets).toBe(5);
+    expect(summary.deliveredAssets).toBe(1);
+  });
+
+  it("propaga nextAction desde el snapshot", () => {
+    const summary = buildTenantOperativeSummary(makeFullSnapshot());
+    expect(summary.nextActionLabel).toBe(nextActionBriefs.label);
+    expect(summary.nextActionHref).toBe("/briefs");
+  });
+
+  it("lista las cuatro entidades activas en snapshot completo", () => {
+    const summary = buildTenantOperativeSummary(makeFullSnapshot());
+    expect(summary.activeEntities).toEqual(["brief", "lead", "quotation", "assets"]);
+  });
+
+  it("retorna null en briefStatus cuando no hay brief", () => {
+    const snapshot = makeFullSnapshot();
+    snapshot.brief = null;
+    const summary = buildTenantOperativeSummary(snapshot);
+    expect(summary.briefStatus).toBeNull();
+    expect(summary.briefIsConsolidated).toBeNull();
+    expect(summary.activeEntities).not.toContain("brief");
+  });
+
+  it("retorna ceros en totalAssets cuando no hay activos", () => {
+    const snapshot = makeFullSnapshot();
+    snapshot.assets = null;
+    const summary = buildTenantOperativeSummary(snapshot);
+    expect(summary.totalAssets).toBe(0);
+    expect(summary.deliveredAssets).toBe(0);
+    expect(summary.activeEntities).not.toContain("assets");
+  });
+
+  it("acepta tenantSlug null y lo propaga", () => {
+    const summary = buildTenantOperativeSummary(makeFullSnapshot({ tenantSlug: null }));
+    expect(summary.tenantSlug).toBeNull();
+  });
+
+  it("activeEntities vacío cuando snapshot no tiene entidades", () => {
+    const snapshot = makeFullSnapshot();
+    snapshot.brief = null;
+    snapshot.lead = null;
+    snapshot.quotation = null;
+    snapshot.assets = null;
+    const summary = buildTenantOperativeSummary(snapshot);
+    expect(summary.activeEntities).toEqual([]);
   });
 });
 
