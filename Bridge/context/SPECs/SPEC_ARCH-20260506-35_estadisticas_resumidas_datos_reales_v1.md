@@ -6,7 +6,7 @@ Estadisticas resumidas con datos reales V1
 
 ## Estado
 
-Activo
+Cerrado
 
 ## Fecha
 
