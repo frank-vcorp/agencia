@@ -6,7 +6,7 @@ Chat contextual real por entidad V1
 
 ## Estado
 
-Planificado
+Activo
 
 ## Fecha
 

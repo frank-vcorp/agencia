@@ -6,7 +6,7 @@ Vinculacion explicita `lead -> client/project` en CRM V1
 
 ## Estado
 
-Planificado
+Cerrado
 
 ## Fecha
 
