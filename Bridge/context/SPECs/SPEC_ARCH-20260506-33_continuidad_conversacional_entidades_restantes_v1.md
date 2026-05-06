@@ -6,7 +6,7 @@ Continuidad conversacional en entidades restantes V1
 
 ## Estado
 
-Activo
+Cerrado
 
 ## Fecha
 

@@ -1,13 +1,13 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** ARCH-20260506-33
+**ID activo:** ARCH-20260506-34
 **Fecha de actualizacion:** 2026-05-06  
-**Estado general:** V1 publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos y contratos externos mínimos visibles en produccion sobre Supabase y Vercel
+**Estado general:** V1 publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos, contratos externos mínimos y continuidad conversacional por entidad visibles en produccion sobre Supabase y Vercel
 
 ## MICRO-SPRINT ACTIVO
 
-### MICRO-SPRINT: Continuidad conversacional en entidades restantes
+### MICRO-SPRINT: Consumo remoto con tenancy reforzado
 
 **Fecha:** 2026-05-06  
 **Proyecto:** Bridge  
@@ -15,16 +15,16 @@
 
 ### Entregable Demostrable
 
-> Bridge expone continuidad conversacional mínima sobre `brief`, `quotation` y `asset`, manteniendo el mismo patrón ya validado en `lead`.
+> Bridge expone un consumo remoto más estable y consciente del tenant activo, apoyado en los contratos externos ya validados sobre objetos vivos.
 
 ### Como se Demuestra
 
 1. abrir la URL productiva de Bridge,
 2. abrir la superficie de contexto para agentes,
 3. confirmar tenant real `vectoria` y snapshot vigente,
-4. abrir la entidad objetivo del nuevo corte,
-5. validar persistencia mínima de conversación contextual,
-6. confirmar que la conversación no reemplaza la fuente primaria.
+4. validar payload remoto estable por entidad y tenant,
+5. comprobar que el consumo remoto conserva trazabilidad,
+6. confirmar que la capa remota no reemplaza la fuente primaria.
 
 ## ESTADO COMPROBABLE ACTUAL
 
@@ -58,25 +58,26 @@
 26. Produccion en `vectoria-zeta.vercel.app/contexto-agentes` ya sirve contexto derivado vivo con `snapshotAt`, `source` y siguiente accion recomendada.
 27. El corte `ARCH-20260506-31 / IMPL-20260506-31` ya publica handoffs remotos compactos por `brief`, `lead`, `quotation` y `asset` sobre la misma superficie `/contexto-agentes`.
 28. El corte `ARCH-20260506-32 / IMPL-20260506-32` ya publica contratos externos mínimos `v1.0` por `brief`, `lead`, `quotation` y `asset` en `/contexto-agentes`.
+29. El corte `ARCH-20260506-33 / IMPL-20260506-33` ya publica continuidad conversacional mínima sobre `brief`, `quotation` y `asset` reutilizando el patrón ya validado en `lead`.
 
 ### [~] En curso
 
-1. Extender continuidad conversacional mínima sobre `brief`, `quotation` y `asset`.
-2. Reusar el patrón de threads y mensajes ya validado en `lead`.
-3. Mantener desacople entre conversación contextual y fuente primaria.
+1. Reforzar el consumo remoto con awareness explícito del tenant activo.
+2. Endurecer la capa de consumo externo sin acoplarla al layout humano.
+3. Mantener trazabilidad desde contrato remoto hasta fuente primaria.
 
 ### [ ] Pendiente
 
-1. Completar chat contextual real y continuidad conversacional sobre `brief`, `cotizacion` y `asset`.
-2. Exponer consumo remoto con tenancy reforzado.
-3. Endurecer contratos externos de agentes sobre objetos vivos.
+1. Exponer consumo remoto con tenancy reforzado.
+2. Endurecer contratos externos de agentes sobre objetos vivos.
+3. Añadir estadísticas resumidas con datos reales cuando agreguen valor operativo.
 
 ## Ultimo Corte Cerrado
 
-1. `ARCH-20260506-32 / IMPL-20260506-32` queda cerrado como corte completado y validado en produccion.
-2. `/contexto-agentes` ya expone contratos externos mínimos `v1.0` derivados de handoffs remotos, además del snapshot y los handoffs compactos.
-3. El commit feature publicado en `main` es `4f2b0e3` y su ajuste documental en `40d125d`.
-4. El siguiente corte activo pasa a ser `ARCH-20260506-33` sobre continuidad conversacional en entidades restantes.
+1. `ARCH-20260506-33 / IMPL-20260506-33` queda cerrado como corte completado y validado en produccion.
+2. `/briefs`, `/cotizaciones` y `/activos` ya exponen continuidad conversacional mínima reutilizando `conversation_threads` y `conversation_messages`.
+3. El commit feature publicado en `main` es `9bb0c6e`.
+4. El siguiente corte activo pasa a ser `ARCH-20260506-34` sobre consumo remoto con tenancy reforzado.
 
 ## Artefactos Clave
 
@@ -118,16 +119,18 @@
 35. context/checkpoints/CHECKPOINT_IMPL-20260506-30_conocimiento_derivado_agentes_v1.md
 36. context/checkpoints/CHECKPOINT_IMPL-20260506-31_handoffs_remotos_endurecidos_v1.md
 37. context/checkpoints/CHECKPOINT_IMPL-20260506-32_contratos_externos_minimos_v1.md
-38. supabase/migrations/20260505223000_identity_memberships_actor_context_v1.sql
-39. supabase/migrations/20260505235500_clients_projects_brief_container_v1.sql
-40. supabase/migrations/20260506000000_quotations_versionadas_v1.sql
-41. supabase/migrations/20260506020000_assets_and_prompt_versions_v1.sql
-42. supabase/migrations/20260506030000_crm_leads_v1.sql
-43. supabase/migrations/20260506032000_crm_rls_service_role_fix.sql
-44. supabase/migrations/20260506050000_conversation_threads_v1.sql
-45. context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
-46. context/SPECs/SPEC_ARCH-20260506-32_contratos_externos_minimos_objetos_vivos_v1.md
-47. context/SPECs/SPEC_ARCH-20260506-33_continuidad_conversacional_entidades_restantes_v1.md
+38. context/checkpoints/CHECKPOINT_IMPL-20260506-33.md
+39. supabase/migrations/20260505223000_identity_memberships_actor_context_v1.sql
+40. supabase/migrations/20260505235500_clients_projects_brief_container_v1.sql
+41. supabase/migrations/20260506000000_quotations_versionadas_v1.sql
+42. supabase/migrations/20260506020000_assets_and_prompt_versions_v1.sql
+43. supabase/migrations/20260506030000_crm_leads_v1.sql
+44. supabase/migrations/20260506032000_crm_rls_service_role_fix.sql
+45. supabase/migrations/20260506050000_conversation_threads_v1.sql
+46. context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
+47. context/SPECs/SPEC_ARCH-20260506-32_contratos_externos_minimos_objetos_vivos_v1.md
+48. context/SPECs/SPEC_ARCH-20260506-33_continuidad_conversacional_entidades_restantes_v1.md
+49. context/SPECs/SPEC_ARCH-20260506-34_consumo_remoto_tenancy_reforzado_v1.md
 
 ## Decisiones Ya Tomadas
 
@@ -177,13 +180,14 @@
 26. Implementar conocimiento derivado utilizable por agentes.
 27. Implementar handoffs remotos endurecidos por entidad.
 28. Implementar contratos externos mínimos sobre objetos vivos.
+29. Implementar continuidad conversacional en entidades restantes.
 
 ### [~] Planificado para el siguiente corte
 
-1. Extender continuidad conversacional a `brief`, `quotation` y `asset`.
-2. Reutilizar el patrón de threads y mensajes ya probado en CRM.
-3. Mantener la conversación contextual desacoplada de la fuente primaria.
-4. Reusar `/contexto-agentes` y las superficies de entidad sin abrir una bandeja global nueva.
+1. Exponer consumo remoto con tenancy reforzado sobre la capa ya derivada.
+2. Mantener el payload remoto estable y desacoplado del layout humano.
+3. Reforzar trazabilidad tenant-entidad-fuente en el consumo externo.
+4. Reusar `/contexto-agentes` como superficie de inspección, no como API final.
 5. Mantener automatización generativa fuera de este corte.
 
 ### [ ] Posterior
@@ -203,8 +207,8 @@
 
 ## Siguiente Paso Recomendado
 
-Mover Bridge desde contratos externos mínimos hacia continuidad conversacional en las entidades restantes y consumo remoto con tenancy reforzado, manteniendo la fuente primaria como eje, en este orden:
+Mover Bridge desde continuidad conversacional mínima hacia consumo remoto con tenancy reforzado y posterior endurecimiento de contratos externos, manteniendo la fuente primaria como eje, en este orden:
 
-1. continuidad conversacional por entidad restante,
-2. consumo remoto con tenancy reforzado,
-3. endurecimiento posterior de contratos externos.
+1. consumo remoto con tenancy reforzado,
+2. endurecimiento posterior de contratos externos,
+3. estadísticas resumidas cuando aporten valor operativo.
