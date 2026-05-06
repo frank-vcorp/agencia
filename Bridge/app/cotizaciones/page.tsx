@@ -220,7 +220,7 @@ export default async function CotizacionesPage() {
                       : "bg-white/80 ring-[color:var(--line)]"
                   }`}
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--muted)]">
                         V{version.versionNumber} {isActive ? "· VIGENTE" : ""}
@@ -232,11 +232,11 @@ export default async function CotizacionesPage() {
                       </div>
                     </div>
                     {!isActive ? (
-                      <form action={setActiveVersionAction}>
+                      <form action={setActiveVersionAction} className="sm:shrink-0">
                         <input name="quotationId" type="hidden" value={quotation.id} />
                         <input name="versionId" type="hidden" value={version.id} />
                         <button
-                          className="rounded-full bg-[color:var(--ink)] px-4 py-2 text-xs font-semibold text-white"
+                          className="w-full rounded-full bg-[color:var(--ink)] px-4 py-2 text-xs font-semibold text-white sm:w-auto"
                           type="submit"
                         >
                           Marcar vigente
