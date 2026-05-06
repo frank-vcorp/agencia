@@ -3,6 +3,8 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-26_crm_ligero_operativo_y_seguimiento_minimo_v1.md
  * IMPL-20260505-27
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-27_vinculacion_explicita_lead_client_project_v1.md
+ * IMPL-20260506-28
+ * Respaldo: context/SPECs/SPEC_ARCH-20260505-28_chat_contextual_por_entidad_v1.md
  */
 import { revalidatePath } from "next/cache";
 
@@ -21,6 +23,13 @@ import {
   type LeadStatus
 } from "@/lib/crm";
 import { getBriefWorkspace } from "@/lib/briefing";
+import {
+  actorRoleLabel,
+  appendLeadMessage,
+  formatMessageTimestamp,
+  getLeadChat,
+  type LeadChat
+} from "@/lib/chat";
 
 // ─── Server Actions ───────────────────────────────────────────────────────────
 
@@ -64,6 +73,19 @@ async function addNoteAction(formData: FormData) {
   revalidatePath("/crm");
 }
 
+async function addLeadChatMessageAction(formData: FormData) {
+  "use server";
+
+  const leadId = String(formData.get("leadId") ?? "").trim();
+  const tenantId = String(formData.get("tenantId") ?? "").trim();
+  const messageText = String(formData.get("messageText") ?? "").trim();
+
+  if (!leadId || !tenantId || !messageText) return;
+
+  await appendLeadMessage(leadId, tenantId, messageText);
+  revalidatePath("/crm");
+}
+
 // ─── Helpers de estilos ───────────────────────────────────────────────────────
 
 function statusBadgeClass(status: LeadStatus): string {
@@ -89,6 +111,16 @@ export default async function CrmPage() {
   ]);
 
   const workspaces = await Promise.all(leads.map((l) => getLeadWorkspace(l.id)));
+
+  // Cargar chats contextuales por lead — IMPL-20260506-28
+  const chatsByLeadId = Object.fromEntries(
+    await Promise.all(
+      leads.map(async (l) => {
+        const chat = await getLeadChat(l.id);
+        return [l.id, chat] as [string, LeadChat];
+      })
+    )
+  );
 
   // ─── Defaults del contenedor activo ─────────────────────────────────────────────────
   const activeClientId = briefWorkspace?.container.client?.id ?? null;
@@ -238,6 +270,7 @@ export default async function CrmPage() {
             const { lead, notes } = ws;
             const nextStatuses = nextLeadStatuses(lead.status);
             const isClosed = lead.status === "cerrado_ganado" || lead.status === "cerrado_perdido";
+            const chat = chatsByLeadId[lead.id] ?? { thread: null, messages: [] };
 
             return (
               <article key={lead.id} className="panel rounded-[28px] px-6 py-6">
@@ -331,6 +364,69 @@ export default async function CrmPage() {
                     Agregar
                   </button>
                 </form>
+
+                {/* ── Chat contextual — IMPL-20260506-28 ──────────────────────── */}
+                <div className="mt-6 border-t border-[color:var(--line)] pt-5">
+                  {/* Resumen contextual de la entidad fuente */}
+                  <div className="mb-3 rounded-[16px] bg-slate-50 px-4 py-3 ring-1 ring-[color:var(--line)]">
+                    <p className="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted)]">
+                      Conversación sobre este lead
+                    </p>
+                    <p className="mt-1 text-sm font-medium leading-5">
+                      {lead.name}
+                    </p>
+                    <p className="text-[11px] text-[color:var(--muted)]">
+                      {leadStatusLabel(lead.status)}
+                      {lead.requestedService ? ` · ${lead.requestedService}` : ""}
+                      {lead.clientId && clientMap[lead.clientId]
+                        ? ` · ${clientMap[lead.clientId].name}`
+                        : ""}
+                    </p>
+                  </div>
+
+                  {/* Hilo de mensajes */}
+                  {chat.messages.length === 0 ? (
+                    <p className="py-3 text-center text-[11px] text-[color:var(--muted)]">
+                      Sin mensajes aún — inicia la conversación sobre este lead.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {chat.messages.map((msg) => (
+                        <div
+                          key={msg.id}
+                          className="rounded-[14px] bg-white/70 px-3 py-2.5 ring-1 ring-[color:var(--line)]"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent-deep)]">
+                              {actorRoleLabel(msg.actorRole)}
+                            </span>
+                            <span className="text-[10px] text-[color:var(--muted)]">
+                              {formatMessageTimestamp(msg.createdAt)}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-sm leading-6">{msg.messageText}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Publicar mensaje */}
+                  <form action={addLeadChatMessageAction} className="mt-3 flex gap-2">
+                    <input type="hidden" name="leadId" value={lead.id} />
+                    <input type="hidden" name="tenantId" value={lead.tenantId} />
+                    <input
+                      name="messageText"
+                      placeholder="Escribe un mensaje sobre este lead..."
+                      className="flex-1 rounded-[14px] border border-[color:var(--line)] bg-white/80 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent-deep)]"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-[14px] bg-[color:var(--accent-deep)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+                    >
+                      Enviar
+                    </button>
+                  </form>
+                </div>
               </article>
             );
           })}
