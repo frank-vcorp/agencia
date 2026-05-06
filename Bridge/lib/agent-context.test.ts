@@ -15,6 +15,7 @@ import {
   buildQuotationExternalContract,
   buildAssetExternalContract,
   buildExternalContracts,
+  buildTenantRemoteContext,
   deriveAssetSummary,
   deriveBriefSummary,
   deriveLeadSummary,
@@ -24,7 +25,8 @@ import {
   type AgentContextSnapshot,
   type AgentRemoteHandoffs,
   type BriefAgentSummary,
-  type QuotationAgentSummary
+  type QuotationAgentSummary,
+  type TenantRemoteContext
 } from "./agent-context";
 import { type AssetsDashboardSummary, type BriefDashboardSummary, type NextAction, type QuotationDashboardSummary } from "./dashboard";
 import { type Lead } from "./crm";
@@ -566,3 +568,112 @@ describe("agent-context — buildExternalContracts (colección)", () => {
     expect(contracts.asset?.handoffRef).toBe(`asset@${SNAPSHOT_AT}`);
   });
 });
+
+// ─── IMPL-20260506-34: buildTenantRemoteContext ───────────────────────────────
+
+/**
+ * Fixture de AgentContextSnapshot completo para tests de buildTenantRemoteContext.
+ * Construido desde los builders existentes para mantener coherencia de datos.
+ */
+function makeFullSnapshot(overrides?: { tenantSlug?: string | null }): AgentContextSnapshot {
+  const briefSummary = deriveBriefSummary(briefConsolidado);
+  const leadSummary = deriveLeadSummary(makeLead("en_seguimiento", { name: "Tech SA" }));
+  const quotationSummary = deriveQuotationSummary(cotizacionEnviada);
+  const assetSummary = deriveAssetSummary(activosConDatos);
+  const slug = overrides?.tenantSlug !== undefined ? overrides.tenantSlug : TENANT_SLUG;
+
+  const handoffsFixture: AgentRemoteHandoffs = {
+    brief: buildBriefHandoff(briefSummary, SNAPSHOT_AT, slug, null),
+    lead: buildLeadHandoff(leadSummary, SNAPSHOT_AT, slug),
+    quotation: buildQuotationHandoff(quotationSummary, SNAPSHOT_AT, slug, null),
+    asset: buildAssetHandoff(assetSummary, SNAPSHOT_AT, slug, null),
+  };
+
+  return {
+    snapshotAt: SNAPSHOT_AT,
+    tenantSlug: slug,
+    lead: leadSummary,
+    brief: briefSummary,
+    quotation: quotationSummary,
+    assets: assetSummary,
+    crm: { source: "crm/buildCrmMetrics", totalLeads: 1, activeLeads: 1, label: "1 lead activo" },
+    nextAction: nextActionBriefs,
+    handoffs: handoffsFixture,
+    externalContracts: buildExternalContracts(handoffsFixture),
+  };
+}
+
+describe("agent-context — buildTenantRemoteContext", () => {
+  it("propaga tenantSlug del snapshot como eje primario", () => {
+    const ctx = buildTenantRemoteContext(makeFullSnapshot());
+    expect(ctx.tenantSlug).toBe(TENANT_SLUG);
+  });
+
+  it("propaga generatedAt desde snapshotAt", () => {
+    const ctx = buildTenantRemoteContext(makeFullSnapshot());
+    expect(ctx.generatedAt).toBe(SNAPSHOT_AT);
+  });
+
+  it("lista las cuatro entidades disponibles cuando el snapshot es completo", () => {
+    const ctx = buildTenantRemoteContext(makeFullSnapshot());
+    expect(ctx.availableEntities).toEqual(["brief", "lead", "quotation", "asset"]);
+  });
+
+  it("traceMap tiene una entrada por entidad activa", () => {
+    const ctx = buildTenantRemoteContext(makeFullSnapshot());
+    expect(ctx.traceMap).toHaveLength(4);
+  });
+
+  it("cada entrada del traceMap incluye tenant, entity, handoffRef, source y contractVersion", () => {
+    const ctx = buildTenantRemoteContext(makeFullSnapshot());
+    for (const entry of ctx.traceMap) {
+      expect(entry.tenant).toBe(TENANT_SLUG);
+      expect(entry.entity).toBeTruthy();
+      expect(entry.handoffRef).toMatch(/^(brief|lead|quotation|asset)@/);
+      expect(entry.source).toBeTruthy();
+      expect(entry.contractVersion).toBe("1.0");
+    }
+  });
+
+  it("el handoffRef de cada entrada coincide con el entityType y snapshotAt", () => {
+    const ctx = buildTenantRemoteContext(makeFullSnapshot());
+    const refMap = Object.fromEntries(ctx.traceMap.map((e) => [e.entity, e.handoffRef]));
+
+    expect(refMap["brief"]).toBe(`brief@${SNAPSHOT_AT}`);
+    expect(refMap["lead"]).toBe(`lead@${SNAPSHOT_AT}`);
+    expect(refMap["quotation"]).toBe(`quotation@${SNAPSHOT_AT}`);
+    expect(refMap["asset"]).toBe(`asset@${SNAPSHOT_AT}`);
+  });
+
+  it("availableEntities está vacía cuando todos los contratos son null", () => {
+    const snapshot = makeFullSnapshot();
+    snapshot.externalContracts = { brief: null, lead: null, quotation: null, asset: null };
+    const ctx = buildTenantRemoteContext(snapshot);
+
+    expect(ctx.availableEntities).toEqual([]);
+    expect(ctx.traceMap).toHaveLength(0);
+  });
+
+  it("solo lista entidades con contrato presente (snapshot parcial)", () => {
+    const snapshot = makeFullSnapshot();
+    snapshot.externalContracts = {
+      ...snapshot.externalContracts,
+      quotation: null,
+      asset: null,
+    };
+    const ctx = buildTenantRemoteContext(snapshot);
+
+    expect(ctx.availableEntities).toEqual(["brief", "lead"]);
+    expect(ctx.traceMap).toHaveLength(2);
+  });
+
+  it("acepta tenantSlug null y lo propaga en tenantSlug y traceMap", () => {
+    const ctx = buildTenantRemoteContext(makeFullSnapshot({ tenantSlug: null }));
+
+    expect(ctx.tenantSlug).toBeNull();
+    for (const entry of ctx.traceMap) {
+      expect(entry.tenant).toBeNull();
+    }
+  });
+});
+

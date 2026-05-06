@@ -452,6 +452,76 @@ export function buildExternalContracts(handoffs: AgentRemoteHandoffs): AgentExte
   };
 }
 
+// ─── IMPL-20260506-34: contexto de consumo remoto por tenant ─────────────────
+
+/**
+ * Contexto de consumo remoto organizado por tenant como eje primario.
+ * Estructura plana, serializable y apta para futuros bridges o endpoints.
+ * Derivada del snapshot; no abre nuevas fuentes ni queries adicionales.
+ *
+ * IMPL-20260506-34
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-34_consumo_remoto_tenancy_reforzado_v1.md
+ */
+export type TenantRemoteContext = {
+  /** Slug del tenant — eje primario de trazabilidad del consumo remoto */
+  tenantSlug: string | null;
+  /** ISO 8601 heredado del snapshot de origen */
+  generatedAt: string;
+  /** Entidades con contrato externo disponible en este instante */
+  availableEntities: string[];
+  /**
+   * Traza completa: tenant → entidad → contrato → handoffRef → fuente primaria.
+   * Una entrada por entidad activa. Permite auditar la cadena de derivación
+   * sin acceder a la fuente primaria.
+   */
+  traceMap: Array<{
+    /** Slug del tenant — repite el eje primario para trazabilidad independiente por entrada */
+    tenant: string | null;
+    /** Discriminante de entidad */
+    entity: string;
+    /** Referencia trazable al handoff de origen: "<entityType>@<snapshotAt>" */
+    handoffRef: string;
+    /** Módulo y función de origen del dato */
+    source: string;
+    /** Versión del contrato externo */
+    contractVersion: string;
+  }>;
+};
+
+/**
+ * Construye el contexto de consumo remoto por tenant desde el snapshot derivado.
+ * Función pura; no lanza queries adicionales. Reutilizable server-side o desde endpoints.
+ * Deriva exclusivamente de externalContracts — la capa más estable del snapshot.
+ *
+ * IMPL-20260506-34
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-34_consumo_remoto_tenancy_reforzado_v1.md
+ */
+export function buildTenantRemoteContext(snapshot: AgentContextSnapshot): TenantRemoteContext {
+  const { externalContracts, snapshotAt, tenantSlug } = snapshot;
+
+  const activeContracts = [
+    externalContracts.brief,
+    externalContracts.lead,
+    externalContracts.quotation,
+    externalContracts.asset,
+  ].filter((c): c is NonNullable<typeof c> => c !== null);
+
+  const traceMap: TenantRemoteContext["traceMap"] = activeContracts.map((c) => ({
+    tenant: c.tenantSlug,
+    entity: c.entityType,
+    handoffRef: c.handoffRef,
+    source: c.source,
+    contractVersion: c.contractVersion,
+  }));
+
+  return {
+    tenantSlug,
+    generatedAt: snapshotAt,
+    availableEntities: activeContracts.map((c) => c.entityType),
+    traceMap,
+  };
+}
+
 // ─── Función principal server-side ────────────────────────────────────────────
 
 /**

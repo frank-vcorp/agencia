@@ -2,14 +2,16 @@
  * IMPL-20260506-30
  * IMPL-20260506-31
  * IMPL-20260506-32
+ * IMPL-20260506-34
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-32_contratos_externos_minimos_objetos_vivos_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-34_consumo_remoto_tenancy_reforzado_v1.md
  *
  * Superficie humana del snapshot derivado para agentes y operadores.
  * Muestra el estado operativo resumido y trazable del tenant activo.
  * NOTA: este es un derivado. La fuente primaria vive en /briefs, /cotizaciones, /activos y /crm.
  */
-import { getAgentContextSnapshot, type AgentExternalContracts } from "@/lib/agent-context";
+import { buildTenantRemoteContext, getAgentContextSnapshot, type AgentExternalContracts, type TenantRemoteContext } from "@/lib/agent-context";
 
 export const dynamic = "force-dynamic";
 
@@ -117,8 +119,7 @@ function ExternalContractBlock({ contract }: { contract: AnyExternalContract }) 
   );
 }
 
-function ExternalContractsSection({ contracts }: { contracts: AgentExternalContracts }) {
-  const items = (
+function ExternalContractsSection({ contracts }: { contracts: AgentExternalContracts }) {  const items = (
     [contracts.brief, contracts.lead, contracts.quotation, contracts.asset] as (AnyExternalContract | null)[]
   ).filter((c): c is AnyExternalContract => c !== null);
   return (
@@ -145,10 +146,73 @@ function ExternalContractsSection({ contracts }: { contracts: AgentExternalContr
   );
 }
 
+// ─── IMPL-20260506-34: consumo remoto con tenancy reforzado ──────────────────
+
+/**
+ * Sección que expone el contexto de consumo remoto organizado por tenant.
+ * Derivado de buildTenantRemoteContext(); sin queries adicionales.
+ * Tenant como eje primario; traceMap muestra la cadena completa de derivación.
+ */
+function TenantRemoteContextSection({ ctx }: { ctx: TenantRemoteContext }) {
+  return (
+    <div>
+      <div className="mb-4">
+        <h2 className="text-sm font-semibold text-zinc-100 uppercase tracking-wide">
+          Consumo remoto — contexto por tenant
+        </h2>
+        <p className="text-xs text-zinc-500 mt-1">
+          Capa reusable derivada del snapshot con tenant como eje primario. Sin queries
+          adicionales. Apta para futuros bridges o endpoints server-side.
+        </p>
+      </div>
+      <Card>
+        <div className="space-y-0.5 mb-4">
+          <Row label="Tenant activo" value={ctx.tenantSlug ?? "—"} />
+          <Row label="Generado" value={ctx.generatedAt} />
+          <Row
+            label="Entidades disponibles"
+            value={ctx.availableEntities.length > 0 ? ctx.availableEntities.join(", ") : "—"}
+          />
+        </div>
+        {ctx.traceMap.length === 0 ? (
+          <EmptyState label="No hay entidades disponibles para trazar." />
+        ) : (
+          <div>
+            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-3">
+              Mapa de trazabilidad (tenant → entidad → contrato → fuente)
+            </p>
+            <div className="space-y-3">
+              {ctx.traceMap.map((entry) => (
+                <div
+                  key={entry.entity}
+                  className="rounded-md border border-zinc-800 bg-zinc-800/30 px-3 py-2.5"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-mono font-semibold text-violet-400 uppercase tracking-wider">
+                      {entry.entity}
+                    </span>
+                    <span className="text-xs text-zinc-600 font-mono">v{entry.contractVersion}</span>
+                  </div>
+                  <p className="text-xs text-zinc-500">
+                    tenant: <span className="text-zinc-400 font-mono">{entry.tenant ?? "—"}</span>
+                  </p>
+                  <p className="text-xs text-zinc-600 font-mono mt-0.5">ref: {entry.handoffRef}</p>
+                  <p className="text-xs text-zinc-600 mt-0.5">fuente: {entry.source}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ─── Página ───────────────────────────────────────────────────────────────────
 
 export default async function ContextoAgentesPage() {
   const snapshot = await getAgentContextSnapshot();
+  const remoteContext = buildTenantRemoteContext(snapshot);
 
   const freshness = new Date(snapshot.snapshotAt).toLocaleString("es-MX", {
     day: "2-digit",
@@ -292,6 +356,9 @@ export default async function ContextoAgentesPage() {
 
       {/* Contratos externos mínimos */}
       <ExternalContractsSection contracts={snapshot.externalContracts} />
+
+      {/* Consumo remoto — contexto por tenant (IMPL-20260506-34) */}
+      <TenantRemoteContextSection ctx={remoteContext} />
     </div>
   );
 }
