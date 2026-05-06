@@ -10,6 +10,11 @@ import {
   buildBriefHandoff,
   buildLeadHandoff,
   buildQuotationHandoff,
+  buildBriefExternalContract,
+  buildLeadExternalContract,
+  buildQuotationExternalContract,
+  buildAssetExternalContract,
+  buildExternalContracts,
   deriveAssetSummary,
   deriveBriefSummary,
   deriveLeadSummary,
@@ -17,6 +22,7 @@ import {
   resolveEntityNextAction,
   selectRepresentativeLead,
   type AgentContextSnapshot,
+  type AgentRemoteHandoffs,
   type BriefAgentSummary,
   type QuotationAgentSummary
 } from "./agent-context";
@@ -372,5 +378,191 @@ describe("agent-context — integridad de handoffs por entidad", () => {
     expect(resolveEntityNextAction(nextAction, "/briefs")).not.toBeNull();
     expect(resolveEntityNextAction(nextAction, "/cotizaciones")).toBeNull();
     expect(resolveEntityNextAction(nextAction, "/activos")).toBeNull();
+  });
+});
+
+// ─── IMPL-20260506-32: contratos externos mínimos ────────────────────────────
+
+describe("agent-context — buildBriefExternalContract", () => {
+  const briefSummary = deriveBriefSummary(briefConsolidado);
+  const handoff = buildBriefHandoff(briefSummary, SNAPSHOT_AT, TENANT_SLUG, null);
+
+  it("construye el contrato con todos los campos obligatorios", () => {
+    const contract = buildBriefExternalContract(handoff);
+
+    expect(contract.entityType).toBe("brief");
+    expect(contract.contractVersion).toBe("1.0");
+    expect(contract.tenantSlug).toBe(TENANT_SLUG);
+    expect(contract.generatedAt).toBe(SNAPSHOT_AT);
+    expect(contract.handoffRef).toBe(`brief@${SNAPSHOT_AT}`);
+    expect(contract.source).toBe("briefing/getBriefWorkspace");
+  });
+
+  it("el payload contiene solo los campos mínimos del brief", () => {
+    const contract = buildBriefExternalContract(handoff);
+
+    expect(contract.payload.id).toBe("brief-1");
+    expect(contract.payload.statusLabel).toBe("Consolidado");
+    expect(contract.payload.isConsolidated).toBe(true);
+    expect(contract.payload.updatedAt).toBe("2026-05-05T10:00:00Z");
+  });
+
+  it("acepta tenantSlug null", () => {
+    const handoffSinTenant = buildBriefHandoff(briefSummary, SNAPSHOT_AT, null, null);
+    const contract = buildBriefExternalContract(handoffSinTenant);
+
+    expect(contract.tenantSlug).toBeNull();
+  });
+});
+
+describe("agent-context — buildLeadExternalContract", () => {
+  const leadSummary = deriveLeadSummary(makeLead("en_seguimiento", { name: "Tech SA" }));
+  const handoff = buildLeadHandoff(leadSummary, SNAPSHOT_AT, TENANT_SLUG);
+
+  it("construye el contrato con todos los campos obligatorios", () => {
+    const contract = buildLeadExternalContract(handoff);
+
+    expect(contract.entityType).toBe("lead");
+    expect(contract.contractVersion).toBe("1.0");
+    expect(contract.tenantSlug).toBe(TENANT_SLUG);
+    expect(contract.generatedAt).toBe(SNAPSHOT_AT);
+    expect(contract.handoffRef).toBe(`lead@${SNAPSHOT_AT}`);
+    expect(contract.source).toBe("crm/getLeadsForDefaultTenant");
+  });
+
+  it("el payload contiene solo los campos mínimos del lead", () => {
+    const contract = buildLeadExternalContract(handoff);
+
+    expect(contract.payload.id).toBe("lead-en_seguimiento");
+    expect(contract.payload.statusLabel).toBe("En seguimiento");
+    expect(contract.payload.isActive).toBe(true);
+    expect(contract.payload.updatedAt).toBe("2026-05-05T10:00:00Z");
+  });
+
+  it("isActive false para lead cerrado", () => {
+    const leadCerrado = deriveLeadSummary(makeLead("cerrado_perdido"));
+    const handoffCerrado = buildLeadHandoff(leadCerrado, SNAPSHOT_AT, TENANT_SLUG);
+    const contract = buildLeadExternalContract(handoffCerrado);
+
+    expect(contract.payload.isActive).toBe(false);
+  });
+});
+
+describe("agent-context — buildQuotationExternalContract", () => {
+  const quotationSummary = deriveQuotationSummary(cotizacionEnviada);
+  const handoff = buildQuotationHandoff(quotationSummary, SNAPSHOT_AT, TENANT_SLUG, null);
+
+  it("construye el contrato con todos los campos obligatorios", () => {
+    const contract = buildQuotationExternalContract(handoff);
+
+    expect(contract.entityType).toBe("quotation");
+    expect(contract.contractVersion).toBe("1.0");
+    expect(contract.tenantSlug).toBe(TENANT_SLUG);
+    expect(contract.generatedAt).toBe(SNAPSHOT_AT);
+    expect(contract.handoffRef).toBe(`quotation@${SNAPSHOT_AT}`);
+    expect(contract.source).toBe("quotations/getQuotationWorkspace");
+  });
+
+  it("el payload contiene solo los campos mínimos de la cotización", () => {
+    const contract = buildQuotationExternalContract(handoff);
+
+    expect(contract.payload.id).toBe("quot-1");
+    expect(contract.payload.statusLabel).toBe("Enviada");
+    expect(contract.payload.isActive).toBe(true);
+    expect(contract.payload.totalEstimado).toBe("$8,000 MXN");
+  });
+
+  it("conserva totalEstimado null cuando no aplica", () => {
+    const quotSinTotal = deriveQuotationSummary({ ...cotizacionEnviada, totalEstimado: null });
+    const handoffSinTotal = buildQuotationHandoff(quotSinTotal, SNAPSHOT_AT, TENANT_SLUG, null);
+    const contract = buildQuotationExternalContract(handoffSinTotal);
+
+    expect(contract.payload.totalEstimado).toBeNull();
+  });
+});
+
+describe("agent-context — buildAssetExternalContract", () => {
+  const assetSummary = deriveAssetSummary(activosConDatos);
+  const handoff = buildAssetHandoff(assetSummary, SNAPSHOT_AT, TENANT_SLUG, null);
+
+  it("construye el contrato con todos los campos obligatorios", () => {
+    const contract = buildAssetExternalContract(handoff);
+
+    expect(contract.entityType).toBe("asset");
+    expect(contract.contractVersion).toBe("1.0");
+    expect(contract.tenantSlug).toBe(TENANT_SLUG);
+    expect(contract.generatedAt).toBe(SNAPSHOT_AT);
+    expect(contract.handoffRef).toBe(`asset@${SNAPSHOT_AT}`);
+    expect(contract.source).toBe("assets/getAssetsForDefaultTenant");
+  });
+
+  it("el payload contiene solo los campos mínimos de activos", () => {
+    const contract = buildAssetExternalContract(handoff);
+
+    expect(contract.payload.total).toBe(5);
+    expect(contract.payload.delivered).toBe(1);
+    expect(contract.payload.hasDelivered).toBe(true);
+  });
+
+  it("no expone inProgress ni inReview en el payload externo", () => {
+    const contract = buildAssetExternalContract(handoff);
+    // El contrato externo es más pequeño que el handoff
+    expect(Object.keys(contract.payload)).toEqual(["total", "delivered", "hasDelivered"]);
+  });
+});
+
+describe("agent-context — buildExternalContracts (colección)", () => {
+  const briefSummary = deriveBriefSummary(briefConsolidado);
+  const leadSummary = deriveLeadSummary(makeLead("nuevo"));
+  const quotSummary = deriveQuotationSummary(cotizacionEnviada);
+  const assetSummary = deriveAssetSummary(activosConDatos);
+
+  const handoffs: AgentRemoteHandoffs = {
+    brief: buildBriefHandoff(briefSummary, SNAPSHOT_AT, TENANT_SLUG, null),
+    lead: buildLeadHandoff(leadSummary, SNAPSHOT_AT, TENANT_SLUG),
+    quotation: buildQuotationHandoff(quotSummary, SNAPSHOT_AT, TENANT_SLUG, null),
+    asset: buildAssetHandoff(assetSummary, SNAPSHOT_AT, TENANT_SLUG, null)
+  };
+
+  it("deriva todos los contratos cuando los handoffs están presentes", () => {
+    const contracts = buildExternalContracts(handoffs);
+
+    expect(contracts.brief?.entityType).toBe("brief");
+    expect(contracts.lead?.entityType).toBe("lead");
+    expect(contracts.quotation?.entityType).toBe("quotation");
+    expect(contracts.asset?.entityType).toBe("asset");
+  });
+
+  it("retorna null para entidades ausentes en el handoffs", () => {
+    const handoffsParciales: AgentRemoteHandoffs = {
+      brief: null,
+      lead: handoffs.lead,
+      quotation: null,
+      asset: null
+    };
+    const contracts = buildExternalContracts(handoffsParciales);
+
+    expect(contracts.brief).toBeNull();
+    expect(contracts.lead).not.toBeNull();
+    expect(contracts.quotation).toBeNull();
+    expect(contracts.asset).toBeNull();
+  });
+
+  it("todos los contratos comparten el mismo generatedAt del snapshot", () => {
+    const contracts = buildExternalContracts(handoffs);
+
+    expect(contracts.brief?.generatedAt).toBe(SNAPSHOT_AT);
+    expect(contracts.lead?.generatedAt).toBe(SNAPSHOT_AT);
+    expect(contracts.quotation?.generatedAt).toBe(SNAPSHOT_AT);
+    expect(contracts.asset?.generatedAt).toBe(SNAPSHOT_AT);
+  });
+
+  it("handoffRef es trazable al entityType y snapshotAt de origen", () => {
+    const contracts = buildExternalContracts(handoffs);
+
+    expect(contracts.brief?.handoffRef).toBe(`brief@${SNAPSHOT_AT}`);
+    expect(contracts.lead?.handoffRef).toBe(`lead@${SNAPSHOT_AT}`);
+    expect(contracts.quotation?.handoffRef).toBe(`quotation@${SNAPSHOT_AT}`);
+    expect(contracts.asset?.handoffRef).toBe(`asset@${SNAPSHOT_AT}`);
   });
 });

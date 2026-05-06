@@ -1,13 +1,15 @@
 /**
  * IMPL-20260506-30
  * IMPL-20260506-31
+ * IMPL-20260506-32
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-32_contratos_externos_minimos_objetos_vivos_v1.md
  *
  * Superficie humana del snapshot derivado para agentes y operadores.
  * Muestra el estado operativo resumido y trazable del tenant activo.
  * NOTA: este es un derivado. La fuente primaria vive en /briefs, /cotizaciones, /activos y /crm.
  */
-import { getAgentContextSnapshot } from "@/lib/agent-context";
+import { getAgentContextSnapshot, type AgentExternalContracts } from "@/lib/agent-context";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +78,70 @@ function HandoffBlock({ handoff }: { handoff: AnyHandoff | null }) {
         </div>
       )}
     </Card>
+  );
+}
+
+type AnyExternalContract = {
+  entityType: string;
+  contractVersion: string;
+  tenantSlug: string | null;
+  generatedAt: string;
+  handoffRef: string;
+  source: string;
+  payload: Record<string, unknown>;
+};
+
+function ExternalContractBlock({ contract }: { contract: AnyExternalContract }) {
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-mono font-semibold text-emerald-400 uppercase tracking-wider">
+          {contract.entityType}
+        </span>
+        <span className="text-xs text-zinc-600 font-mono">v{contract.contractVersion}</span>
+      </div>
+      <p className="text-xs text-zinc-500 mb-1">fuente: {contract.source}</p>
+      <p className="text-xs text-zinc-600 mb-1">tenant: {contract.tenantSlug ?? "—"}</p>
+      <p className="text-xs text-zinc-600 mb-3 font-mono">ref: {contract.handoffRef}</p>
+      <div className="rounded-md bg-zinc-800/40 px-3 py-2 space-y-1">
+        {Object.entries(contract.payload).map(([key, val]) => (
+          <div key={key} className="flex justify-between items-baseline gap-4">
+            <span className="text-xs text-zinc-500 font-mono shrink-0">{key}</span>
+            <span className="text-xs text-zinc-300 text-right">
+              {val === null ? "—" : String(val)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function ExternalContractsSection({ contracts }: { contracts: AgentExternalContracts }) {
+  const items = (
+    [contracts.brief, contracts.lead, contracts.quotation, contracts.asset] as (AnyExternalContract | null)[]
+  ).filter((c): c is AnyExternalContract => c !== null);
+  return (
+    <div>
+      <div className="mb-4">
+        <h2 className="text-sm font-semibold text-zinc-100 uppercase tracking-wide">
+          Contratos externos mínimos
+        </h2>
+        <p className="text-xs text-zinc-500 mt-1">
+          Capa estable derivada de los handoffs remotos. Solo lectura. No reemplaza la fuente
+          primaria ni el handoff. Versión <span className="font-mono">1.0</span>.
+        </p>
+      </div>
+      {items.length === 0 ? (
+        <EmptyState label="No hay contratos externos disponibles." />
+      ) : (
+        <div className="grid gap-4">
+          {items.map((c) => (
+            <ExternalContractBlock key={c.entityType} contract={c} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -223,6 +289,9 @@ export default async function ContextoAgentesPage() {
           <HandoffBlock handoff={snapshot.handoffs.asset} />
         </div>
       </div>
+
+      {/* Contratos externos mínimos */}
+      <ExternalContractsSection contracts={snapshot.externalContracts} />
     </div>
   );
 }

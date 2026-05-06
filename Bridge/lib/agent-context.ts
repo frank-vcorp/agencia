@@ -1,10 +1,17 @@
 /**
  * IMPL-20260506-30
+ * IMPL-20260506-31
+ * IMPL-20260506-32
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-30_conocimiento_derivado_agentes_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-32_contratos_externos_minimos_objetos_vivos_v1.md
  *
  * Capa de conocimiento derivado para agentes y operadores.
  * Este módulo NO reemplaza la fuente primaria. Produce un snapshot
  * resumido y trazable, construido desde los objetos vivos del tenant activo.
+ *
+ * Separación de capas:
+ *   Fuente primaria → AgentSummary → RemoteHandoff → ExternalContract
  */
 
 import {
@@ -122,6 +129,76 @@ export type AgentRemoteHandoffs = {
   asset: AssetRemoteHandoff | null;
 };
 
+// ─── Tipos de contratos externos mínimos ──────────────────────────────────────
+
+/**
+ * Contrato externo mínimo. Derivado del handoff remoto; no de la fuente primaria.
+ * Pequeño, estable, versionado y trazable. Apto para consumo remoto controlado.
+ *
+ * IMPL-20260506-32
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-32_contratos_externos_minimos_objetos_vivos_v1.md
+ */
+export type ExternalContract<TEntityType extends string, TMinimalPayload extends object> = {
+  /** Discriminante de entidad */
+  entityType: TEntityType;
+  /** Versión del contrato externo — solo cambia en breaking changes */
+  contractVersion: "1.0";
+  /** Slug del tenant activo, o null si no hay configuración */
+  tenantSlug: string | null;
+  /** ISO 8601 del momento en que se generó el contrato (heredado del handoff) */
+  generatedAt: string;
+  /** Referencia trazable al handoff de origen: "<entityType>@<snapshotAt>" */
+  handoffRef: string;
+  /** Módulo y función de origen del dato (heredado del handoff) */
+  source: string;
+  /** Payload mínimo y estable para consumo externo */
+  payload: TMinimalPayload;
+};
+
+/** Payload mínimo del brief para contrato externo */
+export type BriefExternalPayload = {
+  id: string;
+  statusLabel: string;
+  isConsolidated: boolean;
+  updatedAt: string;
+};
+
+/** Payload mínimo del lead para contrato externo */
+export type LeadExternalPayload = {
+  id: string;
+  statusLabel: string;
+  isActive: boolean;
+  updatedAt: string;
+};
+
+/** Payload mínimo de la cotización para contrato externo */
+export type QuotationExternalPayload = {
+  id: string;
+  statusLabel: string;
+  isActive: boolean;
+  totalEstimado: string | null;
+};
+
+/** Payload mínimo de activos para contrato externo */
+export type AssetExternalPayload = {
+  total: number;
+  delivered: number;
+  hasDelivered: boolean;
+};
+
+export type BriefExternalContract = ExternalContract<"brief", BriefExternalPayload>;
+export type LeadExternalContract = ExternalContract<"lead", LeadExternalPayload>;
+export type QuotationExternalContract = ExternalContract<"quotation", QuotationExternalPayload>;
+export type AssetExternalContract = ExternalContract<"asset", AssetExternalPayload>;
+
+/** Colección de contratos externos por entidad. null cuando la entidad no existe en el tenant. */
+export type AgentExternalContracts = {
+  brief: BriefExternalContract | null;
+  lead: LeadExternalContract | null;
+  quotation: QuotationExternalContract | null;
+  asset: AssetExternalContract | null;
+};
+
 /**
  * Snapshot derivado completo para agentes y operadores.
  * Contiene resúmenes trazables de las cuatro entidades operativas principales.
@@ -145,6 +222,8 @@ export type AgentContextSnapshot = {
   nextAction: NextAction;
   /** Handoffs remotos compactos por entidad, listos para transporte */
   handoffs: AgentRemoteHandoffs;
+  /** Contratos externos mínimos por entidad, derivados de los handoffs */
+  externalContracts: AgentExternalContracts;
 };
 
 // ─── Funciones puras de derivación (testeables) ───────────────────────────────
@@ -290,6 +369,89 @@ export function buildAssetHandoff(
   };
 }
 
+// ─── Funciones de contrato externo mínimo (puras, testeables) ─────────────────
+
+/** Construye el contrato externo mínimo de un brief desde su handoff remoto. Función pura. */
+export function buildBriefExternalContract(handoff: BriefRemoteHandoff): BriefExternalContract {
+  return {
+    entityType: "brief",
+    contractVersion: "1.0",
+    tenantSlug: handoff.tenantSlug,
+    generatedAt: handoff.snapshotAt,
+    handoffRef: `brief@${handoff.snapshotAt}`,
+    source: handoff.source,
+    payload: {
+      id: handoff.payload.id,
+      statusLabel: handoff.payload.statusLabel,
+      isConsolidated: handoff.payload.isConsolidated,
+      updatedAt: handoff.payload.updatedAt
+    }
+  };
+}
+
+/** Construye el contrato externo mínimo de un lead desde su handoff remoto. Función pura. */
+export function buildLeadExternalContract(handoff: LeadRemoteHandoff): LeadExternalContract {
+  return {
+    entityType: "lead",
+    contractVersion: "1.0",
+    tenantSlug: handoff.tenantSlug,
+    generatedAt: handoff.snapshotAt,
+    handoffRef: `lead@${handoff.snapshotAt}`,
+    source: handoff.source,
+    payload: {
+      id: handoff.payload.id,
+      statusLabel: handoff.payload.statusLabel,
+      isActive: handoff.payload.isActive,
+      updatedAt: handoff.payload.updatedAt
+    }
+  };
+}
+
+/** Construye el contrato externo mínimo de una cotización desde su handoff remoto. Función pura. */
+export function buildQuotationExternalContract(handoff: QuotationRemoteHandoff): QuotationExternalContract {
+  return {
+    entityType: "quotation",
+    contractVersion: "1.0",
+    tenantSlug: handoff.tenantSlug,
+    generatedAt: handoff.snapshotAt,
+    handoffRef: `quotation@${handoff.snapshotAt}`,
+    source: handoff.source,
+    payload: {
+      id: handoff.payload.id,
+      statusLabel: handoff.payload.statusLabel,
+      isActive: handoff.payload.isActive,
+      totalEstimado: handoff.payload.totalEstimado
+    }
+  };
+}
+
+/** Construye el contrato externo mínimo de activos desde su handoff remoto. Función pura. */
+export function buildAssetExternalContract(handoff: AssetRemoteHandoff): AssetExternalContract {
+  return {
+    entityType: "asset",
+    contractVersion: "1.0",
+    tenantSlug: handoff.tenantSlug,
+    generatedAt: handoff.snapshotAt,
+    handoffRef: `asset@${handoff.snapshotAt}`,
+    source: handoff.source,
+    payload: {
+      total: handoff.payload.total,
+      delivered: handoff.payload.delivered,
+      hasDelivered: handoff.payload.hasDelivered
+    }
+  };
+}
+
+/** Deriva la colección de contratos externos desde los handoffs remotos. Función pura. */
+export function buildExternalContracts(handoffs: AgentRemoteHandoffs): AgentExternalContracts {
+  return {
+    brief: handoffs.brief ? buildBriefExternalContract(handoffs.brief) : null,
+    lead: handoffs.lead ? buildLeadExternalContract(handoffs.lead) : null,
+    quotation: handoffs.quotation ? buildQuotationExternalContract(handoffs.quotation) : null,
+    asset: handoffs.asset ? buildAssetExternalContract(handoffs.asset) : null
+  };
+}
+
 // ─── Función principal server-side ────────────────────────────────────────────
 
 /**
@@ -327,6 +489,8 @@ export async function getAgentContextSnapshot(): Promise<AgentContextSnapshot> {
       : null
   };
 
+  const externalContracts = buildExternalContracts(handoffs);
+
   return {
     snapshotAt,
     tenantSlug,
@@ -341,6 +505,7 @@ export async function getAgentContextSnapshot(): Promise<AgentContextSnapshot> {
       label: crmMetrics.label
     },
     nextAction,
-    handoffs
+    handoffs,
+    externalContracts
   };
 }
