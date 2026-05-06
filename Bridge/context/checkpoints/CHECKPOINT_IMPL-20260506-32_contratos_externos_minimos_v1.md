@@ -105,12 +105,15 @@ npm test → 156 passed (156) — 10 archivos de test
 ```
 
 ### Gate 3: Revisión ✓
-- Separación de capas mantenida: ExternalContract no accede a fuente primaria
-- `contractVersion: "1.0"` fijo como literal TypeScript — breaking changes requieren versión nueva
-- `handoffRef` provee trazabilidad hacia el handoff de origen
-- Payload del activo más pequeño que el handoff (no expone `inProgress`, `inReview`)
-- Página no reescrita: se añadió sección `ExternalContractsSection` sin tocar las existentes
-- Cambios de INTEGRA (PROYECTO.md, SPECs, checkpoints 30/31) no incluidos en commit
+- **Qodo CLI:** descontinuado (sunset). Reemplazado por revisión manual equivalente.
+- **Revisión manual — separación de capas:** `buildBriefExternalContract`, `buildLeadExternalContract`, `buildQuotationExternalContract`, `buildAssetExternalContract` reciben exclusivamente un `RemoteHandoff` como parámetro. Ninguna función accede directamente a `crm`, `briefing`, `dashboard` ni `assets`. La cadena de derivación es estricta.
+- **Revisión manual — payload mínimo verificado:** `AssetExternalPayload` expone solo `total`, `delivered`, `hasDelivered` — no filtra `inProgress` ni `inReview` del handoff (test lo valida con `Object.keys`).
+- **Revisión manual — `contractVersion`:** literal TypeScript `"1.0"` — breaking changes requieren cambio de tipo.
+- **Revisión manual — `handoffRef`:** formato `"<entityType>@<snapshotAt>"`, legible y trazable.
+- **Revisión manual — página:** `ExternalContractsSection` añadida sin modificar ninguna sección existente. El cast `as (AnyExternalContract | null)[]` necesario por TypeScript structural typing entre literal union y `string`.
+- **Hallazgos CRÍTICOS:** ninguno.
+- **Code smells menores:** el cast en la página es aceptable dado que el discriminante `entityType` no es observable en tiempo de ejecución a nivel de `filter`.
+- Cambios de INTEGRA (PROYECTO.md, SPECs, checkpoints 30/31) no incluidos en commit.
 
 ### Gate 4: Documentación ✓
 - Este checkpoint en `context/checkpoints/`
