@@ -4,6 +4,7 @@
  * IMPL-20260506-32
  * IMPL-20260506-34
  * IMPL-20260506-36
+ * IMPL-20260506-37
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-32_contratos_externos_minimos_objetos_vivos_v1.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-34_consumo_remoto_tenancy_reforzado_v1.md

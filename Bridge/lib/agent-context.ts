@@ -2,7 +2,7 @@
  * IMPL-20260506-30
  * IMPL-20260506-31
  * IMPL-20260506-32
- * IMPL-20260506-36
+ * IMPL-20260506-37
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-30_conocimiento_derivado_agentes_v1.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-32_contratos_externos_minimos_objetos_vivos_v1.md
@@ -377,7 +377,7 @@ export function buildAssetHandoff(
  * Versión del contrato externo. Solo cambia en breaking changes.
  * Exportada como constante para que los consumidores remotos no dependan del literal.
  *
- * IMPL-20260506-36
+ * IMPL-20260506-37
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-36_endurecimiento_contratos_externos_v1.md
  */
 export const EXTERNAL_CONTRACT_VERSION = "1.0" as const;
@@ -387,7 +387,7 @@ export const EXTERNAL_CONTRACT_VERSION = "1.0" as const;
  * Función pura canónica — fuente de verdad del formato handoffRef.
  * Los cuatro builders de contratos externos deben delegar aquí.
  *
- * IMPL-20260506-36
+ * IMPL-20260506-37
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-36_endurecimiento_contratos_externos_v1.md
  */
 export function buildHandoffRef(entityType: string, snapshotAt: string): string {

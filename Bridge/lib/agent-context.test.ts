@@ -1,7 +1,7 @@
 /**
  * IMPL-20260506-30
  * IMPL-20260506-31
- * IMPL-20260506-36
+ * IMPL-20260506-37
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-36_endurecimiento_contratos_externos_v1.md
  */
@@ -778,7 +778,7 @@ describe("agent-context — buildTenantOperativeSummary", () => {
  * Verifican que el formato del handoffRef y la versión del contrato son estables
  * y producibles de forma independiente por cualquier consumidor remoto.
  *
- * IMPL-20260506-36
+ * IMPL-20260506-37
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-36_endurecimiento_contratos_externos_v1.md
  */
 describe("agent-context — buildHandoffRef (función canónica)", () => {

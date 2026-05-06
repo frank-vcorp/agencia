@@ -6,7 +6,7 @@ Endurecimiento de contratos externos V1
 
 ## Estado
 
-Activo
+Cerrado
 
 ## Fecha
 

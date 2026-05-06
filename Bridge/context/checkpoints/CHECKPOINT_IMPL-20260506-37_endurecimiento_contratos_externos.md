@@ -1,8 +1,8 @@
-# Checkpoint IMPL-20260506-36
+# Checkpoint IMPL-20260506-37
 ## Endurecimiento de Contratos Externos V1
 
 **Fecha:** 2026-05-06
-**ID de Intervención:** IMPL-20260506-36
+**ID de Intervención:** IMPL-20260506-37
 **Agente:** SOFIA - Builder
 **SPEC de respaldo:** context/SPECs/SPEC_ARCH-20260506-36_endurecimiento_contratos_externos_v1.md
 **Commit:** `faa7e36`
@@ -23,13 +23,13 @@ Ambos puntos fueron eliminados. La hipótesis se validó implementando las primi
 ## Cambios implementados
 
 ### `lib/agent-context.ts`
-- **Watermark actualizada:** `IMPL-20260506-36` + respaldo a SPEC-36 agregados al bloque JSDoc de cabecera.
+- **Watermark actualizada:** `IMPL-20260506-37` + respaldo a SPEC-36 agregados al bloque JSDoc de cabecera.
 - **`EXTERNAL_CONTRACT_VERSION`** exportada como `"1.0" as const`. Los 4 builders (`buildBriefExternalContract`, `buildLeadExternalContract`, `buildQuotationExternalContract`, `buildAssetExternalContract`) ahora referencian esta constante.
 - **`buildHandoffRef(entityType, snapshotAt)`** exportada como función pura canónica. Los 4 builders delegan en ella en lugar de usar el template literal inline.
 - Bloque de sección nuevo: `// ─── Constantes canónicas de contratos externos ───`.
 
 ### `lib/agent-context.test.ts`
-- **Watermark actualizada:** `IMPL-20260506-36` + respaldo SPEC-36.
+- **Watermark actualizada:** `IMPL-20260506-37` + respaldo SPEC-36.
 - **Import actualizado:** agrega `buildHandoffRef`, `EXTERNAL_CONTRACT_VERSION`.
 - **11 tests nuevos** en 3 suites:
   - `buildHandoffRef (función canónica)`: formato, determinismo, discriminación por entidad, discriminación por timestamp.
@@ -76,7 +76,7 @@ La capa `externalContracts` ahora cumple los 5 atributos de la decisión arquite
 
 ## Estado de la V1 y nota de cierre de corte
 
-Este corte (36) completa el endurecimiento contractual que faltaba para declarar la V1 realmente lista para consumidores remotos más estrictos.
+Este corte completa el endurecimiento contractual que faltaba para declarar la V1 realmente lista para consumidores remotos más estrictos.
 
 **¿La V1 está lista para cierre?**
 
