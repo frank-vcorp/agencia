@@ -6,7 +6,7 @@ Consumo remoto con tenancy reforzado V1
 
 ## Estado
 
-Activo
+Cerrado
 
 ## Fecha
 

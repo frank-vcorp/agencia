@@ -1,13 +1,13 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** ARCH-20260506-34
+**ID activo:** ARCH-20260506-35
 **Fecha de actualizacion:** 2026-05-06  
-**Estado general:** V1 publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos, contratos externos mínimos y continuidad conversacional por entidad visibles en produccion sobre Supabase y Vercel
+**Estado general:** V1 publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos, contratos externos mínimos, continuidad conversacional por entidad y consumo remoto tenant-aware visibles en produccion sobre Supabase y Vercel
 
 ## MICRO-SPRINT ACTIVO
 
-### MICRO-SPRINT: Consumo remoto con tenancy reforzado
+### MICRO-SPRINT: Estadisticas resumidas con datos reales
 
 **Fecha:** 2026-05-06  
 **Proyecto:** Bridge  
@@ -15,16 +15,16 @@
 
 ### Entregable Demostrable
 
-> Bridge expone un consumo remoto más estable y consciente del tenant activo, apoyado en los contratos externos ya validados sobre objetos vivos.
+> Bridge expone estadisticas resumidas reales que ayudan a leer el estado operativo sin abrir cada entidad manualmente.
 
 ### Como se Demuestra
 
 1. abrir la URL productiva de Bridge,
 2. abrir la superficie de contexto para agentes,
 3. confirmar tenant real `vectoria` y snapshot vigente,
-4. validar payload remoto estable por entidad y tenant,
-5. comprobar que el consumo remoto conserva trazabilidad,
-6. confirmar que la capa remota no reemplaza la fuente primaria.
+4. validar metricas resumidas con datos reales del tenant,
+5. comprobar que las metricas no reemplazan la fuente primaria,
+6. confirmar que la lectura sigue siendo derivada y trazable.
 
 ## ESTADO COMPROBABLE ACTUAL
 
@@ -59,25 +59,26 @@
 27. El corte `ARCH-20260506-31 / IMPL-20260506-31` ya publica handoffs remotos compactos por `brief`, `lead`, `quotation` y `asset` sobre la misma superficie `/contexto-agentes`.
 28. El corte `ARCH-20260506-32 / IMPL-20260506-32` ya publica contratos externos mínimos `v1.0` por `brief`, `lead`, `quotation` y `asset` en `/contexto-agentes`.
 29. El corte `ARCH-20260506-33 / IMPL-20260506-33` ya publica continuidad conversacional mínima sobre `brief`, `quotation` y `asset` reutilizando el patrón ya validado en `lead`.
+30. El corte `ARCH-20260506-34 / IMPL-20260506-34` ya publica una capa reusable de consumo remoto tenant-aware con trazabilidad explícita desde `/contexto-agentes`.
 
 ### [~] En curso
 
-1. Reforzar el consumo remoto con awareness explícito del tenant activo.
-2. Endurecer la capa de consumo externo sin acoplarla al layout humano.
-3. Mantener trazabilidad desde contrato remoto hasta fuente primaria.
+1. Derivar estadisticas resumidas reales desde la capa operativa ya existente.
+2. Hacer visibles esas metricas sin convertir `/contexto-agentes` en dashboard paralelo.
+3. Mantener trazabilidad y bajo acoplamiento con la fuente primaria.
 
 ### [ ] Pendiente
 
-1. Exponer consumo remoto con tenancy reforzado.
+1. Añadir estadísticas resumidas con datos reales cuando agreguen valor operativo.
 2. Endurecer contratos externos de agentes sobre objetos vivos.
-3. Añadir estadísticas resumidas con datos reales cuando agreguen valor operativo.
+3. Evaluar publicación posterior de una API final cuando el contrato se estabilice.
 
 ## Ultimo Corte Cerrado
 
-1. `ARCH-20260506-33 / IMPL-20260506-33` queda cerrado como corte completado y validado en produccion.
-2. `/briefs`, `/cotizaciones` y `/activos` ya exponen continuidad conversacional mínima reutilizando `conversation_threads` y `conversation_messages`.
-3. El commit feature publicado en `main` es `9bb0c6e`.
-4. El siguiente corte activo pasa a ser `ARCH-20260506-34` sobre consumo remoto con tenancy reforzado.
+1. `ARCH-20260506-34 / IMPL-20260506-34` queda cerrado como corte completado y validado en local con build y tests verdes, listo para validacion productiva.
+2. `/contexto-agentes` ya expone `TenantRemoteContext` como capa reusable derivada del snapshot y de `externalContracts`, con `traceMap` explícito por tenant.
+3. El commit feature publicado en `main` es `6c9824d`.
+4. El siguiente corte activo pasa a ser `ARCH-20260506-35` sobre estadisticas resumidas con datos reales.
 
 ## Artefactos Clave
 
@@ -131,6 +132,8 @@
 47. context/SPECs/SPEC_ARCH-20260506-32_contratos_externos_minimos_objetos_vivos_v1.md
 48. context/SPECs/SPEC_ARCH-20260506-33_continuidad_conversacional_entidades_restantes_v1.md
 49. context/SPECs/SPEC_ARCH-20260506-34_consumo_remoto_tenancy_reforzado_v1.md
+50. context/checkpoints/CHECKPOINT_IMPL-20260506-34.md
+51. context/SPECs/SPEC_ARCH-20260506-35_estadisticas_resumidas_datos_reales_v1.md
 
 ## Decisiones Ya Tomadas
 
@@ -181,21 +184,22 @@
 27. Implementar handoffs remotos endurecidos por entidad.
 28. Implementar contratos externos mínimos sobre objetos vivos.
 29. Implementar continuidad conversacional en entidades restantes.
+30. Implementar consumo remoto con tenancy reforzado.
 
 ### [~] Planificado para el siguiente corte
 
-1. Exponer consumo remoto con tenancy reforzado sobre la capa ya derivada.
-2. Mantener el payload remoto estable y desacoplado del layout humano.
-3. Reforzar trazabilidad tenant-entidad-fuente en el consumo externo.
-4. Reusar `/contexto-agentes` como superficie de inspección, no como API final.
+1. Derivar estadísticas resumidas reales desde brief, cotizacion, activos y CRM.
+2. Exponerlas como lectura compacta y trazable sin abrir nuevas queries especializadas.
+3. Reusar `/contexto-agentes` o la capa derivada existente sin duplicar dashboards.
+4. Mantener las metricas como complemento, no como fuente primaria.
 5. Mantener automatización generativa fuera de este corte.
 
 ### [ ] Posterior
 
 1. Implementar chat contextual real por entidad.
-2. Implementar estadisticas resumidas con datos reales.
-3. Implementar handoffs remotos completos para agentes.
-4. Endurecer contratos externos de agentes sobre objetos vivos.
+2. Implementar handoffs remotos completos para agentes.
+3. Endurecer contratos externos de agentes sobre objetos vivos.
+4. Evaluar una API final cuando el contrato remoto esté más estable.
 
 ## Riesgos Abiertos
 
@@ -207,8 +211,8 @@
 
 ## Siguiente Paso Recomendado
 
-Mover Bridge desde continuidad conversacional mínima hacia consumo remoto con tenancy reforzado y posterior endurecimiento de contratos externos, manteniendo la fuente primaria como eje, en este orden:
+Mover Bridge desde consumo remoto tenant-aware hacia estadisticas resumidas reales y posterior endurecimiento contractual, manteniendo la fuente primaria como eje, en este orden:
 
-1. consumo remoto con tenancy reforzado,
+1. estadísticas resumidas con datos reales,
 2. endurecimiento posterior de contratos externos,
-3. estadísticas resumidas cuando aporten valor operativo.
+3. evaluación posterior de una API final estable.
