@@ -1,20 +1,26 @@
 /**
  * IMPL-20260506-30
- * Respaldo: context/SPECs/SPEC_ARCH-20260505-30_conocimiento_derivado_agentes_v1.md
+ * IMPL-20260506-31
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
  */
 import { describe, expect, it } from "vitest";
 
 import {
+  buildAssetHandoff,
+  buildBriefHandoff,
+  buildLeadHandoff,
+  buildQuotationHandoff,
   deriveAssetSummary,
   deriveBriefSummary,
   deriveLeadSummary,
   deriveQuotationSummary,
+  resolveEntityNextAction,
   selectRepresentativeLead,
   type AgentContextSnapshot,
   type BriefAgentSummary,
   type QuotationAgentSummary
 } from "./agent-context";
-import { type AssetsDashboardSummary, type BriefDashboardSummary, type QuotationDashboardSummary } from "./dashboard";
+import { type AssetsDashboardSummary, type BriefDashboardSummary, type NextAction, type QuotationDashboardSummary } from "./dashboard";
 import { type Lead } from "./crm";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -212,5 +218,159 @@ describe("agent-context — coherencia de campos source", () => {
   it("QuotationAgentSummary.source es el literal correcto", () => {
     const s: QuotationAgentSummary = deriveQuotationSummary(cotizacionEnviada);
     expect(s.source).toBe("quotations/getQuotationWorkspace");
+  });
+});
+
+// ─── IMPL-20260506-31: handoffs remotos por entidad ──────────────────────────
+
+const SNAPSHOT_AT = "2026-05-06T12:00:00.000Z";
+const TENANT_SLUG = "vectoria";
+
+const nextActionBriefs: NextAction = {
+  label: "Consolidar el brief",
+  href: "/briefs",
+  reason: "El brief está en borrador."
+};
+
+const nextActionCotizaciones: NextAction = {
+  label: "Enviar cotización",
+  href: "/cotizaciones",
+  reason: "La cotización sigue en borrador."
+};
+
+const nextActionActivos: NextAction = {
+  label: "Revisar foco operativo",
+  href: "/activos",
+  reason: "5 activos en el proyecto."
+};
+
+// ─── resolveEntityNextAction ──────────────────────────────────────────────────
+
+describe("agent-context — resolveEntityNextAction", () => {
+  it("devuelve la nextAction cuando el href coincide exactamente", () => {
+    const result = resolveEntityNextAction(nextActionBriefs, "/briefs");
+    expect(result).toBe(nextActionBriefs);
+  });
+
+  it("devuelve null cuando el href no coincide", () => {
+    const result = resolveEntityNextAction(nextActionBriefs, "/cotizaciones");
+    expect(result).toBeNull();
+  });
+
+  it("devuelve null para /activos cuando la nextAction apunta a /briefs", () => {
+    const result = resolveEntityNextAction(nextActionBriefs, "/activos");
+    expect(result).toBeNull();
+  });
+});
+
+// ─── buildBriefHandoff ────────────────────────────────────────────────────────
+
+describe("agent-context — buildBriefHandoff", () => {
+  const briefSummary = deriveBriefSummary(briefConsolidado);
+
+  it("construye el handoff con todos los campos obligatorios", () => {
+    const handoff = buildBriefHandoff(briefSummary, SNAPSHOT_AT, TENANT_SLUG, nextActionBriefs);
+
+    expect(handoff.entityType).toBe("brief");
+    expect(handoff.source).toBe("briefing/getBriefWorkspace");
+    expect(handoff.snapshotAt).toBe(SNAPSHOT_AT);
+    expect(handoff.tenantSlug).toBe(TENANT_SLUG);
+    expect(handoff.payload).toBe(briefSummary);
+    expect(handoff.nextAction).toBe(nextActionBriefs);
+  });
+
+  it("acepta nextAction null cuando no aplica", () => {
+    const handoff = buildBriefHandoff(briefSummary, SNAPSHOT_AT, null, null);
+
+    expect(handoff.nextAction).toBeNull();
+    expect(handoff.tenantSlug).toBeNull();
+  });
+});
+
+// ─── buildLeadHandoff ─────────────────────────────────────────────────────────
+
+describe("agent-context — buildLeadHandoff", () => {
+  const leadSummary = deriveLeadSummary(makeLead("en_seguimiento", { name: "Tech SA" }));
+
+  it("construye el handoff con entityType lead", () => {
+    const handoff = buildLeadHandoff(leadSummary, SNAPSHOT_AT, TENANT_SLUG);
+
+    expect(handoff.entityType).toBe("lead");
+    expect(handoff.source).toBe("crm/getLeadsForDefaultTenant");
+    expect(handoff.snapshotAt).toBe(SNAPSHOT_AT);
+    expect(handoff.tenantSlug).toBe(TENANT_SLUG);
+    expect(handoff.payload).toBe(leadSummary);
+  });
+
+  it("nextAction es siempre null para lead", () => {
+    const handoff = buildLeadHandoff(leadSummary, SNAPSHOT_AT, TENANT_SLUG);
+    expect(handoff.nextAction).toBeNull();
+  });
+});
+
+// ─── buildQuotationHandoff ────────────────────────────────────────────────────
+
+describe("agent-context — buildQuotationHandoff", () => {
+  const quotationSummary = deriveQuotationSummary(cotizacionEnviada);
+
+  it("construye el handoff con entityType quotation", () => {
+    const handoff = buildQuotationHandoff(quotationSummary, SNAPSHOT_AT, TENANT_SLUG, nextActionCotizaciones);
+
+    expect(handoff.entityType).toBe("quotation");
+    expect(handoff.source).toBe("quotations/getQuotationWorkspace");
+    expect(handoff.snapshotAt).toBe(SNAPSHOT_AT);
+    expect(handoff.payload).toBe(quotationSummary);
+    expect(handoff.nextAction).toBe(nextActionCotizaciones);
+  });
+
+  it("acepta nextAction null cuando no aplica", () => {
+    const handoff = buildQuotationHandoff(quotationSummary, SNAPSHOT_AT, null, null);
+    expect(handoff.nextAction).toBeNull();
+  });
+});
+
+// ─── buildAssetHandoff ────────────────────────────────────────────────────────
+
+describe("agent-context — buildAssetHandoff", () => {
+  const assetSummary = deriveAssetSummary(activosConDatos);
+
+  it("construye el handoff con entityType asset", () => {
+    const handoff = buildAssetHandoff(assetSummary, SNAPSHOT_AT, TENANT_SLUG, nextActionActivos);
+
+    expect(handoff.entityType).toBe("asset");
+    expect(handoff.source).toBe("assets/getAssetsForDefaultTenant");
+    expect(handoff.snapshotAt).toBe(SNAPSHOT_AT);
+    expect(handoff.payload).toBe(assetSummary);
+    expect(handoff.nextAction).toBe(nextActionActivos);
+  });
+
+  it("acepta nextAction null cuando no aplica", () => {
+    const handoff = buildAssetHandoff(assetSummary, SNAPSHOT_AT, TENANT_SLUG, null);
+    expect(handoff.nextAction).toBeNull();
+  });
+});
+
+// ─── AgentRemoteHandoffs — integridad de campos ───────────────────────────────
+
+describe("agent-context — integridad de handoffs por entidad", () => {
+  it("cada handoff conserva trazabilidad snapshotAt y tenantSlug", () => {
+    const briefs = buildBriefHandoff(deriveBriefSummary(briefConsolidado), SNAPSHOT_AT, TENANT_SLUG, null);
+    const lead = buildLeadHandoff(deriveLeadSummary(makeLead("nuevo")), SNAPSHOT_AT, TENANT_SLUG);
+    const quot = buildQuotationHandoff(deriveQuotationSummary(cotizacionEnviada), SNAPSHOT_AT, TENANT_SLUG, null);
+    const asset = buildAssetHandoff(deriveAssetSummary(activosConDatos), SNAPSHOT_AT, TENANT_SLUG, null);
+
+    for (const handoff of [briefs, lead, quot, asset]) {
+      expect(handoff.snapshotAt).toBe(SNAPSHOT_AT);
+      expect(handoff.tenantSlug).toBe(TENANT_SLUG);
+      expect(handoff.entityType).toBeTruthy();
+      expect(handoff.source).toBeTruthy();
+    }
+  });
+
+  it("resolveEntityNextAction distribuye la nextAction solo a la entidad correspondiente", () => {
+    const nextAction = nextActionBriefs; // apunta a /briefs
+    expect(resolveEntityNextAction(nextAction, "/briefs")).not.toBeNull();
+    expect(resolveEntityNextAction(nextAction, "/cotizaciones")).toBeNull();
+    expect(resolveEntityNextAction(nextAction, "/activos")).toBeNull();
   });
 });

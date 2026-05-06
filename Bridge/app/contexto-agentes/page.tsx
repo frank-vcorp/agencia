@@ -1,6 +1,7 @@
 /**
  * IMPL-20260506-30
- * Respaldo: context/SPECs/SPEC_ARCH-20260505-30_conocimiento_derivado_agentes_v1.md
+ * IMPL-20260506-31
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
  *
  * Superficie humana del snapshot derivado para agentes y operadores.
  * Muestra el estado operativo resumido y trazable del tenant activo.
@@ -40,6 +41,42 @@ function Row({ label, value }: { label: string; value: string | null }) {
 
 function EmptyState({ label }: { label: string }) {
   return <p className="text-sm text-zinc-600 italic">{label}</p>;
+}
+
+type AnyHandoff = {
+  entityType: string;
+  source: string;
+  snapshotAt: string;
+  tenantSlug: string | null;
+  nextAction: { label: string; reason: string; href: string } | null;
+};
+
+function HandoffBlock({ handoff }: { handoff: AnyHandoff | null }) {
+  if (!handoff) return null;
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-mono font-semibold text-indigo-400 uppercase tracking-wider">
+          {handoff.entityType}
+        </span>
+        <span className="text-xs text-zinc-600 font-mono">{handoff.snapshotAt}</span>
+      </div>
+      <p className="text-xs text-zinc-500 mb-1">fuente: {handoff.source}</p>
+      <p className="text-xs text-zinc-600">tenant: {handoff.tenantSlug ?? "—"}</p>
+      {handoff.nextAction && (
+        <div className="rounded-md bg-zinc-800/60 px-3 py-2 mt-3">
+          <p className="text-xs font-medium text-amber-400">{handoff.nextAction.label}</p>
+          <p className="text-xs text-zinc-400 mt-0.5">{handoff.nextAction.reason}</p>
+          <a
+            href={handoff.nextAction.href}
+            className="inline-block mt-2 text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
+          >
+            Ir a {handoff.nextAction.href}
+          </a>
+        </div>
+      )}
+    </Card>
+  );
 }
 
 // ─── Página ───────────────────────────────────────────────────────────────────
@@ -167,6 +204,25 @@ export default async function ContextoAgentesPage() {
           <Row label="Resumen" value={snapshot.crm.label} />
         </div>
       </Card>
+
+      {/* Handoffs remotos por entidad */}
+      <div>
+        <div className="mb-4">
+          <h2 className="text-sm font-semibold text-zinc-100 uppercase tracking-wide">
+            Handoffs remotos por entidad
+          </h2>
+          <p className="text-xs text-zinc-500 mt-1">
+            Contratos compactos y trazables listos para transporte remoto. Derivados del snapshot;
+            no reemplazan la fuente primaria. Generados en el mismo instante que el snapshot.
+          </p>
+        </div>
+        <div className="grid gap-4">
+          <HandoffBlock handoff={snapshot.handoffs.brief} />
+          <HandoffBlock handoff={snapshot.handoffs.lead} />
+          <HandoffBlock handoff={snapshot.handoffs.quotation} />
+          <HandoffBlock handoff={snapshot.handoffs.asset} />
+        </div>
+      </div>
     </div>
   );
 }

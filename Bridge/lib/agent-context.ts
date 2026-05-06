@@ -85,6 +85,43 @@ export type CrmAgentSummary = {
   label: string;
 };
 
+// ─── Tipos de handoff remoto por entidad ─────────────────────────────────────
+
+/**
+ * Contrato remoto mínimo por entidad. Compacto, trazable y apto para transporte.
+ * Derivado del snapshot; NO reemplaza la fuente primaria.
+ *
+ * IMPL-20260506-31
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
+ */
+export type RemoteHandoff<TEntityType extends string, TPayload extends object> = {
+  /** Discriminante de entidad para consumo remoto */
+  entityType: TEntityType;
+  /** Módulo y función de origen del payload */
+  source: string;
+  /** ISO 8601 del momento en que se generó este handoff */
+  snapshotAt: string;
+  /** Slug del tenant activo, o null si no hay configuración */
+  tenantSlug: string | null;
+  /** Payload compacto y trazable de la entidad */
+  payload: TPayload;
+  /** Siguiente acción recomendada para esta entidad; null si no aplica */
+  nextAction: { label: string; reason: string; href: string } | null;
+};
+
+export type BriefRemoteHandoff = RemoteHandoff<"brief", BriefAgentSummary>;
+export type LeadRemoteHandoff = RemoteHandoff<"lead", LeadAgentSummary>;
+export type QuotationRemoteHandoff = RemoteHandoff<"quotation", QuotationAgentSummary>;
+export type AssetRemoteHandoff = RemoteHandoff<"asset", AssetAgentSummary>;
+
+/** Colección de handoffs remotos por entidad. null cuando la entidad no existe en el tenant. */
+export type AgentRemoteHandoffs = {
+  brief: BriefRemoteHandoff | null;
+  lead: LeadRemoteHandoff | null;
+  quotation: QuotationRemoteHandoff | null;
+  asset: AssetRemoteHandoff | null;
+};
+
 /**
  * Snapshot derivado completo para agentes y operadores.
  * Contiene resúmenes trazables de las cuatro entidades operativas principales.
@@ -106,6 +143,8 @@ export type AgentContextSnapshot = {
   crm: CrmAgentSummary;
   /** Siguiente acción recomendada para el operador */
   nextAction: NextAction;
+  /** Handoffs remotos compactos por entidad, listos para transporte */
+  handoffs: AgentRemoteHandoffs;
 };
 
 // ─── Funciones puras de derivación (testeables) ───────────────────────────────
@@ -171,6 +210,86 @@ export function deriveAssetSummary(assets: AssetsDashboardSummary): AssetAgentSu
   };
 }
 
+// ─── Funciones de handoff remoto por entidad (puras, testeables) ──────────────
+
+/**
+ * Devuelve la nextAction global si su href apunta a la ruta de la entidad; null si no aplica.
+ * Función pura usada para distribuir la acción al handoff correcto.
+ */
+export function resolveEntityNextAction(
+  globalNextAction: NextAction,
+  entityHref: string
+): NextAction | null {
+  return globalNextAction.href === entityHref ? globalNextAction : null;
+}
+
+/** Construye el handoff remoto de un brief. Función pura. */
+export function buildBriefHandoff(
+  brief: BriefAgentSummary,
+  snapshotAt: string,
+  tenantSlug: string | null,
+  nextAction: NextAction | null
+): BriefRemoteHandoff {
+  return {
+    entityType: "brief",
+    source: brief.source,
+    snapshotAt,
+    tenantSlug,
+    payload: brief,
+    nextAction
+  };
+}
+
+/** Construye el handoff remoto de un lead. Función pura. nextAction siempre null (no aplica). */
+export function buildLeadHandoff(
+  lead: LeadAgentSummary,
+  snapshotAt: string,
+  tenantSlug: string | null
+): LeadRemoteHandoff {
+  return {
+    entityType: "lead",
+    source: lead.source,
+    snapshotAt,
+    tenantSlug,
+    payload: lead,
+    nextAction: null
+  };
+}
+
+/** Construye el handoff remoto de una cotización. Función pura. */
+export function buildQuotationHandoff(
+  quotation: QuotationAgentSummary,
+  snapshotAt: string,
+  tenantSlug: string | null,
+  nextAction: NextAction | null
+): QuotationRemoteHandoff {
+  return {
+    entityType: "quotation",
+    source: quotation.source,
+    snapshotAt,
+    tenantSlug,
+    payload: quotation,
+    nextAction
+  };
+}
+
+/** Construye el handoff remoto de activos. Función pura. */
+export function buildAssetHandoff(
+  asset: AssetAgentSummary,
+  snapshotAt: string,
+  tenantSlug: string | null,
+  nextAction: NextAction | null
+): AssetRemoteHandoff {
+  return {
+    entityType: "asset",
+    source: asset.source,
+    snapshotAt,
+    tenantSlug,
+    payload: asset,
+    nextAction
+  };
+}
+
 // ─── Función principal server-side ────────────────────────────────────────────
 
 /**
@@ -192,10 +311,25 @@ export async function getAgentContextSnapshot(): Promise<AgentContextSnapshot> {
   const assets = summary.assets ? deriveAssetSummary(summary.assets) : null;
 
   const nextAction = resolveNextAction(summary.brief, summary.quotation, summary.assets);
+  const snapshotAt = new Date().toISOString();
+  const tenantSlug = summary.tenant?.slug ?? null;
+
+  const handoffs: AgentRemoteHandoffs = {
+    brief: brief
+      ? buildBriefHandoff(brief, snapshotAt, tenantSlug, resolveEntityNextAction(nextAction, "/briefs"))
+      : null,
+    lead: lead ? buildLeadHandoff(lead, snapshotAt, tenantSlug) : null,
+    quotation: quotation
+      ? buildQuotationHandoff(quotation, snapshotAt, tenantSlug, resolveEntityNextAction(nextAction, "/cotizaciones"))
+      : null,
+    asset: assets
+      ? buildAssetHandoff(assets, snapshotAt, tenantSlug, resolveEntityNextAction(nextAction, "/activos"))
+      : null
+  };
 
   return {
-    snapshotAt: new Date().toISOString(),
-    tenantSlug: summary.tenant?.slug ?? null,
+    snapshotAt,
+    tenantSlug,
     lead,
     brief,
     quotation,
@@ -206,6 +340,7 @@ export async function getAgentContextSnapshot(): Promise<AgentContextSnapshot> {
       activeLeads: crmMetrics.activeLeads,
       label: crmMetrics.label
     },
-    nextAction
+    nextAction,
+    handoffs
   };
 }
