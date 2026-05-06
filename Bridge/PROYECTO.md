@@ -1,13 +1,13 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** ARCH-20260505-28
+**ID activo:** ARCH-20260505-30
 **Fecha de actualizacion:** 2026-05-05  
 **Estado general:** V1 publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable y CRM ligero visibles en produccion sobre Supabase y Vercel
 
 ## MICRO-SPRINT ACTIVO
 
-### MICRO-SPRINT: Chat contextual real por entidad
+### MICRO-SPRINT: Conocimiento derivado utilizable por agentes
 
 **Fecha:** 2026-05-05  
 **Proyecto:** Bridge  
@@ -15,18 +15,18 @@
 
 ### Entregable Demostrable
 
-> El operador, diseñador o cliente pueden abrir una conversación colgada de una entidad real de Bridge y dejar mensajes persistidos sin salir del sistema ni perder el contexto fuente.
+> Bridge expone una primera capa de conocimiento derivado sobre objetos vivos para que agentes y operadores consulten el estado operativo sin rehacer lectura manual de briefs, leads, cotizaciones y activos.
 
 ### Como se Demuestra
 
 1. abrir la URL productiva de Bridge,
 2. ver el dashboard principal cargando correctamente,
 3. confirmar tenant real `vectoria`, canal primario y modulos activos,
-4. abrir una entidad soportada, empezando por `/crm` sobre un lead real,
-5. validar cabecera contextual con resumen de la entidad fuente,
-6. publicar un mensaje manual corto,
-7. recargar y confirmar persistencia del hilo,
-8. comprobar trazabilidad de actor y timestamps.
+4. abrir la superficie que exponga el resumen derivado,
+5. validar que el estado se construye desde datos vivos,
+6. confirmar que un agente puede consumir el resumen sin releer toda la entidad,
+7. comprobar trazabilidad de frescura y fuente,
+8. validar que el flujo no reemplaza la fuente primaria.
 
 ## ESTADO COMPROBABLE ACTUAL
 
@@ -54,12 +54,14 @@
 20. Migracion correctiva de RLS para CRM aplicada remotamente con escritura restringida a `service_role`.
 21. Produccion en `vectoria-zeta.vercel.app/crm` ya sirve el pipeline real de leads del tenant `vectoria`.
 22. El corte `ARCH-20260505-27 / IMPL-20260505-27` ya permite crear leads vinculados explicitamente a cliente y proyecto desde `/crm`.
+23. El corte `ARCH-20260505-29 / IMPL-20260505-29` ya valida de forma cruzada la consistencia `clientId/projectId` antes de persistir leads en CRM.
+24. El corte `ARCH-20260505-28 / IMPL-20260506-28` ya publica chat contextual real sobre `lead` en CRM con persistencia mínima de threads y mensajes.
 
 ### [~] En curso
 
-1. Abrir el primer hilo contextual real sobre entidades persistidas.
-2. Definir el modelo minimo de threads y mensajes por entidad.
-3. Mantener la conversación anclada a la fuente primaria del objeto.
+1. Diseñar la primera capa de conocimiento derivado utilizable por agentes.
+2. Exponer resumenes vivos sin desplazar la fuente primaria.
+3. Mantener trazabilidad de frescura, objeto origen y contexto operativo.
 
 ### [ ] Pendiente
 
@@ -69,10 +71,10 @@
 
 ## Ultimo Corte Cerrado
 
-1. `ARCH-20260505-27 / IMPL-20260505-27` queda cerrado como corte completado y validado en produccion.
-2. El operador ya puede crear leads vinculados explicitamente a cliente y proyecto desde `/crm`.
-3. El commit feature publicado en `main` es `ae33bba`.
-4. El siguiente corte activo pasa a ser `ARCH-20260505-28` sobre chat contextual real por entidad.
+1. `ARCH-20260505-28 / IMPL-20260506-28` queda cerrado como corte completado y validado en produccion.
+2. CRM ya expone conversación contextual por `lead` con persistencia mínima de mensajes.
+3. El commit feature publicado en `main` es `d6a5123`.
+4. El siguiente corte activo pasa a ser `ARCH-20260505-30` sobre conocimiento derivado utilizable por agentes.
 
 ## Artefactos Clave
 
@@ -100,19 +102,24 @@
 21. context/SPECs/SPEC_ARCH-20260505-26_crm_ligero_operativo_y_seguimiento_minimo_v1.md
 22. context/SPECs/SPEC_ARCH-20260505-27_vinculacion_explicita_lead_client_project_v1.md
 23. context/SPECs/SPEC_ARCH-20260505-28_chat_contextual_por_entidad_v1.md
-24. context/checkpoints/CHECKPOINT_IMPL-20260505-21.md
-25. context/checkpoints/CHECKPOINT_IMPL-20260505-22.md
-26. context/checkpoints/CHECKPOINT_IMPL-20260505-23.md
-27. context/checkpoints/CHECKPOINT_IMPL-20260505-24.md
-28. context/checkpoints/CHECKPOINT_IMPL-20260505-25_cabina_operador_accionable.md
-29. context/checkpoints/CHECKPOINT_IMPL-20260505-26_crm_ligero_operativo.md
-30. context/checkpoints/CHECKPOINT_IMPL-20260505-27.md
-31. supabase/migrations/20260505223000_identity_memberships_actor_context_v1.sql
-32. supabase/migrations/20260505235500_clients_projects_brief_container_v1.sql
-33. supabase/migrations/20260506000000_quotations_versionadas_v1.sql
-34. supabase/migrations/20260506020000_assets_and_prompt_versions_v1.sql
-35. supabase/migrations/20260506030000_crm_leads_v1.sql
-36. supabase/migrations/20260506032000_crm_rls_service_role_fix.sql
+24. context/SPECs/SPEC_ARCH-20260505-29_hardening_validacion_cruzada_crm_v1.md
+25. context/SPECs/SPEC_ARCH-20260505-30_conocimiento_derivado_agentes_v1.md
+26. context/checkpoints/CHECKPOINT_IMPL-20260505-21.md
+27. context/checkpoints/CHECKPOINT_IMPL-20260505-22.md
+28. context/checkpoints/CHECKPOINT_IMPL-20260505-23.md
+29. context/checkpoints/CHECKPOINT_IMPL-20260505-24.md
+30. context/checkpoints/CHECKPOINT_IMPL-20260505-25_cabina_operador_accionable.md
+31. context/checkpoints/CHECKPOINT_IMPL-20260505-26_crm_ligero_operativo.md
+32. context/checkpoints/CHECKPOINT_IMPL-20260505-27.md
+33. context/checkpoints/CHECKPOINT_IMPL-20260505-29.md
+34. context/checkpoints/CHECKPOINT_IMPL-20260506-28_chat_contextual_leads_v1.md
+35. supabase/migrations/20260505223000_identity_memberships_actor_context_v1.sql
+36. supabase/migrations/20260505235500_clients_projects_brief_container_v1.sql
+37. supabase/migrations/20260506000000_quotations_versionadas_v1.sql
+38. supabase/migrations/20260506020000_assets_and_prompt_versions_v1.sql
+39. supabase/migrations/20260506030000_crm_leads_v1.sql
+40. supabase/migrations/20260506032000_crm_rls_service_role_fix.sql
+41. supabase/migrations/20260506050000_conversation_threads_v1.sql
 
 ## Decisiones Ya Tomadas
 
@@ -157,14 +164,16 @@
 21. Implementar activos operables colgados de cotizacion y `project`.
 22. Implementar cabina del operador con resumenes reales.
 23. Implementar vinculacion explicita `lead -> client/project` desde CRM.
+24. Implementar hardening de validacion cruzada `clientId/projectId` en CRM.
+25. Implementar chat contextual real sobre `lead`.
 
 ### [~] Planificado para el siguiente corte
 
-1. Implementar threads y mensajes por entidad.
-2. Abrir el primer caso completo de chat contextual sobre `lead`.
-3. Replicar el patrón sobre al menos una entidad operativa adicional.
-4. Mostrar resumen contextual visible de la entidad fuente encima del hilo.
-5. Mantener IA automática y bandeja global fuera de este corte.
+1. Derivar snapshots útiles para agentes desde leads, briefs, cotizaciones y activos.
+2. Exponer frescura, fuente y resumen accionable por entidad.
+3. Mantener la lectura derivada desacoplada de la fuente primaria.
+4. Hacer reutilizable el resumen para handoffs y contexto remoto.
+5. Mantener automatización generativa fuera de este corte.
 
 ### [ ] Posterior
 
@@ -183,8 +192,8 @@
 
 ## Siguiente Paso Recomendado
 
-Mover Bridge desde CRM ligado al contenedor comercial hacia continuidad contextual real, manteniendo la entidad fuente como eje, en este orden:
+Mover Bridge desde conversación contextual sobre entidades reales hacia lectura derivada útil para agentes, manteniendo la fuente primaria como eje, en este orden:
 
-1. chat contextual real por entidad,
-2. contexto derivado mas fuerte para agentes,
-3. endurecimiento de handoffs remotos.
+1. conocimiento derivado utilizable por agentes,
+2. endurecimiento de handoffs remotos,
+3. contratos externos sobre objetos vivos.
