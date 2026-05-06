@@ -2,6 +2,8 @@
  * IMPL-20260505-24
  * Respaldo: context/ACTIVOS_OPERABLES_V1.md, context/CATALOGO_ACTIVOS_V1.md,
  *           context/SPECs/SPEC_ARCH-20260505-24_activos_vinculados_a_cotizacion_y_project_v1.md
+ * IMPL-20260506-33
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-33_continuidad_conversacional_entidades_restantes_v1.md
  */
 import { revalidatePath } from "next/cache";
 
@@ -20,6 +22,13 @@ import {
   placementLabel,
   type AssetStatus
 } from "@/lib/assets";
+import {
+  actorRoleLabel,
+  appendAssetMessage,
+  formatMessageTimestamp,
+  getAssetChat,
+  type EntityChat
+} from "@/lib/chat";
 
 async function createAssetAction(formData: FormData) {
   "use server";
@@ -54,6 +63,19 @@ async function createAssetAction(formData: FormData) {
   revalidatePath("/activos");
 }
 
+async function addAssetChatMessageAction(formData: FormData) {
+  "use server";
+
+  const assetId = String(formData.get("assetId") ?? "").trim();
+  const tenantId = String(formData.get("tenantId") ?? "").trim();
+  const messageText = String(formData.get("messageText") ?? "").trim();
+
+  if (!assetId || !tenantId || !messageText) return;
+
+  await appendAssetMessage(assetId, tenantId, messageText);
+  revalidatePath("/activos");
+}
+
 function statusBadgeClass(status: AssetStatus): string {
   if (status === "approved" || status === "delivered") {
     return "bg-[color:var(--accent-soft)] text-[color:var(--accent-deep)] ring-[color:rgba(200,93,39,0.18)]";
@@ -77,6 +99,16 @@ export default async function ActivosPage() {
   ]);
 
   const canCreate = Boolean(ctx.tenantId && ctx.clientId && ctx.projectId);
+
+  // Chats contextuales por activo — IMPL-20260506-33
+  const chatsByAssetId = Object.fromEntries(
+    await Promise.all(
+      workspaces.map(async ({ asset }) => {
+        const chat = await getAssetChat(asset.id);
+        return [asset.id, chat] as [string, EntityChat];
+      })
+    )
+  );
 
   return (
     <div className="space-y-6">
@@ -123,7 +155,10 @@ export default async function ActivosPage() {
             </div>
           ) : (
             <div className="mt-5 space-y-3">
-              {workspaces.map(({ asset, activePrompt }) => (
+              {workspaces.map(({ asset, activePrompt }) => {
+                const assetChat = chatsByAssetId[asset.id] ?? { thread: null, messages: [] };
+
+                return (
                 <article
                   key={asset.id}
                   className="rounded-[24px] bg-white/80 px-5 py-5 ring-1 ring-[color:var(--line)]"
@@ -161,8 +196,55 @@ export default async function ActivosPage() {
                       <p className="text-[11px] text-[color:var(--muted)]">Sin prompt vigente aun.</p>
                     </div>
                   )}
+
+                  {/* ── Chat contextual del activo — IMPL-20260506-33 ─────── */}
+                  <div className="mt-5 border-t border-[color:var(--line)] pt-4">
+                    <p className="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted)]">
+                      Conversacion sobre este activo
+                    </p>
+                    {assetChat.messages.length === 0 ? (
+                      <p className="mt-2 text-[11px] text-[color:var(--muted)]">
+                        Sin mensajes aun.
+                      </p>
+                    ) : (
+                      <div className="mt-2 space-y-2">
+                        {assetChat.messages.map((msg) => (
+                          <div
+                            key={msg.id}
+                            className="rounded-[12px] bg-white/70 px-3 py-2 ring-1 ring-[color:var(--line)]"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent-deep)]">
+                                {actorRoleLabel(msg.actorRole)}
+                              </span>
+                              <span className="text-[10px] text-[color:var(--muted)]">
+                                {formatMessageTimestamp(msg.createdAt)}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-sm leading-5">{msg.messageText}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <form action={addAssetChatMessageAction} className="mt-2 flex gap-2">
+                      <input type="hidden" name="assetId" value={asset.id} />
+                      <input type="hidden" name="tenantId" value={asset.tenantId} />
+                      <input
+                        name="messageText"
+                        placeholder="Comentario sobre este activo..."
+                        className="flex-1 rounded-[12px] border border-[color:var(--line)] bg-white/80 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent-deep)]"
+                      />
+                      <button
+                        type="submit"
+                        className="rounded-[12px] bg-[color:var(--accent-deep)] px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
+                      >
+                        Enviar
+                      </button>
+                    </form>
+                  </div>
                 </article>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>

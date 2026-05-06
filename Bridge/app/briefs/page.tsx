@@ -19,6 +19,13 @@ import {
   type BriefVersion,
   type StructuredBriefSummary
 } from "@/lib/briefing";
+import {
+  actorRoleLabel,
+  appendBriefMessage,
+  formatMessageTimestamp,
+  getBriefChat,
+  type EntityChat
+} from "@/lib/chat";
 import { getTenantIdentityContext } from "@/lib/identity";
 
 const summarySections: Array<{
@@ -153,6 +160,19 @@ async function createDerivedVersionAction(formData: FormData) {
   revalidatePath("/briefs");
 }
 
+async function addBriefChatMessageAction(formData: FormData) {
+  "use server";
+
+  const briefId = String(formData.get("briefId") ?? "").trim();
+  const tenantId = String(formData.get("tenantId") ?? "").trim();
+  const messageText = String(formData.get("messageText") ?? "").trim();
+
+  if (!briefId || !tenantId || !messageText) return;
+
+  await appendBriefMessage(briefId, tenantId, messageText);
+  revalidatePath("/briefs");
+}
+
 function buildSummaryPatchSeed(): StructuredBriefSummary {
   return {
     projectObjective: "",
@@ -208,6 +228,9 @@ export default async function BriefsPage() {
   const ownerLabel = brief?.container.project?.ownerMembershipId && brief.container.project.ownerMembershipId === identity?.operatorMembership?.id
     ? identity.operatorMembership.displayName
     : "Sin owner_membership operativa";
+
+  // Chat contextual del brief — IMPL-20260506-33
+  const briefChat: EntityChat = brief ? await getBriefChat(brief.id) : { thread: null, messages: [] };
 
   if (!brief || !currentVersion) {
     return (
@@ -547,6 +570,60 @@ export default async function BriefsPage() {
             )}
           </div>
         </article>
+      </section>
+
+      {/* ── Chat contextual del brief — IMPL-20260506-33 ──────────────────── */}
+      <section className="panel rounded-[30px] px-6 py-6">
+        <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">Conversacion operativa</p>
+        <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight">
+          Chat del brief
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
+          Seguimiento y decisiones operativas sobre este brief. Independiente de la conversacion fuente del cliente.
+        </p>
+
+        <div className="mt-5">
+          {briefChat.messages.length === 0 ? (
+            <p className="py-3 text-center text-[11px] text-[color:var(--muted)]">
+              Sin mensajes aun — inicia la conversacion operativa sobre este brief.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {briefChat.messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className="rounded-[14px] bg-white/70 px-3 py-2.5 ring-1 ring-[color:var(--line)]"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent-deep)]">
+                      {actorRoleLabel(msg.actorRole)}
+                    </span>
+                    <span className="text-[10px] text-[color:var(--muted)]">
+                      {formatMessageTimestamp(msg.createdAt)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm leading-6">{msg.messageText}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <form action={addBriefChatMessageAction} className="mt-3 flex gap-2">
+            <input type="hidden" name="briefId" value={brief.id} />
+            <input type="hidden" name="tenantId" value={brief.tenantId} />
+            <input
+              name="messageText"
+              placeholder="Escribe un mensaje operativo sobre este brief..."
+              className="flex-1 rounded-[14px] border border-[color:var(--line)] bg-white/80 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent-deep)]"
+            />
+            <button
+              type="submit"
+              className="rounded-[14px] bg-[color:var(--accent-deep)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+            >
+              Enviar
+            </button>
+          </form>
+        </div>
       </section>
     </div>
   );

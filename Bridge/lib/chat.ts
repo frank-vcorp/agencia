@@ -285,3 +285,127 @@ export async function appendLeadMessage(
     messageText
   });
 }
+
+// ─── Tipo genérico de chat por entidad ───────────────────────────────────────
+
+/**
+ * IMPL-20260506-33
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-33_continuidad_conversacional_entidades_restantes_v1.md
+ *
+ * Alias genérico reutilizable para brief, quotation y asset.
+ */
+export type EntityChat = LeadChat;
+
+// ─── Helpers para brief ───────────────────────────────────────────────────────
+
+/**
+ * Obtiene el chat completo de un brief: thread (null si no existe) + mensajes.
+ */
+export async function getBriefChat(briefId: string): Promise<EntityChat> {
+  if (!isSupabaseConfigured) return { thread: null, messages: [] };
+
+  const tenantId = await getDefaultTenantId();
+  if (!tenantId) return { thread: null, messages: [] };
+
+  const thread = await getThreadForEntity(tenantId, "brief", briefId);
+  if (!thread) return { thread: null, messages: [] };
+
+  const messages = await getMessagesByThread(thread.id);
+  return { thread, messages };
+}
+
+/**
+ * Publica un mensaje en el chat de un brief.
+ * Crea el thread si no existe todavía.
+ */
+export async function appendBriefMessage(
+  briefId: string,
+  tenantId: string,
+  messageText: string
+): Promise<ConversationMessage> {
+  const thread = await getOrCreateThread(tenantId, "brief", briefId);
+
+  return appendMessage({
+    threadId: thread.id,
+    tenantId,
+    actorRole: "operator",
+    actorLabel: "Operador",
+    messageText
+  });
+}
+
+// ─── Helpers para quotation ───────────────────────────────────────────────────
+
+/**
+ * Obtiene el chat completo de una cotización: thread (null si no existe) + mensajes.
+ */
+export async function getQuotationChat(quotationId: string): Promise<EntityChat> {
+  if (!isSupabaseConfigured) return { thread: null, messages: [] };
+
+  const tenantId = await getDefaultTenantId();
+  if (!tenantId) return { thread: null, messages: [] };
+
+  const thread = await getThreadForEntity(tenantId, "quotation", quotationId);
+  if (!thread) return { thread: null, messages: [] };
+
+  const messages = await getMessagesByThread(thread.id);
+  return { thread, messages };
+}
+
+/**
+ * Publica un mensaje en el chat de una cotización.
+ * Crea el thread si no existe todavía.
+ */
+export async function appendQuotationMessage(
+  quotationId: string,
+  tenantId: string,
+  messageText: string
+): Promise<ConversationMessage> {
+  const thread = await getOrCreateThread(tenantId, "quotation", quotationId);
+
+  return appendMessage({
+    threadId: thread.id,
+    tenantId,
+    actorRole: "operator",
+    actorLabel: "Operador",
+    messageText
+  });
+}
+
+// ─── Helpers para asset ───────────────────────────────────────────────────────
+
+/**
+ * Obtiene el chat completo de un activo: thread (null si no existe) + mensajes.
+ */
+export async function getAssetChat(assetId: string): Promise<EntityChat> {
+  if (!isSupabaseConfigured) return { thread: null, messages: [] };
+
+  const tenantId = await getDefaultTenantId();
+  if (!tenantId) return { thread: null, messages: [] };
+
+  const thread = await getThreadForEntity(tenantId, "asset", assetId);
+  if (!thread) return { thread: null, messages: [] };
+
+  const messages = await getMessagesByThread(thread.id);
+  return { thread, messages };
+}
+
+/**
+ * Publica un mensaje en el chat de un activo.
+ * Crea el thread si no existe todavía.
+ */
+export async function appendAssetMessage(
+  assetId: string,
+  tenantId: string,
+  messageText: string
+): Promise<ConversationMessage> {
+  const thread = await getOrCreateThread(tenantId, "asset", assetId);
+
+  return appendMessage({
+    threadId: thread.id,
+    tenantId,
+    actorRole: "operator",
+    actorLabel: "Operador",
+    messageText
+  });
+}
