@@ -1,0 +1,285 @@
+/**
+ * IMPL-20260505-23
+ * Respaldo: context/COTIZACIONES_VERSIONADAS_V1.md, context/SPECs/SPEC_ARCH-20260505-23_cotizaciones_versionadas_v1.md, context/MODELO_DATOS_MULTITENANT_V1.md, context/CONTRATOS_AGENTES_Y_VSCODE_V1.md
+ */
+import { isSupabaseConfigured, supabaseEnv } from "./supabase";
+
+export type QuotationStatus = "draft" | "sent" | "approved" | "invoiced" | "paid";
+
+export type QuotationVersionAdminStatus =
+  | "draft"
+  | "in_review"
+  | "approved"
+  | "rejected"
+  | "superseded";
+
+export type CommercialSummary = {
+  totalEstimado: string;
+  plazo: string;
+  alcance: string;
+  incluye: string[];
+  nota: string;
+};
+
+export type QuotationVersion = {
+  id: string;
+  tenantId: string;
+  quotationId: string;
+  versionNumber: number;
+  title: string;
+  bodyMarkdown: string;
+  commercialSummaryJson: CommercialSummary | null;
+  adminStatus: QuotationVersionAdminStatus;
+  internalNote: string | null;
+  createdByUserId: string | null;
+  createdByAgentId: string | null;
+  createdAt: string;
+};
+
+export type Quotation = {
+  id: string;
+  tenantId: string;
+  clientId: string;
+  projectId: string;
+  briefId: string | null;
+  status: QuotationStatus;
+  activeVersionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type QuotationWorkspace = {
+  quotation: Quotation;
+  activeVersion: QuotationVersion | null;
+  versions: QuotationVersion[];
+};
+
+type QuotationRow = {
+  id: string;
+  tenant_id: string;
+  client_id: string;
+  project_id: string;
+  brief_id: string | null;
+  status: QuotationStatus;
+  active_version_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type QuotationVersionRow = {
+  id: string;
+  tenant_id: string;
+  quotation_id: string;
+  version_number: number;
+  title: string;
+  body_markdown: string;
+  commercial_summary_json: CommercialSummary | null;
+  admin_status: QuotationVersionAdminStatus;
+  internal_note: string | null;
+  created_by_user_id: string | null;
+  created_by_agent_id: string | null;
+  created_at: string;
+};
+
+type TenantRow = {
+  id: string;
+  slug: string;
+};
+
+export const quotationStatusLabels: Record<QuotationStatus, string> = {
+  draft: "Borrador",
+  sent: "Enviada",
+  approved: "Aprobada",
+  invoiced: "Facturada",
+  paid: "Pagada"
+};
+
+export const versionAdminStatusLabels: Record<QuotationVersionAdminStatus, string> = {
+  draft: "Borrador",
+  in_review: "En revision",
+  approved: "Aprobada",
+  rejected: "Rechazada",
+  superseded: "Reemplazada"
+};
+
+export function quotationStatusLabel(status: QuotationStatus): string {
+  return quotationStatusLabels[status] ?? status;
+}
+
+export function versionAdminStatusLabel(status: QuotationVersionAdminStatus): string {
+  return versionAdminStatusLabels[status] ?? status;
+}
+
+export function nextVersionNumber(versions: QuotationVersion[]): number {
+  if (versions.length === 0) {
+    return 1;
+  }
+
+  return Math.max(...versions.map((v) => v.versionNumber)) + 1;
+}
+
+function normalizeVersionRow(row: QuotationVersionRow): QuotationVersion {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    quotationId: row.quotation_id,
+    versionNumber: row.version_number,
+    title: row.title,
+    bodyMarkdown: row.body_markdown,
+    commercialSummaryJson: row.commercial_summary_json,
+    adminStatus: row.admin_status,
+    internalNote: row.internal_note,
+    createdByUserId: row.created_by_user_id,
+    createdByAgentId: row.created_by_agent_id,
+    createdAt: row.created_at
+  };
+}
+
+function normalizeQuotationRow(row: QuotationRow): Quotation {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    clientId: row.client_id,
+    projectId: row.project_id,
+    briefId: row.brief_id,
+    status: row.status,
+    activeVersionId: row.active_version_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function getServerApiKey() {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseEnv.anonKey;
+}
+
+async function postgrest<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${supabaseEnv.url}/rest/v1/${path}`, {
+    ...init,
+    headers: {
+      apikey: getServerApiKey(),
+      Authorization: `Bearer ${getServerApiKey()}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+      ...(init?.headers ?? {})
+    },
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(`supabase_postgrest_error:${response.status}`);
+  }
+
+  if (response.status === 204) {
+    return [] as T;
+  }
+
+  return (await response.json()) as T;
+}
+
+async function getTenantId(slug = supabaseEnv.defaultTenant): Promise<string | null> {
+  const params = new URLSearchParams({
+    select: "id,slug",
+    slug: `eq.${slug}`,
+    limit: "1"
+  });
+  const rows = await postgrest<TenantRow[]>(`tenants?${params.toString()}`, { method: "GET" });
+
+  return rows[0]?.id ?? null;
+}
+
+async function getLatestQuotationRow(tenantId: string): Promise<QuotationRow | null> {
+  const params = new URLSearchParams({
+    select:
+      "id,tenant_id,client_id,project_id,brief_id,status,active_version_id,created_at,updated_at",
+    tenant_id: `eq.${tenantId}`,
+    order: "created_at.desc",
+    limit: "1"
+  });
+  const rows = await postgrest<QuotationRow[]>(`quotations?${params.toString()}`, {
+    method: "GET"
+  });
+
+  return rows[0] ?? null;
+}
+
+async function getQuotationVersionRows(quotationId: string): Promise<QuotationVersionRow[]> {
+  const params = new URLSearchParams({
+    select:
+      "id,tenant_id,quotation_id,version_number,title,body_markdown,commercial_summary_json,admin_status,internal_note,created_by_user_id,created_by_agent_id,created_at",
+    quotation_id: `eq.${quotationId}`,
+    order: "version_number.asc"
+  });
+  return postgrest<QuotationVersionRow[]>(`quotation_versions?${params.toString()}`, {
+    method: "GET"
+  });
+}
+
+export async function getQuotationWorkspace(
+  slug = supabaseEnv.defaultTenant
+): Promise<QuotationWorkspace | null> {
+  if (!isSupabaseConfigured) {
+    return null;
+  }
+
+  const tenantId = await getTenantId(slug);
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const quotationRow = await getLatestQuotationRow(tenantId);
+
+  if (!quotationRow) {
+    return null;
+  }
+
+  const versionRows = await getQuotationVersionRows(quotationRow.id);
+  const versions = versionRows.map(normalizeVersionRow);
+  const quotation = normalizeQuotationRow(quotationRow);
+  const activeVersion =
+    versions.find((v) => v.id === quotation.activeVersionId) ?? null;
+
+  return { quotation, activeVersion, versions };
+}
+
+export async function createQuotationDraftVersion(
+  quotationId: string,
+  tenantId: string,
+  title: string,
+  bodyMarkdown: string,
+  versionNumber: number
+): Promise<QuotationVersion> {
+  const rows = await postgrest<QuotationVersionRow[]>("quotation_versions", {
+    method: "POST",
+    body: JSON.stringify({
+      quotation_id: quotationId,
+      tenant_id: tenantId,
+      version_number: versionNumber,
+      title: title.trim(),
+      body_markdown: bodyMarkdown.trim(),
+      admin_status: "draft"
+    })
+  });
+
+  const row = rows[0];
+
+  if (!row) {
+    throw new Error("quotations:create_version_failed");
+  }
+
+  return normalizeVersionRow(row);
+}
+
+export async function setQuotationActiveVersion(
+  quotationId: string,
+  versionId: string
+): Promise<void> {
+  await postgrest<QuotationRow[]>(
+    `quotations?id=eq.${encodeURIComponent(quotationId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ active_version_id: versionId })
+    }
+  );
+}
