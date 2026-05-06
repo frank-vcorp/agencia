@@ -6,7 +6,7 @@ Conocimiento derivado utilizable por agentes V1
 
 ## Estado
 
-Activo
+Cerrado
 
 ## Fecha
 

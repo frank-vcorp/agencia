@@ -1,32 +1,30 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** ARCH-20260505-30
-**Fecha de actualizacion:** 2026-05-05  
-**Estado general:** V1 publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable y CRM ligero visibles en produccion sobre Supabase y Vercel
+**ID activo:** ARCH-20260506-33
+**Fecha de actualizacion:** 2026-05-06  
+**Estado general:** V1 publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos y contratos externos mínimos visibles en produccion sobre Supabase y Vercel
 
 ## MICRO-SPRINT ACTIVO
 
-### MICRO-SPRINT: Conocimiento derivado utilizable por agentes
+### MICRO-SPRINT: Continuidad conversacional en entidades restantes
 
-**Fecha:** 2026-05-05  
+**Fecha:** 2026-05-06  
 **Proyecto:** Bridge  
 **Duracion estimada:** Sesion de implementacion, validacion y publicacion del siguiente corte
 
 ### Entregable Demostrable
 
-> Bridge expone una primera capa de conocimiento derivado sobre objetos vivos para que agentes y operadores consulten el estado operativo sin rehacer lectura manual de briefs, leads, cotizaciones y activos.
+> Bridge expone continuidad conversacional mínima sobre `brief`, `quotation` y `asset`, manteniendo el mismo patrón ya validado en `lead`.
 
 ### Como se Demuestra
 
 1. abrir la URL productiva de Bridge,
-2. ver el dashboard principal cargando correctamente,
-3. confirmar tenant real `vectoria`, canal primario y modulos activos,
-4. abrir la superficie que exponga el resumen derivado,
-5. validar que el estado se construye desde datos vivos,
-6. confirmar que un agente puede consumir el resumen sin releer toda la entidad,
-7. comprobar trazabilidad de frescura y fuente,
-8. validar que el flujo no reemplaza la fuente primaria.
+2. abrir la superficie de contexto para agentes,
+3. confirmar tenant real `vectoria` y snapshot vigente,
+4. abrir la entidad objetivo del nuevo corte,
+5. validar persistencia mínima de conversación contextual,
+6. confirmar que la conversación no reemplaza la fuente primaria.
 
 ## ESTADO COMPROBABLE ACTUAL
 
@@ -56,25 +54,29 @@
 22. El corte `ARCH-20260505-27 / IMPL-20260505-27` ya permite crear leads vinculados explicitamente a cliente y proyecto desde `/crm`.
 23. El corte `ARCH-20260505-29 / IMPL-20260505-29` ya valida de forma cruzada la consistencia `clientId/projectId` antes de persistir leads en CRM.
 24. El corte `ARCH-20260505-28 / IMPL-20260506-28` ya publica chat contextual real sobre `lead` en CRM con persistencia mínima de threads y mensajes.
+25. El corte `ARCH-20260505-30 / IMPL-20260506-30` ya publica en `/contexto-agentes` un snapshot derivado y trazable sobre brief, cotizacion, activos y CRM del tenant activo.
+26. Produccion en `vectoria-zeta.vercel.app/contexto-agentes` ya sirve contexto derivado vivo con `snapshotAt`, `source` y siguiente accion recomendada.
+27. El corte `ARCH-20260506-31 / IMPL-20260506-31` ya publica handoffs remotos compactos por `brief`, `lead`, `quotation` y `asset` sobre la misma superficie `/contexto-agentes`.
+28. El corte `ARCH-20260506-32 / IMPL-20260506-32` ya publica contratos externos mínimos `v1.0` por `brief`, `lead`, `quotation` y `asset` en `/contexto-agentes`.
 
 ### [~] En curso
 
-1. Diseñar la primera capa de conocimiento derivado utilizable por agentes.
-2. Exponer resumenes vivos sin desplazar la fuente primaria.
-3. Mantener trazabilidad de frescura, objeto origen y contexto operativo.
+1. Extender continuidad conversacional mínima sobre `brief`, `quotation` y `asset`.
+2. Reusar el patrón de threads y mensajes ya validado en `lead`.
+3. Mantener desacople entre conversación contextual y fuente primaria.
 
 ### [ ] Pendiente
 
-1. Completar chat contextual real y continuidad conversacional sobre `lead`, `brief`, `cotizacion` y `asset`.
-2. Implementar conocimiento derivado utilizable por agentes sobre datos vivos.
-3. Endurecer handoffs remotos y contratos externos por entidad.
+1. Completar chat contextual real y continuidad conversacional sobre `brief`, `cotizacion` y `asset`.
+2. Exponer consumo remoto con tenancy reforzado.
+3. Endurecer contratos externos de agentes sobre objetos vivos.
 
 ## Ultimo Corte Cerrado
 
-1. `ARCH-20260505-28 / IMPL-20260506-28` queda cerrado como corte completado y validado en produccion.
-2. CRM ya expone conversación contextual por `lead` con persistencia mínima de mensajes.
-3. El commit feature publicado en `main` es `d6a5123`.
-4. El siguiente corte activo pasa a ser `ARCH-20260505-30` sobre conocimiento derivado utilizable por agentes.
+1. `ARCH-20260506-32 / IMPL-20260506-32` queda cerrado como corte completado y validado en produccion.
+2. `/contexto-agentes` ya expone contratos externos mínimos `v1.0` derivados de handoffs remotos, además del snapshot y los handoffs compactos.
+3. El commit feature publicado en `main` es `4f2b0e3` y su ajuste documental en `40d125d`.
+4. El siguiente corte activo pasa a ser `ARCH-20260506-33` sobre continuidad conversacional en entidades restantes.
 
 ## Artefactos Clave
 
@@ -113,13 +115,19 @@
 32. context/checkpoints/CHECKPOINT_IMPL-20260505-27.md
 33. context/checkpoints/CHECKPOINT_IMPL-20260505-29.md
 34. context/checkpoints/CHECKPOINT_IMPL-20260506-28_chat_contextual_leads_v1.md
-35. supabase/migrations/20260505223000_identity_memberships_actor_context_v1.sql
-36. supabase/migrations/20260505235500_clients_projects_brief_container_v1.sql
-37. supabase/migrations/20260506000000_quotations_versionadas_v1.sql
-38. supabase/migrations/20260506020000_assets_and_prompt_versions_v1.sql
-39. supabase/migrations/20260506030000_crm_leads_v1.sql
-40. supabase/migrations/20260506032000_crm_rls_service_role_fix.sql
-41. supabase/migrations/20260506050000_conversation_threads_v1.sql
+35. context/checkpoints/CHECKPOINT_IMPL-20260506-30_conocimiento_derivado_agentes_v1.md
+36. context/checkpoints/CHECKPOINT_IMPL-20260506-31_handoffs_remotos_endurecidos_v1.md
+37. context/checkpoints/CHECKPOINT_IMPL-20260506-32_contratos_externos_minimos_v1.md
+38. supabase/migrations/20260505223000_identity_memberships_actor_context_v1.sql
+39. supabase/migrations/20260505235500_clients_projects_brief_container_v1.sql
+40. supabase/migrations/20260506000000_quotations_versionadas_v1.sql
+41. supabase/migrations/20260506020000_assets_and_prompt_versions_v1.sql
+42. supabase/migrations/20260506030000_crm_leads_v1.sql
+43. supabase/migrations/20260506032000_crm_rls_service_role_fix.sql
+44. supabase/migrations/20260506050000_conversation_threads_v1.sql
+45. context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
+46. context/SPECs/SPEC_ARCH-20260506-32_contratos_externos_minimos_objetos_vivos_v1.md
+47. context/SPECs/SPEC_ARCH-20260506-33_continuidad_conversacional_entidades_restantes_v1.md
 
 ## Decisiones Ya Tomadas
 
@@ -166,13 +174,16 @@
 23. Implementar vinculacion explicita `lead -> client/project` desde CRM.
 24. Implementar hardening de validacion cruzada `clientId/projectId` en CRM.
 25. Implementar chat contextual real sobre `lead`.
+26. Implementar conocimiento derivado utilizable por agentes.
+27. Implementar handoffs remotos endurecidos por entidad.
+28. Implementar contratos externos mínimos sobre objetos vivos.
 
 ### [~] Planificado para el siguiente corte
 
-1. Derivar snapshots útiles para agentes desde leads, briefs, cotizaciones y activos.
-2. Exponer frescura, fuente y resumen accionable por entidad.
-3. Mantener la lectura derivada desacoplada de la fuente primaria.
-4. Hacer reutilizable el resumen para handoffs y contexto remoto.
+1. Extender continuidad conversacional a `brief`, `quotation` y `asset`.
+2. Reutilizar el patrón de threads y mensajes ya probado en CRM.
+3. Mantener la conversación contextual desacoplada de la fuente primaria.
+4. Reusar `/contexto-agentes` y las superficies de entidad sin abrir una bandeja global nueva.
 5. Mantener automatización generativa fuera de este corte.
 
 ### [ ] Posterior
@@ -192,8 +203,8 @@
 
 ## Siguiente Paso Recomendado
 
-Mover Bridge desde conversación contextual sobre entidades reales hacia lectura derivada útil para agentes, manteniendo la fuente primaria como eje, en este orden:
+Mover Bridge desde contratos externos mínimos hacia continuidad conversacional en las entidades restantes y consumo remoto con tenancy reforzado, manteniendo la fuente primaria como eje, en este orden:
 
-1. conocimiento derivado utilizable por agentes,
-2. endurecimiento de handoffs remotos,
-3. contratos externos sobre objetos vivos.
+1. continuidad conversacional por entidad restante,
+2. consumo remoto con tenancy reforzado,
+3. endurecimiento posterior de contratos externos.
