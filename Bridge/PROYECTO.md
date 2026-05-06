@@ -1,13 +1,13 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** ARCH-20260505-23  
+**ID activo:** ARCH-20260505-25  
 **Fecha de actualizacion:** 2026-05-05  
-**Estado general:** V1 publicada con briefing persistido, identidad minima operativa y contenedor real client-project visible en produccion sobre Supabase y Vercel
+**Estado general:** V1 publicada con briefing persistido, identidad minima operativa, contenedor real client-project y activos operables visibles en produccion sobre Supabase y Vercel
 
 ## MICRO-SPRINT ACTIVO
 
-### MICRO-SPRINT: Cotizaciones versionadas sobre project activo
+### MICRO-SPRINT: Cabina del operador accionable con resumenes reales
 
 **Fecha:** 2026-05-05  
 **Proyecto:** Bridge  
@@ -15,16 +15,17 @@
 
 ### Entregable Demostrable
 
-> El operador puede trabajar una cotizacion versionada ligada al `project` activo y el cliente puede ver la version vigente dentro de Bridge.
+> El operador puede abrir el dashboard principal y ver el estado real del `project` activo, del brief, de la cotizacion vigente y de los activos, con siguiente accion visible y sin placeholders engañosos.
 
 ### Como se Demuestra
 
 1. abrir la URL productiva de Bridge,
 2. ver el dashboard principal cargando correctamente,
 3. confirmar tenant real `vectoria`, canal primario y modulos activos,
-4. abrir `/cotizaciones`,
-5. validar version vigente, estado administrativo e historial corto,
-6. confirmar que la cotizacion cuelga del `project` demo activo.
+4. abrir `/`,
+5. validar resumen real del `project` activo,
+6. validar brief, cotizacion y activos con datos reales,
+7. confirmar siguiente accion visible y enlaces hacia los modulos operativos.
 
 ## ESTADO COMPROBABLE ACTUAL
 
@@ -44,6 +45,9 @@
 12. Migracion remota `20260505235500_clients_projects_brief_container_v1.sql` aplicada en Supabase.
 13. Produccion en Vercel ya sirve el contenedor operativo en `/briefs`.
 14. Corte `ARCH-20260505-22 / IMPL-20260505-22` publicado en `main` mediante commit `d7e7059`.
+15. Cotizaciones versionadas implementadas, con creación de versiones y cambio de vigente funcionando en producción.
+16. Activos operables implementados con migracion, seed demo, UI de `/activos` y relación visible con `project` y cotización.
+17. Produccion en `vectoria-zeta.vercel.app/activos` ya sirve el activo demo, el prompt vigente y la creación guiada del slice `ARCH-20260505-24 / IMPL-20260505-24`.
 
 ### [~] En curso
 
@@ -54,17 +58,15 @@
 ### [ ] Pendiente
 
 1. Completar chat contextual real y continuidad conversacional sobre briefing persistido.
-2. Implementar cotizaciones versionadas con flujo visible para operador y cliente.
-3. Implementar catalogo operable de activos con combinaciones y prompts asociados.
-4. Implementar mini CRM con leads y seguimiento.
-5. Implementar conocimiento derivado utilizable por agentes sobre datos vivos.
+2. Implementar mini CRM con leads y seguimiento.
+3. Implementar conocimiento derivado utilizable por agentes sobre datos vivos.
 
 ## Ultimo Corte Cerrado
 
-1. `ARCH-20260505-22 / IMPL-20260505-22` queda cerrado como corte completado y publicado.
-2. El commit publicado en `main` es `d7e7059`.
-3. Supabase remoto ya recibio la migracion `20260505235500_clients_projects_brief_container_v1.sql`.
-4. Vercel produccion ya sirve el contenedor operativo de `clients + projects` en `/briefs`.
+1. `ARCH-20260505-24 / IMPL-20260505-24` queda cerrado como corte completado y validado en producción.
+2. Supabase remoto queda al día con la migracion `20260506020000_assets_and_prompt_versions_v1.sql`.
+3. Produccion valida activo demo, prompt vigente y selección guiada en `/activos`.
+4. El siguiente corte activo pasa a ser `ARCH-20260505-25` sobre cabina del operador accionable.
 
 ## Artefactos Clave
 
@@ -86,10 +88,17 @@
 16. context/SPECs/SPEC_ARCH-20260505-22_clients_y_projects_v1.md
 16. context/COTIZACIONES_VERSIONADAS_V1.md
 17. context/SPECs/SPEC_ARCH-20260505-23_cotizaciones_versionadas_v1.md
-18. context/checkpoints/CHECKPOINT_IMPL-20260505-21.md
-19. context/checkpoints/CHECKPOINT_IMPL-20260505-22.md
-20. supabase/migrations/20260505223000_identity_memberships_actor_context_v1.sql
-21. supabase/migrations/20260505235500_clients_projects_brief_container_v1.sql
+18. context/ACTIVOS_OPERABLES_V1.md
+19. context/SPECs/SPEC_ARCH-20260505-24_activos_vinculados_a_cotizacion_y_project_v1.md
+20. context/SPECs/SPEC_ARCH-20260505-25_cabina_operador_accionable_resumenes_reales_v1.md
+21. context/checkpoints/CHECKPOINT_IMPL-20260505-21.md
+22. context/checkpoints/CHECKPOINT_IMPL-20260505-22.md
+23. context/checkpoints/CHECKPOINT_IMPL-20260505-23.md
+24. context/checkpoints/CHECKPOINT_IMPL-20260505-24.md
+25. supabase/migrations/20260505223000_identity_memberships_actor_context_v1.sql
+26. supabase/migrations/20260505235500_clients_projects_brief_container_v1.sql
+27. supabase/migrations/20260506000000_quotations_versionadas_v1.sql
+28. supabase/migrations/20260506020000_assets_and_prompt_versions_v1.sql
 
 ## Decisiones Ya Tomadas
 
@@ -129,14 +138,17 @@
 16. Implementar identidad minima operativa sobre el flujo de briefing persistido.
 17. Implementar clients y projects como contenedor operativo real del brief en produccion.
 18. Cerrar arquitectura operativa de cotizaciones versionadas sobre `project` activo.
+19. Implementar cotizaciones versionadas sobre `project` activo.
+20. Cerrar arquitectura operativa de activos vinculados a cotizacion y `project`.
+21. Implementar activos operables colgados de cotizacion y `project`.
 
 ### [~] Planificado para el siguiente corte
 
-1. Implementar cotizaciones versionadas colgadas del `project` activo.
-2. Exponer resumen comercial y estado visible para operador y cliente.
-3. Permitir crear nueva version y marcar version vigente.
+1. Implementar cabina del operador con resumenes reales.
+2. Reemplazar placeholders del dashboard por datos reales.
+3. Calcular siguiente accion desde reglas simples y trazables.
 4. Mostrar tenant snapshot real en mas superficies del shell.
-5. Pasar de dashboard informativo a dashboard accionable.
+5. Mantener navegacion hacia briefs, cotizaciones y activos desde el dashboard.
 
 ### [ ] Posterior
 
@@ -157,7 +169,7 @@
 
 Mover Bridge desde briefs con contenedor operativo hacia el siguiente bloque comercial ejecutable en este orden:
 
-1. cotizaciones versionadas sobre `project`,
-2. catalogo de activos vinculado a cotizacion y `project`,
-3. dashboard accionable con resumenes reales,
-4. CRM ligero.
+1. dashboard accionable con resumenes reales,
+2. CRM ligero,
+3. chat contextual real,
+4. contexto derivado mas fuerte para agentes.

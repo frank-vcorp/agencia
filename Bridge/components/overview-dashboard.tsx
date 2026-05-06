@@ -1,29 +1,57 @@
 /**
- * IMPL-20260505-02
- * Respaldo: context/00_ARQUITECTURA.md, context/DIRECCION_VISUAL_V1.md
+ * IMPL-20260505-25
+ * Respaldo: context/SPECs/SPEC_ARCH-20260505-25_cabina_operador_accionable_resumenes_reales_v1.md
  */
 import Link from "next/link";
 
-import { modulePages, p0Combinations, rolePages, strategicSignals } from "@/lib/bridge-data";
+import { modulePages, rolePages } from "@/lib/bridge-data";
+import { getOperativeSummary } from "@/lib/dashboard";
 import { getSupabaseHealth } from "@/lib/supabase-health";
-import { getTenantSnapshot } from "@/lib/tenant-runtime";
 
 export async function OverviewDashboard() {
-  const supabaseHealth = await getSupabaseHealth();
-  const tenantSnapshot = await getTenantSnapshot();
+  const [supabaseHealth, summary] = await Promise.all([
+    getSupabaseHealth(),
+    getOperativeSummary()
+  ]);
+
+  const tenantSnapshot = summary.tenant;
   const tenantConfig = tenantSnapshot?.config;
   const dashboardTitle = tenantConfig?.dashboardHeadline ?? "Una sola superficie para coordinar el piloto real";
   const dashboardSummary = tenantConfig?.dashboardSummary ?? "Bridge coordina el piloto mientras termina de poblar tenancy, configuracion y objetos operativos reales.";
 
-  const visibleSignals = strategicSignals.map((signal) =>
-    signal.label === "Preparacion de datos"
-      ? {
-          ...signal,
-          value: supabaseHealth.label,
-          detail: supabaseHealth.detail
-        }
-      : signal
-  );
+  const visibleSignals = [
+    {
+      label: "Preparacion de datos",
+      value: supabaseHealth.label,
+      detail: supabaseHealth.detail,
+      accent: supabaseHealth.connected
+    },
+    {
+      label: "Brief activo",
+      value: summary.brief ? summary.brief.statusLabel : "Sin brief",
+      detail: summary.brief
+        ? summary.brief.projectObjective || "Objetivo pendiente de completar."
+        : "Ingresa al modulo de Briefs para crear el primero.",
+      accent: summary.brief?.isConsolidated ?? false
+    },
+    {
+      label: "Cotizacion",
+      value: summary.quotation ? summary.quotation.statusLabel : "Sin cotizacion",
+      detail: summary.quotation
+        ? summary.quotation.title
+          ? `${summary.quotation.title}${summary.quotation.totalEstimado ? ` — ${summary.quotation.totalEstimado}` : ""}`
+          : "Cotizacion registrada sin version activa."
+        : "El brief debe consolidarse antes de crear una cotizacion.",
+      accent: summary.quotation?.isActive ?? false
+    }
+  ];
+
+  const modulePagesWithMetrics = modulePages.map((m) => {
+    if (m.key === "briefs") return { ...m, metric: summary.moduleMetrics.briefs };
+    if (m.key === "cotizaciones") return { ...m, metric: summary.moduleMetrics.cotizaciones };
+    if (m.key === "activos") return { ...m, metric: summary.moduleMetrics.activos };
+    return m;
+  });
 
   return (
     <div className="space-y-5">
@@ -51,19 +79,29 @@ export async function OverviewDashboard() {
                 <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">Slug {tenantSnapshot.slug} con estado {tenantSnapshot.status}.</p>
               </article>
               <article className="rounded-[22px] bg-white/72 px-4 py-4 ring-1 ring-[color:var(--line)]">
-                <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Canal primario</div>
-                <div className="mt-2 font-[family-name:var(--font-heading)] text-xl font-bold tracking-tight">
-                  {tenantConfig?.primaryContactChannel ?? "Pendiente"}
+                <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">
+                  {summary.client ? "Cliente activo" : "Canal primario"}
                 </div>
-                <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">Configuracion inicial obtenida desde Supabase cuando existe un registro sembrado.</p>
-              </article>
-              <article className="rounded-[22px] bg-white/72 px-4 py-4 ring-1 ring-[color:var(--line)]">
-                <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Modulos activos</div>
                 <div className="mt-2 font-[family-name:var(--font-heading)] text-xl font-bold tracking-tight">
-                  {tenantConfig?.activeModules.length ?? 0}
+                  {summary.client?.name ?? tenantConfig?.primaryContactChannel ?? "Pendiente"}
                 </div>
                 <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
-                  {(tenantConfig?.activeModules ?? []).join(" · ") || "Se mostraran aqui cuando la configuracion remota este disponible."}
+                  {summary.client
+                    ? `Estado: ${summary.client.status}.${summary.client.primaryContactChannel ? ` Canal: ${summary.client.primaryContactChannel}.` : ""}`
+                    : "Configuracion inicial obtenida desde Supabase cuando existe un registro sembrado."}
+                </p>
+              </article>
+              <article className="rounded-[22px] bg-white/72 px-4 py-4 ring-1 ring-[color:var(--line)]">
+                <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">
+                  {summary.project ? "Proyecto activo" : "Modulos activos"}
+                </div>
+                <div className="mt-2 font-[family-name:var(--font-heading)] text-xl font-bold tracking-tight">
+                  {summary.project?.name ?? tenantConfig?.activeModules.length ?? 0}
+                </div>
+                <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
+                  {summary.project
+                    ? `Tipo: ${summary.project.projectType}. Estado: ${summary.project.status}.`
+                    : (tenantConfig?.activeModules ?? []).join(" · ") || "Se mostraran aqui cuando la configuracion remota este disponible."}
                 </p>
               </article>
             </div>
@@ -75,9 +113,7 @@ export async function OverviewDashboard() {
                 <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">{signal.label}</div>
                 <div
                   className={`mt-2 font-[family-name:var(--font-heading)] text-3xl font-bold tracking-tight ${
-                    signal.label === "Preparacion de datos" && supabaseHealth.connected
-                      ? "text-[color:var(--accent-deep)]"
-                      : ""
+                    signal.accent ? "text-[color:var(--accent-deep)]" : ""
                   }`}
                 >
                   {signal.value}
@@ -89,10 +125,10 @@ export async function OverviewDashboard() {
         </div>
 
         <aside className="panel rounded-[30px] px-6 py-6">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">Corte P0</p>
+          <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">Modulos operativos</p>
           <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight">Objetos listos para demostrar valor</h3>
           <div className="mt-5 space-y-3">
-            {modulePages.map((module) => (
+            {modulePagesWithMetrics.map((module) => (
               <Link key={module.href} href={module.href} className="block rounded-[22px] bg-white/70 px-4 py-3 ring-1 ring-[color:var(--line)] transition hover:bg-white">
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-medium">{module.label}</span>
@@ -126,29 +162,71 @@ export async function OverviewDashboard() {
         </div>
 
         <div className="panel rounded-[30px] px-6 py-6">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">Contrato de activos P0</p>
-          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight">Combinaciones iniciales visibles desde el dashboard</h3>
-          <div className="mt-5 overflow-hidden rounded-[24px] border border-[color:var(--line)] bg-white/78">
-            <table className="min-w-full border-collapse text-left text-sm">
-              <thead className="bg-[color:var(--background-soft)] text-[11px] uppercase tracking-[0.18em] text-[color:var(--muted)]">
-                <tr>
-                  <th className="px-4 py-3 font-medium">ID</th>
-                  <th className="px-4 py-3 font-medium">Aplicativo</th>
-                  <th className="px-4 py-3 font-medium">Pieza</th>
-                  <th className="px-4 py-3 font-medium">Formato</th>
-                </tr>
-              </thead>
-              <tbody>
-                {p0Combinations.slice(0, 6).map((combination) => (
-                  <tr key={combination.id} className="border-t border-[color:var(--line)]">
-                    <td className="px-4 py-3 font-medium text-slate-900">{combination.id}</td>
-                    <td className="px-4 py-3 text-[color:var(--muted)]">{combination.app}</td>
-                    <td className="px-4 py-3 text-[color:var(--muted)]">{combination.piece}</td>
-                    <td className="px-4 py-3 text-[color:var(--muted)]">{combination.format}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">Estado operativo del proyecto</p>
+          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight">Resumen accionable del piloto</h3>
+
+          <div className="mt-5 space-y-3">
+            {/* Brief */}
+            <div className="rounded-[22px] bg-white/70 px-4 py-3 ring-1 ring-[color:var(--line)]">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Brief</span>
+                {summary.brief ? (
+                  <span className={`text-[11px] uppercase tracking-[0.2em] ${summary.brief.isConsolidated ? "text-[color:var(--accent-deep)]" : "text-amber-600"}`}>
+                    {summary.brief.statusLabel}
+                  </span>
+                ) : (
+                  <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Vacío</span>
+                )}
+              </div>
+              <p className="mt-1 text-sm leading-6 text-[color:var(--muted)]">
+                {summary.brief?.projectObjective || "Sin objetivo registrado aún."}
+              </p>
+            </div>
+
+            {/* Cotización */}
+            <div className="rounded-[22px] bg-white/70 px-4 py-3 ring-1 ring-[color:var(--line)]">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Cotización</span>
+                {summary.quotation ? (
+                  <span className={`text-[11px] uppercase tracking-[0.2em] ${summary.quotation.isActive ? "text-[color:var(--accent-deep)]" : "text-amber-600"}`}>
+                    {summary.quotation.statusLabel}
+                  </span>
+                ) : (
+                  <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Vacío</span>
+                )}
+              </div>
+              <p className="mt-1 text-sm leading-6 text-[color:var(--muted)]">
+                {summary.quotation?.title ?? "Sin cotización registrada aún."}
+                {summary.quotation?.totalEstimado ? ` — ${summary.quotation.totalEstimado}` : ""}
+              </p>
+            </div>
+
+            {/* Activos */}
+            <div className="rounded-[22px] bg-white/70 px-4 py-3 ring-1 ring-[color:var(--line)]">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Activos</span>
+                <span className={`text-[11px] uppercase tracking-[0.2em] ${summary.assets && summary.assets.total > 0 ? "text-[color:var(--accent-deep)]" : "text-slate-400"}`}>
+                  {summary.moduleMetrics.activos}
+                </span>
+              </div>
+              <p className="mt-1 text-sm leading-6 text-[color:var(--muted)]">
+                {summary.assets && summary.assets.total > 0
+                  ? Object.entries(summary.assets.byStatus)
+                      .map(([status, count]) => `${count} ${status.replace("_", " ")}`)
+                      .join(" · ")
+                  : "Sin activos registrados aún."}
+              </p>
+            </div>
+
+            {/* Siguiente acción */}
+            <Link
+              href={summary.nextAction.href}
+              className="block rounded-[22px] bg-slate-900 px-4 py-3 text-white transition hover:bg-slate-800"
+            >
+              <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Siguiente acción</div>
+              <div className="mt-1 font-semibold">{summary.nextAction.label}</div>
+              <p className="mt-1 text-sm leading-5 text-slate-300">{summary.nextAction.reason}</p>
+            </Link>
           </div>
         </div>
       </section>

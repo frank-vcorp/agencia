@@ -93,6 +93,15 @@ export default async function ActivosPage() {
         <p className="mt-2 max-w-3xl text-base leading-7 text-[color:var(--muted)]">
           Piezas de produccion ligadas al project activo y a la cotizacion vigente. Cada activo tiene clasificacion de catalogo y prompt operativo inicial.
         </p>
+
+        <div className="mt-4 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.18em] text-[color:var(--muted)]">
+          <span className="rounded-[16px] bg-white/70 px-3 py-2 ring-1 ring-[color:var(--line)]">
+            Project activo {ctx.projectId ? "vinculado" : "pendiente"}
+          </span>
+          <span className="rounded-[16px] bg-white/70 px-3 py-2 ring-1 ring-[color:var(--line)]">
+            Cotizacion {ctx.quotationId ? "disponible" : "sin referencia"}
+          </span>
+        </div>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
@@ -124,6 +133,9 @@ export default async function ActivosPage() {
                       <p className="truncate font-medium leading-6">{asset.title}</p>
                       <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-[color:var(--muted)]">
                         {applicationLabel(asset.applicationCode)} · {pieceTypeLabel(asset.pieceTypeCode)} · {placementLabel(asset.placementCode)} · {formatLabel(asset.formatCode)}
+                      </p>
+                      <p className="mt-2 text-[11px] uppercase tracking-[0.18em] text-[color:var(--muted)]">
+                        Project {asset.projectId ? "ligado" : "pendiente"} · Cotizacion {asset.quotationId ? "ligada" : "sin referencia"}
                       </p>
                     </div>
                     <span
