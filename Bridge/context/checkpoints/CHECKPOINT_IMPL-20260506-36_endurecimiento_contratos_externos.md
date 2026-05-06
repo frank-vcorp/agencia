@@ -47,7 +47,7 @@ Ambos puntos fueron eliminados. La hipótesis se validó implementando las primi
 |------|--------|---------|
 | **Gate 1 — Compilación** | ✅ Verde | `npx tsc --noEmit` sin errores; `npm run build` limpio |
 | **Gate 2 — Testing** | ✅ Verde | 188 tests / 188 pasando (76 en agent-context, +11 nuevos) |
-| **Gate 3 — Revisión** | ✅ Verde | Cambios acotados a 3 archivos; compatibilidad mantenida |
+| **Gate 3 — Revisión** | ✅ Verde | `qodo self-review` no disponible (CLI sunset). Revisión manual del diff `faa7e36`: cambios acotados y quirúrgicos, sin anomalías, 3 archivos, sin ruptura de capas ni de UI |
 | **Gate 4 — Documentación** | ✅ Verde | Watermarks actualizadas; SPEC referenciada en todos los archivos tocados |
 
 **Archivos modificados:** 3
