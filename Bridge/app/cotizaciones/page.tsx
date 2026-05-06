@@ -236,7 +236,7 @@ export default async function CotizacionesPage() {
                         <input name="quotationId" type="hidden" value={quotation.id} />
                         <input name="versionId" type="hidden" value={version.id} />
                         <button
-                          className="inline-flex rounded-full bg-[color:var(--ink)] px-4 py-2 text-xs font-semibold text-white"
+                          className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm ring-1 ring-slate-900"
                           type="submit"
                         >
                           Marcar vigente
