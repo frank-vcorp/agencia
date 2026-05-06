@@ -2,9 +2,11 @@
  * IMPL-20260506-30
  * IMPL-20260506-31
  * IMPL-20260506-32
+ * IMPL-20260506-36
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-30_conocimiento_derivado_agentes_v1.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-32_contratos_externos_minimos_objetos_vivos_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-36_endurecimiento_contratos_externos_v1.md
  *
  * Capa de conocimiento derivado para agentes y operadores.
  * Este módulo NO reemplaza la fuente primaria. Produce un snapshot
@@ -369,16 +371,39 @@ export function buildAssetHandoff(
   };
 }
 
+// ─── Constantes canónicas de contratos externos ───────────────────────────────
+
+/**
+ * Versión del contrato externo. Solo cambia en breaking changes.
+ * Exportada como constante para que los consumidores remotos no dependan del literal.
+ *
+ * IMPL-20260506-36
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-36_endurecimiento_contratos_externos_v1.md
+ */
+export const EXTERNAL_CONTRACT_VERSION = "1.0" as const;
+
+/**
+ * Construye la referencia trazable al handoff de origen: "<entityType>@<snapshotAt>".
+ * Función pura canónica — fuente de verdad del formato handoffRef.
+ * Los cuatro builders de contratos externos deben delegar aquí.
+ *
+ * IMPL-20260506-36
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-36_endurecimiento_contratos_externos_v1.md
+ */
+export function buildHandoffRef(entityType: string, snapshotAt: string): string {
+  return `${entityType}@${snapshotAt}`;
+}
+
 // ─── Funciones de contrato externo mínimo (puras, testeables) ─────────────────
 
 /** Construye el contrato externo mínimo de un brief desde su handoff remoto. Función pura. */
 export function buildBriefExternalContract(handoff: BriefRemoteHandoff): BriefExternalContract {
   return {
     entityType: "brief",
-    contractVersion: "1.0",
+    contractVersion: EXTERNAL_CONTRACT_VERSION,
     tenantSlug: handoff.tenantSlug,
     generatedAt: handoff.snapshotAt,
-    handoffRef: `brief@${handoff.snapshotAt}`,
+    handoffRef: buildHandoffRef("brief", handoff.snapshotAt),
     source: handoff.source,
     payload: {
       id: handoff.payload.id,
@@ -393,10 +418,10 @@ export function buildBriefExternalContract(handoff: BriefRemoteHandoff): BriefEx
 export function buildLeadExternalContract(handoff: LeadRemoteHandoff): LeadExternalContract {
   return {
     entityType: "lead",
-    contractVersion: "1.0",
+    contractVersion: EXTERNAL_CONTRACT_VERSION,
     tenantSlug: handoff.tenantSlug,
     generatedAt: handoff.snapshotAt,
-    handoffRef: `lead@${handoff.snapshotAt}`,
+    handoffRef: buildHandoffRef("lead", handoff.snapshotAt),
     source: handoff.source,
     payload: {
       id: handoff.payload.id,
@@ -411,10 +436,10 @@ export function buildLeadExternalContract(handoff: LeadRemoteHandoff): LeadExter
 export function buildQuotationExternalContract(handoff: QuotationRemoteHandoff): QuotationExternalContract {
   return {
     entityType: "quotation",
-    contractVersion: "1.0",
+    contractVersion: EXTERNAL_CONTRACT_VERSION,
     tenantSlug: handoff.tenantSlug,
     generatedAt: handoff.snapshotAt,
-    handoffRef: `quotation@${handoff.snapshotAt}`,
+    handoffRef: buildHandoffRef("quotation", handoff.snapshotAt),
     source: handoff.source,
     payload: {
       id: handoff.payload.id,
@@ -429,10 +454,10 @@ export function buildQuotationExternalContract(handoff: QuotationRemoteHandoff):
 export function buildAssetExternalContract(handoff: AssetRemoteHandoff): AssetExternalContract {
   return {
     entityType: "asset",
-    contractVersion: "1.0",
+    contractVersion: EXTERNAL_CONTRACT_VERSION,
     tenantSlug: handoff.tenantSlug,
     generatedAt: handoff.snapshotAt,
-    handoffRef: `asset@${handoff.snapshotAt}`,
+    handoffRef: buildHandoffRef("asset", handoff.snapshotAt),
     source: handoff.source,
     payload: {
       total: handoff.payload.total,

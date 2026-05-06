@@ -1,7 +1,9 @@
 /**
  * IMPL-20260506-30
  * IMPL-20260506-31
+ * IMPL-20260506-36
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-31_handoffs_remotos_endurecidos_por_entidad_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-36_endurecimiento_contratos_externos_v1.md
  */
 import { describe, expect, it } from "vitest";
 
@@ -15,12 +17,14 @@ import {
   buildQuotationExternalContract,
   buildAssetExternalContract,
   buildExternalContracts,
+  buildHandoffRef,
   buildTenantRemoteContext,
   buildTenantOperativeSummary,
   deriveAssetSummary,
   deriveBriefSummary,
   deriveLeadSummary,
   deriveQuotationSummary,
+  EXTERNAL_CONTRACT_VERSION,
   resolveEntityNextAction,
   selectRepresentativeLead,
   type AgentContextSnapshot,
@@ -764,6 +768,116 @@ describe("agent-context — buildTenantOperativeSummary", () => {
     snapshot.assets = null;
     const summary = buildTenantOperativeSummary(snapshot);
     expect(summary.activeEntities).toEqual([]);
+  });
+});
+
+// ─── IMPL-20260506-36: endurecimiento de contratos externos ──────────────────
+
+/**
+ * Tests de invariantes canónicas: buildHandoffRef y EXTERNAL_CONTRACT_VERSION.
+ * Verifican que el formato del handoffRef y la versión del contrato son estables
+ * y producibles de forma independiente por cualquier consumidor remoto.
+ *
+ * IMPL-20260506-36
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-36_endurecimiento_contratos_externos_v1.md
+ */
+describe("agent-context — buildHandoffRef (función canónica)", () => {
+  it("produce el formato <entityType>@<snapshotAt>", () => {
+    expect(buildHandoffRef("brief", SNAPSHOT_AT)).toBe(`brief@${SNAPSHOT_AT}`);
+    expect(buildHandoffRef("lead", SNAPSHOT_AT)).toBe(`lead@${SNAPSHOT_AT}`);
+    expect(buildHandoffRef("quotation", SNAPSHOT_AT)).toBe(`quotation@${SNAPSHOT_AT}`);
+    expect(buildHandoffRef("asset", SNAPSHOT_AT)).toBe(`asset@${SNAPSHOT_AT}`);
+  });
+
+  it("es determinista: misma entrada produce siempre la misma salida", () => {
+    const ref1 = buildHandoffRef("brief", SNAPSHOT_AT);
+    const ref2 = buildHandoffRef("brief", SNAPSHOT_AT);
+    expect(ref1).toBe(ref2);
+  });
+
+  it("distingue entidades distintas con el mismo snapshotAt", () => {
+    const refBrief = buildHandoffRef("brief", SNAPSHOT_AT);
+    const refLead = buildHandoffRef("lead", SNAPSHOT_AT);
+    expect(refBrief).not.toBe(refLead);
+  });
+
+  it("distingue el mismo entityType con distintos snapshotAt", () => {
+    const ref1 = buildHandoffRef("brief", "2026-05-06T10:00:00.000Z");
+    const ref2 = buildHandoffRef("brief", "2026-05-06T11:00:00.000Z");
+    expect(ref1).not.toBe(ref2);
+  });
+});
+
+describe("agent-context — EXTERNAL_CONTRACT_VERSION (constante canónica)", () => {
+  it("es el literal '1.0'", () => {
+    expect(EXTERNAL_CONTRACT_VERSION).toBe("1.0");
+  });
+
+  it("los cuatro builders usan la misma contractVersion", () => {
+    const briefSummary = deriveBriefSummary(briefConsolidado);
+    const leadSummary = deriveLeadSummary(makeLead("nuevo"));
+    const quotSummary = deriveQuotationSummary(cotizacionEnviada);
+    const assetSummary = deriveAssetSummary(activosConDatos);
+
+    const contracts = [
+      buildBriefExternalContract(buildBriefHandoff(briefSummary, SNAPSHOT_AT, TENANT_SLUG, null)),
+      buildLeadExternalContract(buildLeadHandoff(leadSummary, SNAPSHOT_AT, TENANT_SLUG)),
+      buildQuotationExternalContract(buildQuotationHandoff(quotSummary, SNAPSHOT_AT, TENANT_SLUG, null)),
+      buildAssetExternalContract(buildAssetHandoff(assetSummary, SNAPSHOT_AT, TENANT_SLUG, null)),
+    ];
+
+    for (const c of contracts) {
+      expect(c.contractVersion).toBe(EXTERNAL_CONTRACT_VERSION);
+    }
+  });
+
+  it("buildExternalContracts: todos los contratos de la colección comparten contractVersion", () => {
+    const briefSummary = deriveBriefSummary(briefConsolidado);
+    const leadSummary = deriveLeadSummary(makeLead("nuevo"));
+    const quotSummary = deriveQuotationSummary(cotizacionEnviada);
+    const assetSummary = deriveAssetSummary(activosConDatos);
+
+    const handoffs: AgentRemoteHandoffs = {
+      brief: buildBriefHandoff(briefSummary, SNAPSHOT_AT, TENANT_SLUG, null),
+      lead: buildLeadHandoff(leadSummary, SNAPSHOT_AT, TENANT_SLUG),
+      quotation: buildQuotationHandoff(quotSummary, SNAPSHOT_AT, TENANT_SLUG, null),
+      asset: buildAssetHandoff(assetSummary, SNAPSHOT_AT, TENANT_SLUG, null),
+    };
+    const contracts = buildExternalContracts(handoffs);
+
+    for (const c of [contracts.brief, contracts.lead, contracts.quotation, contracts.asset]) {
+      expect(c?.contractVersion).toBe(EXTERNAL_CONTRACT_VERSION);
+    }
+  });
+});
+
+describe("agent-context — handoffRef consistencia con buildHandoffRef", () => {
+  it("handoffRef del brief coincide con buildHandoffRef('brief', snapshotAt)", () => {
+    const briefSummary = deriveBriefSummary(briefConsolidado);
+    const handoff = buildBriefHandoff(briefSummary, SNAPSHOT_AT, TENANT_SLUG, null);
+    const contract = buildBriefExternalContract(handoff);
+    expect(contract.handoffRef).toBe(buildHandoffRef("brief", SNAPSHOT_AT));
+  });
+
+  it("handoffRef del lead coincide con buildHandoffRef('lead', snapshotAt)", () => {
+    const leadSummary = deriveLeadSummary(makeLead("nuevo"));
+    const handoff = buildLeadHandoff(leadSummary, SNAPSHOT_AT, TENANT_SLUG);
+    const contract = buildLeadExternalContract(handoff);
+    expect(contract.handoffRef).toBe(buildHandoffRef("lead", SNAPSHOT_AT));
+  });
+
+  it("handoffRef de la cotización coincide con buildHandoffRef('quotation', snapshotAt)", () => {
+    const quotSummary = deriveQuotationSummary(cotizacionEnviada);
+    const handoff = buildQuotationHandoff(quotSummary, SNAPSHOT_AT, TENANT_SLUG, null);
+    const contract = buildQuotationExternalContract(handoff);
+    expect(contract.handoffRef).toBe(buildHandoffRef("quotation", SNAPSHOT_AT));
+  });
+
+  it("handoffRef de activos coincide con buildHandoffRef('asset', snapshotAt)", () => {
+    const assetSummary = deriveAssetSummary(activosConDatos);
+    const handoff = buildAssetHandoff(assetSummary, SNAPSHOT_AT, TENANT_SLUG, null);
+    const contract = buildAssetExternalContract(handoff);
+    expect(contract.handoffRef).toBe(buildHandoffRef("asset", SNAPSHOT_AT));
   });
 });
 

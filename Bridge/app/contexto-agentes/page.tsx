@@ -8,6 +8,7 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-32_contratos_externos_minimos_objetos_vivos_v1.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-34_consumo_remoto_tenancy_reforzado_v1.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-35_estadisticas_resumidas_datos_reales_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-36_endurecimiento_contratos_externos_v1.md
  *
  * Superficie humana del snapshot derivado para agentes y operadores.
  * Muestra el estado operativo resumido y trazable del tenant activo.
