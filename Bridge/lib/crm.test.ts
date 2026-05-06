@@ -1,6 +1,8 @@
 /**
  * IMPL-20260505-26
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-26_crm_ligero_operativo_y_seguimiento_minimo_v1.md
+ * IMPL-20260505-27
+ * Respaldo: context/SPECs/SPEC_ARCH-20260505-27_vinculacion_explicita_lead_client_project_v1.md
  */
 import { describe, expect, it } from "vitest";
 
@@ -13,6 +15,10 @@ import {
   leadStatusLabel,
   leadStatusLabels,
   nextLeadStatuses,
+  type CreateLeadInput,
+  type CrmClient,
+  type CrmLinkOptions,
+  type CrmProject,
   type Lead,
   type LeadStatus
 } from "./crm";
@@ -136,5 +142,77 @@ describe("crm — buildCrmMetrics", () => {
     const m = buildCrmMetrics(leads);
     expect(m.label).toBe("2 cerrados");
     expect(m.activeLeads).toBe(0);
+  });
+});
+
+// ─── Slice 27: vinculación explícita lead -> client/project ───────────────────
+
+describe("crm — CreateLeadInput acepta clientId y projectId opcionales", () => {
+  it("input mínimo sin vínculos es válido como tipo", () => {
+    const input: CreateLeadInput = {
+      name: "Test Lead",
+      sourceChannel: "directo",
+      requestedService: ""
+    };
+    expect(input.clientId).toBeUndefined();
+    expect(input.projectId).toBeUndefined();
+  });
+
+  it("input con clientId y projectId nulos es válido", () => {
+    const input: CreateLeadInput = {
+      name: "Lead con nulos",
+      sourceChannel: "instagram",
+      requestedService: "Campaña",
+      clientId: null,
+      projectId: null
+    };
+    expect(input.clientId).toBeNull();
+    expect(input.projectId).toBeNull();
+  });
+
+  it("input con clientId y projectId como strings es válido", () => {
+    const input: CreateLeadInput = {
+      name: "Lead vinculado",
+      sourceChannel: "referido",
+      requestedService: "Lanzamiento",
+      clientId: "client-uuid-1",
+      projectId: "project-uuid-1"
+    };
+    expect(input.clientId).toBe("client-uuid-1");
+    expect(input.projectId).toBe("project-uuid-1");
+  });
+});
+
+describe("crm — CrmLinkOptions estructura", () => {
+  it("CrmClient tiene los campos requeridos", () => {
+    const client: CrmClient = { id: "c-1", name: "Acme Corp", status: "active" };
+    expect(client.id).toBeTruthy();
+    expect(client.name).toBeTruthy();
+    expect(client.status).toBeTruthy();
+  });
+
+  it("CrmProject tiene los campos requeridos incluyendo clientId", () => {
+    const project: CrmProject = {
+      id: "p-1",
+      clientId: "c-1",
+      name: "Campaña Lanzamiento",
+      status: "active"
+    };
+    expect(project.clientId).toBe("c-1");
+  });
+
+  it("CrmLinkOptions vacío es válido y predecible", () => {
+    const opts: CrmLinkOptions = { clients: [], projects: [] };
+    expect(opts.clients).toHaveLength(0);
+    expect(opts.projects).toHaveLength(0);
+  });
+
+  it("CrmLinkOptions con datos mantiene integridad referencial manual", () => {
+    const clients: CrmClient[] = [{ id: "c-1", name: "Vectoria", status: "active" }];
+    const projects: CrmProject[] = [{ id: "p-1", clientId: "c-1", name: "Lanzamiento 2026", status: "active" }];
+    const opts: CrmLinkOptions = { clients, projects };
+
+    const projectClient = opts.clients.find((c) => c.id === opts.projects[0].clientId);
+    expect(projectClient?.name).toBe("Vectoria");
   });
 });

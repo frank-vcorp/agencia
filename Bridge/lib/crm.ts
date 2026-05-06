@@ -1,6 +1,8 @@
 /**
  * IMPL-20260505-26
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-26_crm_ligero_operativo_y_seguimiento_minimo_v1.md
+ * IMPL-20260505-27
+ * Respaldo: context/SPECs/SPEC_ARCH-20260505-27_vinculacion_explicita_lead_client_project_v1.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 
@@ -91,7 +93,30 @@ export type LeadWorkspace = {
   notes: LeadNote[];
 };
 
+// ─── Tipos de vínculo comercial ─────────────────────────────────────────────
+
+export type CrmClient = {
+  id: string;
+  name: string;
+  status: string;
+};
+
+export type CrmProject = {
+  id: string;
+  clientId: string;
+  name: string;
+  status: string;
+};
+
+export type CrmLinkOptions = {
+  clients: CrmClient[];
+  projects: CrmProject[];
+};
+
 // ─── Tipos de filas DB ────────────────────────────────────────────────────────
+
+type CrmClientRow = { id: string; name: string; status: string };
+type CrmProjectRow = { id: string; client_id: string; name: string; status: string };
 
 type LeadRow = {
   id: string;
@@ -183,6 +208,39 @@ async function getTenantId(slug = supabaseEnv.defaultTenant): Promise<string | n
 
 // ─── Funciones públicas — lectura ─────────────────────────────────────────────
 
+/**
+ * Devuelve las opciones de cliente y proyecto disponibles para vincular a un lead.
+ * Retorna listas vacías si Supabase no está configurado o si no hay tenant.
+ * IMPL-20260505-27
+ */
+export async function getCrmLinkOptionsForDefaultTenant(): Promise<CrmLinkOptions> {
+  if (!isSupabaseConfigured) return { clients: [], projects: [] };
+
+  const tenantId = await getTenantId();
+  if (!tenantId) return { clients: [], projects: [] };
+
+  const clientParams = new URLSearchParams({
+    select: "id,name,status",
+    tenant_id: `eq.${tenantId}`,
+    order: "name.asc"
+  });
+  const projectParams = new URLSearchParams({
+    select: "id,client_id,name,status",
+    tenant_id: `eq.${tenantId}`,
+    order: "name.asc"
+  });
+
+  const [clientRows, projectRows] = await Promise.all([
+    postgrest<CrmClientRow[]>(`clients?${clientParams.toString()}`, { method: "GET" }),
+    postgrest<CrmProjectRow[]>(`projects?${projectParams.toString()}`, { method: "GET" })
+  ]);
+
+  return {
+    clients: clientRows.map((r) => ({ id: r.id, name: r.name, status: r.status })),
+    projects: projectRows.map((r) => ({ id: r.id, clientId: r.client_id, name: r.name, status: r.status }))
+  };
+}
+
 export async function getLeadsForDefaultTenant(): Promise<Lead[]> {
   if (!isSupabaseConfigured) return [];
 
@@ -239,6 +297,10 @@ export type CreateLeadInput = {
   name: string;
   sourceChannel: LeadSourceChannel;
   requestedService: string;
+  /** Vínculo explícito a cliente existente. Nullable — sin default requerido. IMPL-20260505-27 */
+  clientId?: string | null;
+  /** Vínculo explícito a proyecto existente. Nullable — sin default requerido. IMPL-20260505-27 */
+  projectId?: string | null;
 };
 
 export async function createLeadForDefaultTenant(input: CreateLeadInput): Promise<Lead | null> {
@@ -247,13 +309,17 @@ export async function createLeadForDefaultTenant(input: CreateLeadInput): Promis
   const tenantId = await getTenantId();
   if (!tenantId) return null;
 
-  const body = JSON.stringify({
+  const payload: Record<string, string | null> = {
     tenant_id: tenantId,
     name: input.name.trim(),
     source_channel: input.sourceChannel,
     requested_service: input.requestedService.trim(),
-    status: "nuevo"
-  });
+    status: "nuevo",
+    client_id: input.clientId?.trim() || null,
+    project_id: input.projectId?.trim() || null
+  };
+
+  const body = JSON.stringify(payload);
 
   const rows = await postgrest<LeadRow[]>("leads", { method: "POST", body });
   return rows[0] ? normalizeLeadRow(rows[0]) : null;

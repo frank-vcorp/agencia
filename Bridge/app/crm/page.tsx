@@ -1,6 +1,8 @@
 /**
  * IMPL-20260505-26
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-26_crm_ligero_operativo_y_seguimiento_minimo_v1.md
+ * IMPL-20260505-27
+ * Respaldo: context/SPECs/SPEC_ARCH-20260505-27_vinculacion_explicita_lead_client_project_v1.md
  */
 import { revalidatePath } from "next/cache";
 
@@ -8,6 +10,7 @@ import {
   LEAD_SOURCE_CHANNELS,
   addLeadNote,
   createLeadForDefaultTenant,
+  getCrmLinkOptionsForDefaultTenant,
   getLeadWorkspace,
   getLeadsForDefaultTenant,
   leadSourceChannelLabel,
@@ -17,6 +20,7 @@ import {
   type LeadSourceChannel,
   type LeadStatus
 } from "@/lib/crm";
+import { getBriefWorkspace } from "@/lib/briefing";
 
 // ─── Server Actions ───────────────────────────────────────────────────────────
 
@@ -26,10 +30,12 @@ async function createLeadAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const sourceChannel = String(formData.get("sourceChannel") ?? "").trim() as LeadSourceChannel;
   const requestedService = String(formData.get("requestedService") ?? "").trim();
+  const clientId = String(formData.get("clientId") ?? "").trim() || null;
+  const projectId = String(formData.get("projectId") ?? "").trim() || null;
 
   if (!name || !sourceChannel) return;
 
-  await createLeadForDefaultTenant({ name, sourceChannel, requestedService });
+  await createLeadForDefaultTenant({ name, sourceChannel, requestedService, clientId, projectId });
   revalidatePath("/crm");
 }
 
@@ -76,9 +82,24 @@ function statusBadgeClass(status: LeadStatus): string {
 // ─── Página ───────────────────────────────────────────────────────────────────
 
 export default async function CrmPage() {
-  const leads = await getLeadsForDefaultTenant();
+  const [leads, linkOptions, briefWorkspace] = await Promise.all([
+    getLeadsForDefaultTenant(),
+    getCrmLinkOptionsForDefaultTenant(),
+    getBriefWorkspace()
+  ]);
 
   const workspaces = await Promise.all(leads.map((l) => getLeadWorkspace(l.id)));
+
+  // ─── Defaults del contenedor activo ─────────────────────────────────────────────────
+  const activeClientId = briefWorkspace?.container.client?.id ?? null;
+  const activeProjectId = briefWorkspace?.container.project?.id ?? null;
+
+  // Lookup rápido para resolver nombres en tarjetas
+  const clientMap = Object.fromEntries(linkOptions.clients.map((c) => [c.id, c]));
+  const projectMap = Object.fromEntries(linkOptions.projects.map((p) => [p.id, p]));
+
+  const hasClients = linkOptions.clients.length > 0;
+  const hasProjects = linkOptions.projects.length > 0;
 
   return (
     <div className="space-y-8 px-1">
@@ -147,6 +168,50 @@ export default async function CrmPage() {
               className="w-full rounded-[14px] border border-[color:var(--line)] bg-white/80 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent-deep)]"
             />
           </div>
+          {/* Selección de cliente y proyecto — IMPL-20260505-27 */}
+          {hasClients && (
+            <div className="space-y-1.5">
+              <label className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--muted)]" htmlFor="lead-client">
+                Cliente
+              </label>
+              <select
+                id="lead-client"
+                name="clientId"
+                defaultValue={activeClientId ?? ""}
+                className="w-full rounded-[14px] border border-[color:var(--line)] bg-white/80 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent-deep)]"
+              >
+                <option value="">Sin cliente</option>
+                {linkOptions.clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {hasProjects && (
+            <div className="space-y-1.5">
+              <label className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--muted)]" htmlFor="lead-project">
+                Proyecto
+              </label>
+              <select
+                id="lead-project"
+                name="projectId"
+                defaultValue={activeProjectId ?? ""}
+                className="w-full rounded-[14px] border border-[color:var(--line)] bg-white/80 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent-deep)]"
+              >
+                <option value="">Sin proyecto</option>
+                {linkOptions.projects.map((p) => {
+                  const clientName = clientMap[p.clientId]?.name;
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {clientName ? `${clientName} — ${p.name}` : p.name}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
           <div className="md:col-span-3 flex justify-end">
             <button
               type="submit"
@@ -190,8 +255,16 @@ export default async function CrmPage() {
                     <p className="mt-1 text-sm text-[color:var(--muted)]">
                       {leadSourceChannelLabel(lead.sourceChannel)}
                       {lead.requestedService ? ` · ${lead.requestedService}` : ""}
-                      {lead.clientId ? " · Con cliente vinculado" : ""}
-                      {lead.projectId ? " · Con proyecto vinculado" : ""}
+                      {lead.clientId && clientMap[lead.clientId]
+                        ? ` · Cliente: ${clientMap[lead.clientId].name}`
+                        : lead.clientId
+                        ? " · Cliente vinculado"
+                        : ""}
+                      {lead.projectId && projectMap[lead.projectId]
+                        ? ` · Proyecto: ${projectMap[lead.projectId].name}`
+                        : lead.projectId
+                        ? " · Proyecto vinculado"
+                        : ""}
                     </p>
                   </div>
                   <p className="text-[11px] text-[color:var(--muted)]">
