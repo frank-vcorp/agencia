@@ -3,6 +3,8 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-26_crm_ligero_operativo_y_seguimiento_minimo_v1.md
  * IMPL-20260505-27
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-27_vinculacion_explicita_lead_client_project_v1.md
+ * IMPL-20260505-29
+ * Respaldo: context/SPECs/SPEC_ARCH-20260505-29_hardening_validacion_cruzada_crm_v1.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 
@@ -113,6 +115,65 @@ export type CrmLinkOptions = {
   projects: CrmProject[];
 };
 
+// ─── Validación de vínculos lead → client/project ───────────────────────────
+
+/**
+ * Resultado de la resolución del vínculo comercial de un lead.
+ * IMPL-20260505-29
+ */
+export type LeadLinkResolution =
+  | { ok: true; clientId: string | null; projectId: string | null }
+  | { ok: false; error: string };
+
+/**
+ * Valida y resuelve la consistencia del vínculo clientId/projectId contra
+ * listas reales de clientes y proyectos del tenant. Función pura y testeable.
+ *
+ * Comportamiento por caso:
+ * - Sin vínculos: ok, ambos null.
+ * - Solo clientId: valida que el cliente exista.
+ * - Solo projectId: valida que el proyecto exista y resuelve su clientId automáticamente.
+ * - Ambos: valida existencia de ambos y que el proyecto pertenezca al cliente.
+ * IMPL-20260505-29
+ */
+export function resolveLeadLinksFromData(
+  clients: CrmClient[],
+  projects: CrmProject[],
+  clientId: string | null | undefined,
+  projectId: string | null | undefined
+): LeadLinkResolution {
+  const cid = clientId?.trim() || null;
+  const pid = projectId?.trim() || null;
+
+  if (!cid && !pid) return { ok: true, clientId: null, projectId: null };
+
+  if (pid) {
+    const project = projects.find((p) => p.id === pid);
+    if (!project) {
+      return { ok: false, error: `El proyecto '${pid}' no existe en este tenant.` };
+    }
+    if (cid) {
+      const client = clients.find((c) => c.id === cid);
+      if (!client) {
+        return { ok: false, error: `El cliente '${cid}' no existe en este tenant.` };
+      }
+      if (project.clientId !== cid) {
+        return { ok: false, error: `El proyecto '${project.name}' no pertenece al cliente seleccionado.` };
+      }
+      return { ok: true, clientId: cid, projectId: pid };
+    }
+    // Solo projectId: auto-resolver clientId desde el proyecto
+    return { ok: true, clientId: project.clientId, projectId: pid };
+  }
+
+  // Solo clientId
+  const client = clients.find((c) => c.id === cid);
+  if (!client) {
+    return { ok: false, error: `El cliente '${cid}' no existe en este tenant.` };
+  }
+  return { ok: true, clientId: cid, projectId: null };
+}
+
 // ─── Tipos de filas DB ────────────────────────────────────────────────────────
 
 type CrmClientRow = { id: string; name: string; status: string };
@@ -204,6 +265,47 @@ async function getTenantId(slug = supabaseEnv.defaultTenant): Promise<string | n
   const params = new URLSearchParams({ select: "id,slug", slug: `eq.${slug}`, limit: "1" });
   const rows = await postgrest<TenantRow[]>(`tenants?${params.toString()}`, { method: "GET" });
   return rows[0]?.id ?? null;
+}
+
+/**
+ * Obtiene clientes y proyectos del tenant para validación de vínculos.
+ * Uso interno de resolveLeadLinks. IMPL-20260505-29
+ */
+async function fetchCrmLinkDataForTenant(tenantId: string): Promise<{ clients: CrmClient[]; projects: CrmProject[] }> {
+  const clientParams = new URLSearchParams({
+    select: "id,name,status",
+    tenant_id: `eq.${tenantId}`,
+    order: "name.asc"
+  });
+  const projectParams = new URLSearchParams({
+    select: "id,client_id,name,status",
+    tenant_id: `eq.${tenantId}`,
+    order: "name.asc"
+  });
+  const [clientRows, projectRows] = await Promise.all([
+    postgrest<CrmClientRow[]>(`clients?${clientParams.toString()}`, { method: "GET" }),
+    postgrest<CrmProjectRow[]>(`projects?${projectParams.toString()}`, { method: "GET" })
+  ]);
+  return {
+    clients: clientRows.map((r) => ({ id: r.id, name: r.name, status: r.status })),
+    projects: projectRows.map((r) => ({ id: r.id, clientId: r.client_id, name: r.name, status: r.status }))
+  };
+}
+
+/**
+ * Resuelve y valida el vínculo clientId/projectId contra datos reales del tenant.
+ * IMPL-20260505-29
+ */
+async function resolveLeadLinks(
+  tenantId: string,
+  clientId: string | null | undefined,
+  projectId: string | null | undefined
+): Promise<LeadLinkResolution> {
+  const cid = clientId?.trim() || null;
+  const pid = projectId?.trim() || null;
+  if (!cid && !pid) return { ok: true, clientId: null, projectId: null };
+  const { clients, projects } = await fetchCrmLinkDataForTenant(tenantId);
+  return resolveLeadLinksFromData(clients, projects, cid, pid);
 }
 
 // ─── Funciones públicas — lectura ─────────────────────────────────────────────
@@ -309,14 +411,20 @@ export async function createLeadForDefaultTenant(input: CreateLeadInput): Promis
   const tenantId = await getTenantId();
   if (!tenantId) return null;
 
+  // Validación cruzada server-side — IMPL-20260505-29
+  const linkResult = await resolveLeadLinks(tenantId, input.clientId, input.projectId);
+  if (!linkResult.ok) {
+    throw new Error(linkResult.error);
+  }
+
   const payload: Record<string, string | null> = {
     tenant_id: tenantId,
     name: input.name.trim(),
     source_channel: input.sourceChannel,
     requested_service: input.requestedService.trim(),
     status: "nuevo",
-    client_id: input.clientId?.trim() || null,
-    project_id: input.projectId?.trim() || null
+    client_id: linkResult.clientId,
+    project_id: linkResult.projectId
   };
 
   const body = JSON.stringify(payload);

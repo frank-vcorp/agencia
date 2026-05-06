@@ -15,6 +15,7 @@ import {
   leadStatusLabel,
   leadStatusLabels,
   nextLeadStatuses,
+  resolveLeadLinksFromData,
   type CreateLeadInput,
   type CrmClient,
   type CrmLinkOptions,
@@ -214,5 +215,97 @@ describe("crm — CrmLinkOptions estructura", () => {
 
     const projectClient = opts.clients.find((c) => c.id === opts.projects[0].clientId);
     expect(projectClient?.name).toBe("Vectoria");
+  });
+});
+
+// ─── Slice 29: resolveLeadLinksFromData — validación cruzada server-side ──────
+
+describe("crm — resolveLeadLinksFromData", () => {
+  const clients: CrmClient[] = [
+    { id: "c-1", name: "Acme Corp", status: "active" },
+    { id: "c-2", name: "Vectoria", status: "active" }
+  ];
+  const projects: CrmProject[] = [
+    { id: "p-1", clientId: "c-1", name: "Lanzamiento 2026", status: "active" },
+    { id: "p-2", clientId: "c-2", name: "Campaña Evergreen", status: "active" }
+  ];
+
+  it("sin vínculos devuelve ok con ambos null", () => {
+    const r = resolveLeadLinksFromData(clients, projects, null, null);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.clientId).toBeNull();
+      expect(r.projectId).toBeNull();
+    }
+  });
+
+  it("sin vínculos (undefined) devuelve ok con ambos null", () => {
+    const r = resolveLeadLinksFromData(clients, projects, undefined, undefined);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.clientId).toBeNull();
+      expect(r.projectId).toBeNull();
+    }
+  });
+
+  it("clientId válido sin projectId devuelve ok", () => {
+    const r = resolveLeadLinksFromData(clients, projects, "c-1", null);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.clientId).toBe("c-1");
+      expect(r.projectId).toBeNull();
+    }
+  });
+
+  it("clientId inexistente devuelve error", () => {
+    const r = resolveLeadLinksFromData(clients, projects, "c-999", null);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/cliente/i);
+  });
+
+  it("solo projectId válido resuelve clientId automáticamente", () => {
+    const r = resolveLeadLinksFromData(clients, projects, null, "p-1");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.clientId).toBe("c-1");
+      expect(r.projectId).toBe("p-1");
+    }
+  });
+
+  it("projectId inexistente devuelve error", () => {
+    const r = resolveLeadLinksFromData(clients, projects, null, "p-999");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/proyecto/i);
+  });
+
+  it("clientId y projectId consistentes devuelven ok", () => {
+    const r = resolveLeadLinksFromData(clients, projects, "c-1", "p-1");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.clientId).toBe("c-1");
+      expect(r.projectId).toBe("p-1");
+    }
+  });
+
+  it("clientId y projectId inconsistentes devuelven error", () => {
+    // p-2 pertenece a c-2, no a c-1
+    const r = resolveLeadLinksFromData(clients, projects, "c-1", "p-2");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/no pertenece/i);
+  });
+
+  it("clientId inexistente con projectId válido devuelve error", () => {
+    const r = resolveLeadLinksFromData(clients, projects, "c-999", "p-1");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/cliente/i);
+  });
+
+  it("strings vacíos se tratan como ausencia de vínculo", () => {
+    const r = resolveLeadLinksFromData(clients, projects, "", "");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.clientId).toBeNull();
+      expect(r.projectId).toBeNull();
+    }
   });
 });
