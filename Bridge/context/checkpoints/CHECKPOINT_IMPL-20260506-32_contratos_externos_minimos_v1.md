@@ -136,4 +136,4 @@ npm test → 156 passed (156) — 10 archivos de test
 - HEAD: commit `IMPL-20260506-32` (sobre 305c6d7)
 - Build: verde
 - Tests: 156/156 pasando
-- Producción: pendiente de deploy (misma pipeline Vercel)
+- Producción: desplegada y validada en `vectoria-zeta.vercel.app/contexto-agentes`
