@@ -4,6 +4,7 @@
  */
 import { type BriefClientContainer, type BriefProjectContainer, type BriefingStatus, getBriefWorkspace } from "./briefing";
 import { type AssetStatus, getAssetsForDefaultTenant } from "./assets";
+import { buildCrmMetrics, getLeadsForDefaultTenant } from "./crm";
 import { type QuotationStatus, getQuotationWorkspace, quotationStatusLabel } from "./quotations";
 import { type TenantSnapshot, getTenantSnapshot } from "./tenant-runtime";
 
@@ -44,6 +45,7 @@ export type ModuleMetrics = {
   briefs: string;
   cotizaciones: string;
   activos: string;
+  crm: string;
 };
 
 export type OperativeSummary = {
@@ -146,11 +148,12 @@ export function resolveNextAction(
 // ─── Función principal del dashboard ─────────────────────────────────────────
 
 export async function getOperativeSummary(): Promise<OperativeSummary> {
-  const [tenantSnapshot, briefWorkspace, quotationWorkspace, assetWorkspaces] = await Promise.all([
+  const [tenantSnapshot, briefWorkspace, quotationWorkspace, assetWorkspaces, leads] = await Promise.all([
     getTenantSnapshot(),
     getBriefWorkspace(),
     getQuotationWorkspace(),
-    getAssetsForDefaultTenant()
+    getAssetsForDefaultTenant(),
+    getLeadsForDefaultTenant()
   ]);
 
   const brief: BriefDashboardSummary | null = briefWorkspace
@@ -198,10 +201,13 @@ export async function getOperativeSummary(): Promise<OperativeSummary> {
 
   const nextAction = resolveNextAction(brief, quotation, assets);
 
+  const crmMetrics = buildCrmMetrics(leads);
+
   const moduleMetrics: ModuleMetrics = {
     briefs: brief ? "1 activo" : "Sin brief",
     cotizaciones: quotation ? `1 ${quotation.statusLabel.toLowerCase()}` : "Sin cotización",
-    activos: assets ? `${assets.total} activo${assets.total !== 1 ? "s" : ""}` : "Sin activos"
+    activos: assets ? `${assets.total} activo${assets.total !== 1 ? "s" : ""}` : "Sin activos",
+    crm: crmMetrics.label
   };
 
   return {

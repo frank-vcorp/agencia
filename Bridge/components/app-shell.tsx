@@ -1,6 +1,6 @@
 /**
- * IMPL-20260505-01
- * Respaldo: context/DIRECCION_VISUAL_V1.md, context/00_ARQUITECTURA.md
+ * FIX-20260505-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260505-26_crm_ligero_operativo_y_seguimiento_minimo_v1.md
  */
 "use client";
 
@@ -9,6 +9,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { shellMeta } from "@/lib/bridge-data";
+import type { ModuleMetrics } from "@/lib/dashboard";
 import { isSupabaseConfigured, supabaseEnv } from "@/lib/supabase";
 
 function isCurrent(pathname: string, href: string) {
@@ -19,9 +20,19 @@ function isCurrent(pathname: string, href: string) {
   return pathname.startsWith(href);
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  moduleMetrics
+}: {
+  children: React.ReactNode;
+  moduleMetrics?: ModuleMetrics;
+}) {
   const pathname = usePathname();
   const mobileLinks = [...shellMeta.roles, ...shellMeta.modules];
+  const modulesWithMetrics = shellMeta.modules.map((item) => {
+    const nextMetric = moduleMetrics?.[item.key as keyof ModuleMetrics];
+    return nextMetric ? { ...item, metric: nextMetric } : item;
+  });
 
   return (
     <div className="mx-auto flex min-h-screen max-w-[1600px] gap-5 px-4 py-4 text-sm text-slate-800 md:px-6 md:py-6">
@@ -69,7 +80,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <nav>
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-[color:var(--muted)]">Objetos compartidos</p>
             <div className="space-y-2">
-              {shellMeta.modules.map((item) => {
+              {modulesWithMetrics.map((item) => {
                 const active = isCurrent(pathname, item.href);
 
                 return (

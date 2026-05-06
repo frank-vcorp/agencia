@@ -50,6 +50,7 @@ export async function OverviewDashboard() {
     if (m.key === "briefs") return { ...m, metric: summary.moduleMetrics.briefs };
     if (m.key === "cotizaciones") return { ...m, metric: summary.moduleMetrics.cotizaciones };
     if (m.key === "activos") return { ...m, metric: summary.moduleMetrics.activos };
+    if (m.key === "crm") return { ...m, metric: summary.moduleMetrics.crm };
     return m;
   });
 

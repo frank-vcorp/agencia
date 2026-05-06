@@ -103,7 +103,7 @@ export const modulePages: ModulePage[] = [
     href: "/crm",
     label: "CRM",
     description: "Seguimiento ligero de leads, origen y proximas respuestas.",
-    metric: "12 leads"
+    metric: "Sin leads"
   },
   {
     key: "contexto-agentes",
