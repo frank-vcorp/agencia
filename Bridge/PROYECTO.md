@@ -1,13 +1,13 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** ARCH-20260506-45 — Activo creativo detallado planificado
+**ID activo:** ARCH-20260506-47 — Activo con archivos y evidencias reales planificado
 **Fecha de actualizacion:** 2026-05-06  
-**Estado general:** V1 cerrada y publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos, contratos externos endurecidos, continuidad conversacional por entidad, consumo remoto tenant-aware y estadisticas resumidas derivadas visibles sobre Supabase y Vercel. Operador y Disenador ya tienen superficies reales publicadas; el siguiente corte planificado aterriza la vista detallada del activo creativo como centro de trabajo y revision.
+**Estado general:** V1 cerrada y publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos, contratos externos endurecidos, continuidad conversacional por entidad, consumo remoto tenant-aware y estadisticas resumidas derivadas visibles sobre Supabase y Vercel. Operador, Disenador y la ficha del activo ya avanzaron con propuestas y decision operativa; el siguiente corte planificado cierra evidencias reales y upload de archivos antes de pasar a Cliente.
 
 ## MICRO-SPRINT ACTIVO
 
-### MICRO-SPRINT: Activo creativo detallado
+### MICRO-SPRINT: Evidencias reales del activo
 
 **Fecha:** 2026-05-06  
 **Proyecto:** Bridge  
@@ -15,16 +15,16 @@
 
 ### Entregable Demostrable
 
-> Bridge da el siguiente paso para que cada activo tenga su propia ficha creativa con prompt, contexto, propuestas y regreso a Bridge para revision.
+> Bridge cierra el activo como unidad tangible de trabajo creativo, permitiendo devolver archivos reales y evidencias dentro de la misma ficha.
 
 ### Como se Demuestra
 
 1. abrir el modulo de Activos,
-2. entrar desde un activo o desde el workspace del disenador a la vista detallada del activo,
-3. confirmar que se ve el prompt fuente, el contexto y la herramienta sugerida,
-4. confirmar que la ficha representa propuestas candidatas y revision,
-5. validar que el flujo Bridge -> Adobe -> Bridge queda claro,
-6. comprobar que los vacios V1 se muestran sin inventar persistencia inexistente.
+2. entrar desde un activo o desde el workspace del disenador a la ficha detallada,
+3. confirmar que una propuesta puede recibir un archivo o evidencia real,
+4. confirmar que la ficha muestra el nombre del archivo y la accion de abrir o descargar,
+5. validar que el flujo de devolucion desde Adobe ya no depende solo de una nota,
+6. comprobar que el gap de `file_upload` desaparece de los vacios honestos.
 
 ## ESTADO COMPROBABLE ACTUAL
 
@@ -68,8 +68,8 @@
 ### [~] En curso
 
 1. El paquete guiado por IA sigue activo sobre el marco ya definido por `ARCH-20260506-37` y `ARCH-20260506-38`.
-2. `ARCH-20260506-45` queda como siguiente corte para la vista detallada del activo creativo y propuestas versionadas.
-3. `ARCH-20260506-42` queda como siguiente corte para el cliente ligero guiado por IA.
+2. `ARCH-20260506-47` queda como siguiente corte para cerrar evidencias reales y upload del activo creativo.
+3. `ARCH-20260506-42` queda despues de ese cierre como siguiente corte para el cliente ligero guiado por IA.
 
 ### [ ] Pendiente
 
@@ -80,7 +80,7 @@
 1. `ARCH-20260506-40-41 / IMPL-20260506-44` queda cerrado como corte completado y validado con compilación, tests, revisión y documentación.
 2. `/disenador` ya dejó atrás la shell estática y publica un workspace guiado con tarea activa, cola priorizada, prompt fuente, estación Adobe y resumen de jornada.
 3. El checkpoint canónico del cierre es `context/checkpoints/CHECKPOINT_IMPL-20260506-44_workspace_disenador_guiado.md`.
-4. El siguiente corte recomendado es la vista detallada del activo creativo antes de avanzar al Cliente.
+4. El siguiente corte recomendado es cerrar upload y evidencias reales del activo antes de avanzar al Cliente.
 
 ## Artefactos Clave
 
@@ -207,7 +207,7 @@
 
 ### [~] Planificado para el siguiente corte
 
-1. Implementar vista detallada del activo creativo con propuestas versionadas y flujo Bridge -> Adobe -> Bridge.
+1. Implementar activo con archivos y evidencias reales.
 2. Implementar cliente ligero guiado por IA.
 
 ### [ ] Posterior
@@ -227,8 +227,8 @@
 
 ## Siguiente Paso Recomendado
 
-Con Operador y Disenador ya publicados, el siguiente paso recomendado es cerrar la unidad real de trabajo creativo antes de pasar al Cliente:
+Con Operador, Disenador y la ficha del activo ya avanzados, el siguiente paso recomendado es cerrar la unidad tangible de trabajo creativo antes de pasar al Cliente:
 
-1. implementar `ARCH-20260506-45` para la vista detallada del activo creativo,
-2. consolidar propuestas y revision dentro del activo,
+1. implementar `ARCH-20260506-47` para upload y evidencias reales del activo,
+2. reducir el principal vacio material del activo antes de abrir una nueva superficie,
 3. cerrar despues `ARCH-20260506-42` para la superficie ligera del cliente.

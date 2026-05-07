@@ -103,8 +103,9 @@ export default async function AssetDetailPage({
     const toolUsed   = String(formData.get("toolUsed") ?? "other").trim();
     const isPrimary  = formData.get("isPrimary") === "true";
     const promptVid  = String(formData.get("promptVersionId") ?? "").trim() || null;
+    const file       = formData.get("file");
     if (!tenantId || !note) return;
-    await insertAssetProposal({
+    const proposal = await insertAssetProposal({
       tenantId,
       assetId:          id,
       promptVersionId:  promptVid,
@@ -113,6 +114,31 @@ export default async function AssetDetailPage({
       isPrimary,
       reviewDecision:   "pending"
     });
+
+    if (proposal && file instanceof File && file.size > 0) {
+      const ext = file.name.split(".").pop() ?? "bin";
+      const uniqueId = crypto.randomUUID();
+      const storagePath = `${tenantId}/${id}/${proposal.id}/${uniqueId}.${ext}`;
+      const buffer = await file.arrayBuffer();
+      const uploaded = await uploadEvidenceToStorage(
+        storagePath,
+        buffer,
+        file.type || "application/octet-stream"
+      );
+
+      if (uploaded) {
+        await insertProposalEvidence({
+          tenantId,
+          assetId: id,
+          proposalId: proposal.id,
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          storagePath,
+          fileSizeBytes: file.size
+        });
+      }
+    }
+
     revalidatePath(`/activos/${id}`);
   }
 
@@ -388,7 +414,7 @@ export default async function AssetDetailPage({
 
             <p className="mt-3 text-[11px] text-[color:var(--muted)]">
               V1 — La integracion automatica con Adobe APIs esta fuera de alcance en este corte.
-              El disenador devuelve propuestas registrando un mensaje en la conversacion del activo.
+              El disenador devuelve propuestas registrandolas en esta ficha y puede adjuntar la evidencia real cuando ya la tenga lista.
             </p>
           </section>
 
@@ -652,7 +678,7 @@ export default async function AssetDetailPage({
               <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">
                 Registrar devolucion del disenador
               </p>
-              <form action={addProposalAction} className="mt-3 space-y-3">
+              <form action={addProposalAction} encType="multipart/form-data" className="mt-3 space-y-3">
                 <input type="hidden" name="tenantId" value={asset.tenantId} />
                 <input
                   type="hidden"
@@ -665,6 +691,20 @@ export default async function AssetDetailPage({
                   placeholder="Descripcion corta de la propuesta entregada desde la estacion Adobe..."
                   className="w-full rounded-[14px] border border-[color:var(--line)] bg-white/80 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent-deep)] resize-none"
                 />
+                <div className="rounded-[14px] border border-dashed border-[color:var(--line)] bg-white/60 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">
+                    Evidencia opcional de esta propuesta
+                  </p>
+                  <input
+                    type="file"
+                    name="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/quicktime"
+                    className="mt-2 text-[11px] text-[color:var(--muted)] file:mr-2 file:rounded-[10px] file:border-0 file:bg-[color:var(--accent-soft)] file:px-2.5 file:py-1 file:text-[11px] file:font-semibold file:text-[color:var(--accent-deep)]"
+                  />
+                  <p className="mt-2 text-[11px] leading-5 text-[color:var(--muted)]">
+                    Si ya traes la pieza desde Adobe, puedes subirla en el mismo paso en que registras la propuesta.
+                  </p>
+                </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <select
                     name="toolUsed"
