@@ -232,11 +232,12 @@ function ActiveTaskCard({ task }: { task: DesignerTask }) {
 
       {/* Accesos rapidos */}
       <div className="mt-4 flex flex-wrap gap-2">
+        {/* IMPL-20260506-45: apunta a la ficha detallada del activo */}
         <Link
-          href="/activos"
+          href={`/activos/${task.assetId}`}
           className="inline-flex items-center rounded-full bg-[color:var(--accent-soft)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--accent-deep)] transition hover:bg-[color:var(--accent-deep)] hover:text-white"
         >
-          → Ver activo
+          → Ver ficha
         </Link>
         {task.briefId && (
           <Link
@@ -276,11 +277,12 @@ function QueueTaskCard({ task }: { task: DesignerTask }) {
       <div className="flex shrink-0 flex-col items-end gap-2">
         <TaskStatusBadge status={task.status} />
         <span className="text-[10px] text-[color:var(--muted)]">{toolLabel}</span>
+        {/* IMPL-20260506-45: apunta a la ficha detallada del activo */}
         <Link
-          href="/activos"
+          href={`/activos/${task.assetId}`}
           className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent-deep)] transition hover:underline"
         >
-          Ver activo →
+          Ver ficha →
         </Link>
       </div>
     </article>

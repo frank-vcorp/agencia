@@ -4,7 +4,10 @@
  *           context/SPECs/SPEC_ARCH-20260505-24_activos_vinculados_a_cotizacion_y_project_v1.md
  * IMPL-20260506-33
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-33_continuidad_conversacional_entidades_restantes_v1.md
+ * IMPL-20260506-45
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-45_vista_detallada_activo_creativo_y_propuestas.md
  */
+import Link from "next/link";
 import { revalidatePath } from "next/cache";
 
 import {
@@ -178,6 +181,16 @@ export default async function ActivosPage() {
                     >
                       {assetStatusLabel(asset.status)}
                     </span>
+                  </div>
+
+                  {/* ── Acceso a la ficha detallada — IMPL-20260506-45 ─── */}
+                  <div className="mt-3">
+                    <Link
+                      href={`/activos/${asset.id}`}
+                      className="inline-flex items-center rounded-full bg-[color:var(--accent-soft)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--accent-deep)] transition hover:bg-[color:var(--accent-deep)] hover:text-white"
+                    >
+                      Ver ficha →
+                    </Link>
                   </div>
 
                   {activePrompt ? (
