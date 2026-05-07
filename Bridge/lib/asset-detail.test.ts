@@ -1,9 +1,9 @@
 /**
- * IMPL-20260506-45
- * Respaldo: context/SPECs/SPEC_ARCH-20260506-45_vista_detallada_activo_creativo_y_propuestas.md
+ * IMPL-20260506-46
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-46_cierre_activo_propuestas_persistentes_y_revision.md
  *
  * Tests de las funciones puras de la capa asset-detail.
- * Las funciones async (getFullAssetDetail) no se testean aqui — requieren DB.
+ * Las funciones async (getFullAssetDetail, insertAssetProposal) no se testean aqui — requieren DB.
  */
 import { describe, expect, it } from "vitest";
 
@@ -11,8 +11,13 @@ import {
   buildCreativeToolSuggestion,
   buildSourceRefs,
   buildV1ProposalDrafts,
+  derivePrimaryAndSecondary,
+  normalizeProposalRow,
+  resolveOperativeDecision,
   resolveReviewState,
-  type AssetPromptVersion
+  type AssetPromptVersion,
+  type ProposalDraft,
+  type ProposalRow
 } from "./asset-detail";
 
 describe("asset-detail — resolveReviewState", () => {
@@ -80,7 +85,7 @@ describe("asset-detail — resolveReviewState", () => {
 });
 
 describe("asset-detail — buildV1ProposalDrafts", () => {
-  it("devuelve array vacio (tabla asset_proposals no existe en V1)", () => {
+  it("devuelve array vacio (funcion de compatibilidad SPEC-45, deprecated en SPEC-46)", () => {
     expect(buildV1ProposalDrafts()).toEqual([]);
   });
 
@@ -187,5 +192,124 @@ describe("asset-detail — buildCreativeToolSuggestion", () => {
       expect(s.label, `label para ${code}`).toBeTruthy();
       expect(s.description, `description para ${code}`).toBeTruthy();
     });
+  });
+});
+
+// ─── Tests SPEC-46: normalizeProposalRow ─────────────────────────────────────
+
+describe("asset-detail — normalizeProposalRow", () => {
+  const baseRow: ProposalRow = {
+    id:                "prop-001",
+    tenant_id:         "tenant-abc",
+    asset_id:          "asset-xyz",
+    prompt_version_id: "pv-123",
+    is_primary:        true,
+    note:              "Propuesta inicial con Firefly",
+    tool_used:         "firefly",
+    review_decision:   "pending",
+    created_at:        "2026-05-06T10:00:00Z"
+  };
+
+  it("normaliza correctamente una fila completa", () => {
+    const draft = normalizeProposalRow(baseRow);
+    expect(draft.id).toBe("prop-001");
+    expect(draft.isPrimary).toBe(true);
+    expect(draft.note).toBe("Propuesta inicial con Firefly");
+    expect(draft.toolUsed).toBe("firefly");
+    expect(draft.promptVersionId).toBe("pv-123");
+    expect(draft.reviewDecision).toBe("pending");
+    expect(draft.createdAt).toBe("2026-05-06T10:00:00Z");
+  });
+
+  it("normaliza prompt_version_id null", () => {
+    const draft = normalizeProposalRow({ ...baseRow, prompt_version_id: null });
+    expect(draft.promptVersionId).toBeNull();
+  });
+
+  it("normaliza is_primary false", () => {
+    const draft = normalizeProposalRow({ ...baseRow, is_primary: false });
+    expect(draft.isPrimary).toBe(false);
+  });
+
+  it("normaliza review_decision approved_internal", () => {
+    const draft = normalizeProposalRow({ ...baseRow, review_decision: "approved_internal" });
+    expect(draft.reviewDecision).toBe("approved_internal");
+  });
+});
+
+// ─── Tests SPEC-46: derivePrimaryAndSecondary ─────────────────────────────────
+
+const makeProposal = (overrides: Partial<ProposalDraft>): ProposalDraft => ({
+  id:              "p1",
+  isPrimary:       false,
+  note:            "nota",
+  toolUsed:        "firefly",
+  promptVersionId: null,
+  reviewDecision:  "pending",
+  createdAt:       "2026-05-06T10:00:00Z",
+  ...overrides
+});
+
+describe("asset-detail — derivePrimaryAndSecondary", () => {
+  it("sin propuestas devuelve null en primary y secondary", () => {
+    const r = derivePrimaryAndSecondary([]);
+    expect(r.primary).toBeNull();
+    expect(r.secondary).toBeNull();
+    expect(r.comparisonNote).toBeNull();
+  });
+
+  it("con una sola propuesta, primary es esa y secondary null", () => {
+    const p = makeProposal({ id: "p1", isPrimary: true });
+    const r = derivePrimaryAndSecondary([p]);
+    expect(r.primary?.id).toBe("p1");
+    expect(r.secondary).toBeNull();
+    expect(r.comparisonNote).toBeNull();
+  });
+
+  it("la marcada isPrimary queda como primary", () => {
+    const p1 = makeProposal({ id: "p1", isPrimary: false, createdAt: "2026-05-06T11:00:00Z" });
+    const p2 = makeProposal({ id: "p2", isPrimary: true,  createdAt: "2026-05-06T09:00:00Z" });
+    const r  = derivePrimaryAndSecondary([p1, p2]);
+    expect(r.primary?.id).toBe("p2");
+    expect(r.secondary?.id).toBe("p1");
+  });
+
+  it("sin isPrimary, la mas reciente es primary", () => {
+    const p1 = makeProposal({ id: "p1", isPrimary: false, createdAt: "2026-05-06T09:00:00Z" });
+    const p2 = makeProposal({ id: "p2", isPrimary: false, createdAt: "2026-05-06T11:00:00Z" });
+    const r  = derivePrimaryAndSecondary([p1, p2]);
+    expect(r.primary?.id).toBe("p2");
+    expect(r.secondary?.id).toBe("p1");
+  });
+
+  it("comparisonNote incluye herramientas de primary y secondary", () => {
+    const p1 = makeProposal({ id: "p1", isPrimary: true,  toolUsed: "firefly",      createdAt: "2026-05-06T10:00:00Z" });
+    const p2 = makeProposal({ id: "p2", isPrimary: false, toolUsed: "adobe_express", createdAt: "2026-05-06T09:00:00Z" });
+    const r  = derivePrimaryAndSecondary([p1, p2]);
+    expect(r.comparisonNote).toContain("firefly");
+    expect(r.comparisonNote).toContain("adobe_express");
+  });
+});
+
+// ─── Tests SPEC-46: resolveOperativeDecision ─────────────────────────────────
+
+describe("asset-detail — resolveOperativeDecision", () => {
+  it("sin propuestas devuelve pending", () => {
+    expect(resolveOperativeDecision([])).toBe("pending");
+  });
+
+  it("toma la decision de la propuesta marcada isPrimary", () => {
+    const proposals = [
+      makeProposal({ id: "p1", isPrimary: false, reviewDecision: "needs_adjustment" }),
+      makeProposal({ id: "p2", isPrimary: true,  reviewDecision: "approved_internal" })
+    ];
+    expect(resolveOperativeDecision(proposals)).toBe("approved_internal");
+  });
+
+  it("si no hay isPrimary toma la primera del array", () => {
+    const proposals = [
+      makeProposal({ id: "p1", isPrimary: false, reviewDecision: "in_review" })
+    ];
+    expect(resolveOperativeDecision(proposals)).toBe("in_review");
   });
 });

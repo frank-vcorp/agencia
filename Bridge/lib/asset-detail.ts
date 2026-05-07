@@ -1,18 +1,33 @@
 /**
- * IMPL-20260506-45
- * Respaldo: context/SPECs/SPEC_ARCH-20260506-45_vista_detallada_activo_creativo_y_propuestas.md
+ * IMPL-20260506-46
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-46_cierre_activo_propuestas_persistentes_y_revision.md
  *
  * Capa reusable server-side para la vista detallada del activo creativo.
  * Contrato mínimo (SPEC-45): assetDetail, assetContext, promptVersion,
  * creativeToolSuggestion, proposalDrafts, reviewState, conversationThread,
  * sourceRefs, gaps.
+ * Contrato extendido (SPEC-46): primaryProposal, secondaryProposal,
+ * proposalComparisonNote, reviewDecision — persistencia real de propuestas.
  */
 import { getAssetChat, type EntityChat } from "./chat";
 import { suggestCreativeTool, type CreativeTool } from "./designer-workspace";
 import { assetStatusLabel, type Asset, type AssetPromptVersion, type AssetStatus } from "./assets";
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 
-// ─── Tipos del contrato (SPEC-45) ─────────────────────────────────────────────
+// ─── Tipos del contrato (SPEC-45 + SPEC-46) ──────────────────────────────────
+
+/**
+ * Decision operativa interna sobre una propuesta (SPEC-46 §3).
+ * pending           — sin decision aun, propuesta recibida
+ * needs_adjustment  — devuelta al disenador para ajuste
+ * in_review         — en revision por el operador
+ * approved_internal — aprobada operativamente, lista para presentar al cliente
+ */
+export type ReviewDecision =
+  | "pending"
+  | "needs_adjustment"
+  | "in_review"
+  | "approved_internal";
 
 /**
  * Estado de revision y flujo del activo (SPEC-45 §4).
@@ -34,14 +49,18 @@ export type ReviewState = {
 };
 
 /**
- * Propuesta candidata del disenador (SPEC-45 §2).
- * V1: tabla asset_proposals no existe — lista siempre vacia.
+ * Propuesta candidata del disenador (SPEC-46 §1).
+ * V1: tabla asset_proposals existe desde migracion 20260506060000.
  */
 export type ProposalDraft = {
   id: string;
+  /** true si es la propuesta principal del corte; false si es alternativa. */
+  isPrimary: boolean;
   note: string;
   toolUsed: CreativeTool;
-  promptVersionId: string;
+  /** Referencia al prompt origen; puede ser null si el prompt fue eliminado. */
+  promptVersionId: string | null;
+  reviewDecision: ReviewDecision;
   createdAt: string;
 };
 
@@ -51,7 +70,7 @@ export type SourceRef = {
   value: string;
 };
 
-/** Vista detallada completa de un activo (SPEC-45 contrato minimo). */
+/** Vista detallada completa de un activo (SPEC-45 + SPEC-46 contrato minimo). */
 export type AssetDetailFull = {
   /** Activo base con historial de versiones de prompt (SPEC-45 §1). */
   assetDetail: {
@@ -73,15 +92,23 @@ export type AssetDetailFull = {
     label: string;
     description: string;
   };
-  /** Propuestas candidatas V1 — siempre vacio, tabla asset_proposals no existe (SPEC-45 §2). */
+  /** Propuestas candidatas del disenador; vacio si no se han registrado aun (SPEC-46 §1). */
   proposalDrafts: ProposalDraft[];
+  /** Propuesta principal: la marcada is_primary=true o la mas reciente (SPEC-46 §2). */
+  primaryProposal: ProposalDraft | null;
+  /** Propuesta alternativa si existe mas de una (SPEC-46 §2). */
+  secondaryProposal: ProposalDraft | null;
+  /** Nota de diferencia entre propuesta principal y alternativa (SPEC-46 §2). */
+  proposalComparisonNote: string | null;
+  /** Decision operativa interna derivada de la propuesta principal (SPEC-46 §3). */
+  reviewDecision: ReviewDecision;
   /** Estado de revision derivado del status del activo (SPEC-45 §4). */
   reviewState: ReviewState;
   /** Conversacion contextual del activo (SPEC-45 §1). */
   conversationThread: EntityChat;
   /** Referencias de contexto derivadas del referencesJson del prompt activo. */
   sourceRefs: SourceRef[];
-  /** Vacios honestos documentados de V1 (SPEC-45 principios). */
+  /** Vacios honestos documentados (reducidos en SPEC-46 respecto a SPEC-45). */
   gaps: string[];
 };
 
@@ -106,21 +133,36 @@ const CREATIVE_TOOL_META: Record<CreativeTool, { label: string; description: str
   }
 };
 
-// ─── Vacios honestos de V1 ────────────────────────────────────────────────────
+// ─── Vacios honestos de V1 (reducidos en SPEC-46) ────────────────────────────
 
 const V1_GAPS: string[] = [
-  "asset_proposals: tabla no existe — propuestas candidatas son vacias en V1",
-  "proposal_comparison: sin comparador visual entre propuestas en V1",
+  "proposal_comparison: comparador visual binario entre propuestas no disponible en V1",
   "file_upload: carga binaria de archivos no implementada en V1",
   "client_approval: aprobacion final del cliente no disponible en esta ficha V1",
   "analytics_per_asset: historial de metricas por activo no disponible en V1"
 ];
 
+// ─── Labels y helpers de decision operativa ───────────────────────────────────
+
+export const REVIEW_DECISION_LABELS: Record<ReviewDecision, string> = {
+  pending:           "Pendiente",
+  needs_adjustment:  "Requiere ajuste",
+  in_review:         "En revision",
+  approved_internal: "Aprobada internamente"
+};
+
+export const REVIEW_DECISION_COLORS: Record<ReviewDecision, string> = {
+  pending:           "bg-slate-50 text-slate-600 ring-slate-200",
+  needs_adjustment:  "bg-amber-50 text-amber-700 ring-amber-200",
+  in_review:         "bg-violet-50 text-violet-700 ring-violet-200",
+  approved_internal: "bg-emerald-50 text-emerald-700 ring-emerald-200"
+};
+
 // ─── Funciones puras (testeables) ─────────────────────────────────────────────
 
 /**
  * Resuelve el estado de revision del activo desde su status.
- * IMPL-20260506-45
+ * IMPL-20260506-46
  */
 export function resolveReviewState(status: AssetStatus): ReviewState {
   return {
@@ -136,18 +178,72 @@ export function resolveReviewState(status: AssetStatus): ReviewState {
 }
 
 /**
- * Devuelve lista de propuestas candidatas.
- * V1: siempre vacio honesto — tabla asset_proposals no existe.
- * IMPL-20260506-45
+ * Devuelve lista de propuestas candidatas vacia (compatibilidad con tests SPEC-45).
+ * @deprecated En SPEC-46 se usa fetchAssetProposals(assetId) para propuestas reales.
+ * IMPL-20260506-46
  */
 export function buildV1ProposalDrafts(): ProposalDraft[] {
   return [];
 }
 
 /**
+ * Normaliza una fila de asset_proposals a ProposalDraft.
+ * IMPL-20260506-46
+ */
+export function normalizeProposalRow(row: ProposalRow): ProposalDraft {
+  return {
+    id:              row.id,
+    isPrimary:       row.is_primary,
+    note:            row.note,
+    toolUsed:        row.tool_used as CreativeTool,
+    promptVersionId: row.prompt_version_id,
+    reviewDecision:  row.review_decision as ReviewDecision,
+    createdAt:       row.created_at
+  };
+}
+
+/**
+ * Deriva propuesta principal, alternativa y nota de comparacion desde
+ * la lista completa de propuestas del activo.
+ * Principal = la marcada is_primary=true; si no hay ninguna, la mas reciente.
+ * IMPL-20260506-46
+ */
+export function derivePrimaryAndSecondary(proposals: ProposalDraft[]): {
+  primary: ProposalDraft | null;
+  secondary: ProposalDraft | null;
+  comparisonNote: string | null;
+} {
+  if (proposals.length === 0) {
+    return { primary: null, secondary: null, comparisonNote: null };
+  }
+  const sorted = [...proposals].sort((a, b) => {
+    if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+    return a.createdAt < b.createdAt ? 1 : -1;
+  });
+  const primary   = sorted[0];
+  const secondary = sorted[1] ?? null;
+  const comparisonNote =
+    primary && secondary
+      ? `Principal: ${primary.toolUsed} — Alternativa: ${secondary.toolUsed}`
+      : null;
+  return { primary, secondary, comparisonNote };
+}
+
+/**
+ * Resuelve la decision operativa interna desde la propuesta principal.
+ * Si no hay propuestas, devuelve 'pending'.
+ * IMPL-20260506-46
+ */
+export function resolveOperativeDecision(proposals: ProposalDraft[]): ReviewDecision {
+  if (proposals.length === 0) return "pending";
+  const primary = proposals.find((p) => p.isPrimary) ?? proposals[0];
+  return primary.reviewDecision;
+}
+
+/**
  * Extrae referencias de contexto desde el referencesJson del prompt.
  * Omite entradas con valor null o undefined.
- * IMPL-20260506-45
+ * IMPL-20260506-46
  */
 export function buildSourceRefs(prompt: AssetPromptVersion | null): SourceRef[] {
   if (!prompt?.referencesJson) return [];
@@ -159,7 +255,7 @@ export function buildSourceRefs(prompt: AssetPromptVersion | null): SourceRef[] 
 /**
  * Construye la sugerencia de herramienta creativa para el tipo de pieza.
  * Reutiliza la logica del workspace del disenador (SPEC-40).
- * IMPL-20260506-45
+ * IMPL-20260506-46
  */
 export function buildCreativeToolSuggestion(pieceTypeCode: string): {
   tool: CreativeTool;
@@ -200,6 +296,19 @@ type PromptVersionRow = {
   status: string;
   created_by_user_id: string | null;
   created_by_agent_id: string | null;
+  created_at: string;
+};
+
+/** Fila de asset_proposals (SPEC-46). */
+export type ProposalRow = {
+  id: string;
+  tenant_id: string;
+  asset_id: string;
+  prompt_version_id: string | null;
+  is_primary: boolean;
+  note: string;
+  tool_used: string;
+  review_decision: string;
   created_at: string;
 };
 
@@ -271,11 +380,83 @@ function normalizePromptVersionRow(row: PromptVersionRow): AssetPromptVersion {
 // ─── Función pública ──────────────────────────────────────────────────────────
 
 /**
+ * Obtiene las propuestas persistidas de un activo desde asset_proposals.
+ * Devuelve array vacio si no hay propuestas o si Supabase no esta configurado.
+ * IMPL-20260506-46
+ */
+async function fetchAssetProposals(assetId: string): Promise<ProposalDraft[]> {
+  if (!isSupabaseConfigured) return [];
+  const params = new URLSearchParams({
+    select: "id,tenant_id,asset_id,prompt_version_id,is_primary,note,tool_used,review_decision,created_at",
+    asset_id: `eq.${assetId}`,
+    order: "created_at.desc"
+  });
+  try {
+    const rows = await postgrest<ProposalRow[]>(`asset_proposals?${params.toString()}`, {
+      method: "GET"
+    });
+    return rows.map(normalizeProposalRow);
+  } catch {
+    // Tabla puede no existir en entornos sin migracion aplicada — degradar honestamente
+    return [];
+  }
+}
+
+/**
+ * Persiste una nueva propuesta para el activo en asset_proposals.
+ * Requiere service_role key configurada.
+ * IMPL-20260506-46
+ */
+export async function insertAssetProposal(input: {
+  tenantId: string;
+  assetId: string;
+  promptVersionId: string | null;
+  note: string;
+  toolUsed: CreativeTool;
+  isPrimary: boolean;
+  reviewDecision: ReviewDecision;
+}): Promise<ProposalDraft | null> {
+  if (!isSupabaseConfigured) return null;
+  const body = {
+    tenant_id:         input.tenantId,
+    asset_id:          input.assetId,
+    prompt_version_id: input.promptVersionId ?? null,
+    is_primary:        input.isPrimary,
+    note:              input.note,
+    tool_used:         input.toolUsed,
+    review_decision:   input.reviewDecision
+  };
+  const rows = await postgrest<ProposalRow[]>("asset_proposals", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+  return rows[0] ? normalizeProposalRow(rows[0]) : null;
+}
+
+/**
+ * Actualiza la decision operativa de una propuesta existente.
+ * Requiere service_role key configurada.
+ * IMPL-20260506-46
+ */
+export async function updateProposalDecision(
+  proposalId: string,
+  reviewDecision: ReviewDecision
+): Promise<boolean> {
+  if (!isSupabaseConfigured) return false;
+  const params = new URLSearchParams({ id: `eq.${proposalId}` });
+  await postgrest(`asset_proposals?${params.toString()}`, {
+    method: "PATCH",
+    body: JSON.stringify({ review_decision: reviewDecision })
+  });
+  return true;
+}
+
+/**
  * Obtiene la vista detallada completa de un activo por ID.
  * Reune: activo, historial de prompts, chat, herramienta sugerida,
- * estado de revision, propuestas V1 vacias y vacios honestos.
+ * estado de revision, propuestas persistidas (SPEC-46) y vacios honestos.
  * Devuelve null si Supabase no esta configurado o el activo no existe.
- * IMPL-20260506-45
+ * IMPL-20260506-46
  */
 export async function getFullAssetDetail(assetId: string): Promise<AssetDetailFull | null> {
   if (!isSupabaseConfigured) return null;
@@ -308,22 +489,31 @@ export async function getFullAssetDetail(assetId: string): Promise<AssetDetailFu
   const activePrompt =
     promptHistory.find((p) => p.status === "active") ?? promptHistory[0] ?? null;
 
-  const chat = await getAssetChat(assetId);
+  const [chat, proposalDrafts] = await Promise.all([
+    getAssetChat(assetId),
+    fetchAssetProposals(assetId)
+  ]);
+
+  const { primary, secondary, comparisonNote } = derivePrimaryAndSecondary(proposalDrafts);
 
   return {
     assetDetail: { asset, promptHistory },
     assetContext: {
-      clientId: asset.clientId,
-      projectId: asset.projectId,
-      briefId: asset.briefId,
+      clientId:    asset.clientId,
+      projectId:   asset.projectId,
+      briefId:     asset.briefId,
       quotationId: asset.quotationId
     },
-    promptVersion: activePrompt,
-    creativeToolSuggestion: buildCreativeToolSuggestion(asset.pieceTypeCode),
-    proposalDrafts: buildV1ProposalDrafts(),
-    reviewState: resolveReviewState(asset.status),
-    conversationThread: chat,
-    sourceRefs: buildSourceRefs(activePrompt),
-    gaps: V1_GAPS
+    promptVersion:            activePrompt,
+    creativeToolSuggestion:   buildCreativeToolSuggestion(asset.pieceTypeCode),
+    proposalDrafts,
+    primaryProposal:          primary,
+    secondaryProposal:        secondary,
+    proposalComparisonNote:   comparisonNote,
+    reviewDecision:           resolveOperativeDecision(proposalDrafts),
+    reviewState:              resolveReviewState(asset.status),
+    conversationThread:       chat,
+    sourceRefs:               buildSourceRefs(activePrompt),
+    gaps:                     V1_GAPS
   };
 }

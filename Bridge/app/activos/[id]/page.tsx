@@ -1,6 +1,6 @@
 /**
- * IMPL-20260506-45
- * Respaldo: context/SPECs/SPEC_ARCH-20260506-45_vista_detallada_activo_creativo_y_propuestas.md
+ * IMPL-20260506-46
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-46_cierre_activo_propuestas_persistentes_y_revision.md
  *
  * Vista detallada del activo creativo — unidad real de trabajo en Bridge.
  * Accesible desde /activos y desde /disenador.
@@ -22,7 +22,15 @@ import {
   placementLabel,
   type AssetStatus
 } from "@/lib/assets";
-import { getFullAssetDetail, type ReviewState } from "@/lib/asset-detail";
+import {
+  getFullAssetDetail,
+  insertAssetProposal,
+  updateProposalDecision,
+  REVIEW_DECISION_LABELS,
+  REVIEW_DECISION_COLORS,
+  type ReviewState,
+  type ReviewDecision
+} from "@/lib/asset-detail";
 
 // ─── Helpers de presentacion ──────────────────────────────────────────────────
 
@@ -65,6 +73,10 @@ export default async function AssetDetailPage({
     promptVersion,
     creativeToolSuggestion,
     proposalDrafts,
+    primaryProposal,
+    secondaryProposal,
+    proposalComparisonNote,
+    reviewDecision,
     reviewState,
     conversationThread,
     sourceRefs,
@@ -81,6 +93,37 @@ export default async function AssetDetailPage({
     revalidatePath(`/activos/${id}`);
   }
 
+  // ─── Server action: registrar propuesta del disenador ────────────────────
+  async function addProposalAction(formData: FormData) {
+    "use server";
+    const tenantId   = String(formData.get("tenantId") ?? "").trim();
+    const note       = String(formData.get("note") ?? "").trim();
+    const toolUsed   = String(formData.get("toolUsed") ?? "other").trim();
+    const isPrimary  = formData.get("isPrimary") === "true";
+    const promptVid  = String(formData.get("promptVersionId") ?? "").trim() || null;
+    if (!tenantId || !note) return;
+    await insertAssetProposal({
+      tenantId,
+      assetId:          id,
+      promptVersionId:  promptVid,
+      note,
+      toolUsed:         toolUsed as "firefly" | "adobe_express" | "photoshop" | "other",
+      isPrimary,
+      reviewDecision:   "pending"
+    });
+    revalidatePath(`/activos/${id}`);
+  }
+
+  // ─── Server action: actualizar decision operativa de una propuesta ────────
+  async function updateDecisionAction(formData: FormData) {
+    "use server";
+    const proposalId = String(formData.get("proposalId") ?? "").trim();
+    const decision   = String(formData.get("decision") ?? "").trim() as ReviewDecision;
+    if (!proposalId || !decision) return;
+    await updateProposalDecision(proposalId, decision);
+    revalidatePath(`/activos/${id}`);
+  }
+
   const ALL_CREATIVE_TOOLS = ["firefly", "adobe_express", "photoshop"] as const;
   const TOOL_LABELS = {
     firefly: "Adobe Firefly",
@@ -88,6 +131,13 @@ export default async function AssetDetailPage({
     photoshop: "Photoshop",
     other: "Texto"
   };
+
+  const REVIEW_DECISIONS: ReviewDecision[] = [
+    "pending",
+    "needs_adjustment",
+    "in_review",
+    "approved_internal"
+  ];
 
   return (
     <div className="space-y-6">
@@ -311,42 +361,198 @@ export default async function AssetDetailPage({
             </p>
           </section>
 
-          {/* Propuestas candidatas */}
+          {/* Propuestas candidatas (SPEC-46: persistencia real) */}
           <section className="panel rounded-[30px] px-6 py-6">
-            <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
-              Propuestas candidatas
-            </p>
-            <h2 className="mt-2 font-[family-name:var(--font-heading)] text-xl font-bold tracking-tight">
-              Propuestas del disenador
-            </h2>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
+                  Propuestas candidatas
+                </p>
+                <h2 className="mt-2 font-[family-name:var(--font-heading)] text-xl font-bold tracking-tight">
+                  Propuestas del disenador
+                </h2>
+              </div>
+              <span
+                className={`shrink-0 rounded-[14px] px-3 py-1 text-[10px] uppercase tracking-[0.18em] ring-1 ${REVIEW_DECISION_COLORS[reviewDecision]}`}
+              >
+                {REVIEW_DECISION_LABELS[reviewDecision]}
+              </span>
+            </div>
 
             {proposalDrafts.length === 0 ? (
               <div className="mt-4 rounded-[18px] bg-white/80 px-4 py-5 ring-1 ring-[color:var(--line)]">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--muted)]">
-                  Vacio honesto V1
+                  Sin propuestas aun
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
-                  La tabla <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">asset_proposals</code>{" "}
-                  no existe en V1. Las propuestas se registran como mensajes en la conversacion del
-                  activo hasta que se implemente persistencia dedicada.
-                </p>
-                <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
-                  Flujo V1: el disenador produce en la estacion Adobe y devuelve la propuesta
-                  dejando un mensaje en esta conversacion con el resultado.
+                  El disenador aun no ha registrado propuestas para este activo.
+                  Usa el formulario de abajo para devolver la primera entrega desde la estacion Adobe.
                 </p>
               </div>
             ) : (
               <div className="mt-4 space-y-3">
-                {proposalDrafts.map((p) => (
-                  <div
-                    key={p.id}
-                    className="rounded-[18px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]"
-                  >
-                    <p className="text-sm">{p.note}</p>
+                {/* Tarjeta propuesta principal */}
+                {primaryProposal && (
+                  <div className="rounded-[20px] bg-[color:var(--accent-soft)] px-5 py-5 ring-1 ring-[color:rgba(200,93,39,0.18)]">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--accent-deep)]">
+                        Propuesta principal
+                      </span>
+                      <span className={`rounded-[12px] px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] ring-1 ${REVIEW_DECISION_COLORS[primaryProposal.reviewDecision]}`}>
+                        {REVIEW_DECISION_LABELS[primaryProposal.reviewDecision]}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-[color:var(--accent-deep)]">
+                      {primaryProposal.note}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-[color:var(--muted)]">
+                      <span className="rounded bg-white/60 px-2 py-0.5 ring-1 ring-[color:rgba(200,93,39,0.1)]">
+                        {TOOL_LABELS[primaryProposal.toolUsed as keyof typeof TOOL_LABELS] ?? primaryProposal.toolUsed}
+                      </span>
+                      {primaryProposal.promptVersionId && (
+                        <span className="rounded bg-white/60 px-2 py-0.5 ring-1 ring-[color:rgba(200,93,39,0.1)]">
+                          Prompt v{promptHistory.find(p => p.id === primaryProposal.promptVersionId)?.versionNumber ?? "?"}
+                        </span>
+                      )}
+                      <span className="rounded bg-white/60 px-2 py-0.5 ring-1 ring-[color:rgba(200,93,39,0.1)]">
+                        {new Date(primaryProposal.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}
+                      </span>
+                    </div>
+
+                    {/* Decision operativa para la propuesta principal */}
+                    <form action={updateDecisionAction} className="mt-4 flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="proposalId" value={primaryProposal.id} />
+                      <select
+                        name="decision"
+                        defaultValue={primaryProposal.reviewDecision}
+                        className="rounded-[12px] border border-[color:rgba(200,93,39,0.2)] bg-white/70 px-2.5 py-1.5 text-[11px] outline-none focus:ring-2 focus:ring-[color:var(--accent-deep)]"
+                      >
+                        {REVIEW_DECISIONS.map((d) => (
+                          <option key={d} value={d}>{REVIEW_DECISION_LABELS[d]}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="submit"
+                        className="rounded-[12px] bg-[color:var(--accent-deep)] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:opacity-90"
+                      >
+                        Guardar decision
+                      </button>
+                    </form>
                   </div>
-                ))}
+                )}
+
+                {/* Tarjeta propuesta alternativa */}
+                {secondaryProposal && (
+                  <div className="rounded-[20px] bg-white/80 px-5 py-5 ring-1 ring-[color:var(--line)]">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--muted)]">
+                        Propuesta alternativa
+                      </span>
+                      <span className={`rounded-[12px] px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] ring-1 ${REVIEW_DECISION_COLORS[secondaryProposal.reviewDecision]}`}>
+                        {REVIEW_DECISION_LABELS[secondaryProposal.reviewDecision]}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-[color:var(--muted)]">
+                      {secondaryProposal.note}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-[color:var(--muted)]">
+                      <span className="rounded bg-slate-50 px-2 py-0.5 ring-1 ring-[color:var(--line)]">
+                        {TOOL_LABELS[secondaryProposal.toolUsed as keyof typeof TOOL_LABELS] ?? secondaryProposal.toolUsed}
+                      </span>
+                      {secondaryProposal.promptVersionId && (
+                        <span className="rounded bg-slate-50 px-2 py-0.5 ring-1 ring-[color:var(--line)]">
+                          Prompt v{promptHistory.find(p => p.id === secondaryProposal.promptVersionId)?.versionNumber ?? "?"}
+                        </span>
+                      )}
+                    </div>
+
+                    <form action={updateDecisionAction} className="mt-4 flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="proposalId" value={secondaryProposal.id} />
+                      <select
+                        name="decision"
+                        defaultValue={secondaryProposal.reviewDecision}
+                        className="rounded-[12px] border border-[color:var(--line)] bg-white/70 px-2.5 py-1.5 text-[11px] outline-none focus:ring-2 focus:ring-[color:var(--accent-deep)]"
+                      >
+                        {REVIEW_DECISIONS.map((d) => (
+                          <option key={d} value={d}>{REVIEW_DECISION_LABELS[d]}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="submit"
+                        className="rounded-[12px] bg-slate-700 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:opacity-90"
+                      >
+                        Guardar decision
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                {/* Nota de comparacion si hay dos propuestas */}
+                {proposalComparisonNote && (
+                  <div className="rounded-[14px] bg-slate-50 px-4 py-3 ring-1 ring-[color:var(--line)]">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">
+                      Diferencia entre propuestas
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-[color:var(--muted)]">{proposalComparisonNote}</p>
+                  </div>
+                )}
+
+                {/* Propuestas adicionales (mas de 2) */}
+                {proposalDrafts.length > 2 && (
+                  <p className="text-[11px] text-[color:var(--muted)]">
+                    + {proposalDrafts.length - 2} propuesta(s) adicionale(s) registradas.
+                  </p>
+                )}
               </div>
             )}
+
+            {/* Formulario de devolucion de propuesta por el disenador */}
+            <div className="mt-6 border-t border-[color:var(--line)] pt-5">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">
+                Registrar devolucion del disenador
+              </p>
+              <form action={addProposalAction} className="mt-3 space-y-3">
+                <input type="hidden" name="tenantId" value={asset.tenantId} />
+                <input
+                  type="hidden"
+                  name="promptVersionId"
+                  value={promptVersion?.id ?? ""}
+                />
+                <textarea
+                  name="note"
+                  rows={3}
+                  placeholder="Descripcion corta de la propuesta entregada desde la estacion Adobe..."
+                  className="w-full rounded-[14px] border border-[color:var(--line)] bg-white/80 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent-deep)] resize-none"
+                />
+                <div className="flex flex-wrap items-center gap-3">
+                  <select
+                    name="toolUsed"
+                    className="rounded-[12px] border border-[color:var(--line)] bg-white/80 px-2.5 py-1.5 text-[11px] outline-none focus:ring-2 focus:ring-[color:var(--accent-deep)]"
+                  >
+                    <option value="firefly">Adobe Firefly</option>
+                    <option value="adobe_express">Adobe Express</option>
+                    <option value="photoshop">Photoshop</option>
+                    <option value="other">Otra herramienta</option>
+                  </select>
+                  <label className="flex items-center gap-1.5 text-[11px] text-[color:var(--muted)]">
+                    <input type="hidden" name="isPrimary" value="false" />
+                    <input
+                      type="checkbox"
+                      name="isPrimary"
+                      value="true"
+                      className="accent-[color:var(--accent-deep)]"
+                    />
+                    Marcar como principal
+                  </label>
+                  <button
+                    type="submit"
+                    className="rounded-[12px] bg-[color:var(--accent-deep)] px-4 py-1.5 text-[11px] font-semibold text-white transition hover:opacity-90"
+                  >
+                    Registrar propuesta
+                  </button>
+                </div>
+              </form>
+            </div>
           </section>
         </div>
 
