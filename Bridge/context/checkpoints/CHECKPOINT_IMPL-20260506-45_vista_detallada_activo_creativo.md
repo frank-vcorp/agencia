@@ -66,11 +66,28 @@ Nuevos tests en `lib/asset-detail.test.ts`: 33 casos cubriendo:
 - `buildCreativeToolSuggestion` — 10 tests (por tipo de pieza + labels definidos)
 
 ### Gate 3 — Revisión ✓
-- Código fiel a SPEC-45 sin inventar datos ni integraciones
-- Vacios V1 declarados con honestidad en 5 puntos explícitos
-- Flujo Bridge → Adobe → Bridge visible en UI sin depender de API Adobe
-- `revalidatePath` correcto en el server action de la ficha detallada
-- Links del diseñador actualizados para navegar a la ficha específica
+
+**Nota:** Qodo CLI fue discontinuado (sunsetted). Gate 3 ejecutado como revisión manual exhaustiva.
+
+**Errores de TS/lint:** 0 en los 5 archivos del corte (`get_errors` confirmado).
+
+**Checklist de seguridad:**
+
+| Punto | Resultado |
+|-------|-----------|
+| Sin `console.log` ni credenciales hardcodeadas | ✓ OK |
+| `isSupabaseConfigured` guard en `getFullAssetDetail` | ✓ línea 281 |
+| `id` pasado como URL param PostgREST (`eq.${id}`), no SQL crudo | ✓ mismo patrón repo |
+| `revalidatePath` con ruta dinámica correcta (`/activos/${id}`) | ✓ línea 81 |
+| `notFound()` ante activo inexistente | ✓ línea 60 |
+| Inputs del server action sanitizados con `.trim()` | ✓ líneas 77-78 |
+| Sin inventar datos, integraciones ni tablas inexistentes | ✓ vacios V1 explícitos |
+
+**Calidad:**
+- Código fiel a SPEC-45 sin agregar features no solicitadas
+- Flujo Bridge → Adobe → Bridge visible sin depender de API Adobe
+- Links del diseñador actualizados a `/activos/${task.assetId}`
+- Vacios V1 declarados en 5 puntos con honestidad en UI y tipos
 
 ### Gate 4 — Documentación ✓
 - Watermark IMPL-20260506-45 en todos los archivos nuevos y modificados
