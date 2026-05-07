@@ -33,6 +33,7 @@ import {
   type ReviewState,
   type ReviewDecision
 } from "@/lib/asset-detail";
+import { EvidencePreview } from "./EvidencePreview";
 
 // ─── Helpers de presentacion ──────────────────────────────────────────────────
 
@@ -496,36 +497,13 @@ export default async function AssetDetailPage({
                       </button>
                     </form>
 
-                    {/* Evidencia real de la propuesta principal (SPEC-47) */}
+                    {/* Evidencia real de la propuesta principal (SPEC-47, IMPL-20260506-49) */}
                     <div className="mt-4 border-t border-[color:rgba(200,93,39,0.15)] pt-4">
                       <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--accent-deep)]">
                         Evidencia real
                       </p>
                       {primaryProposal.hasEvidence && primaryProposal.evidence ? (
-                        <div className="mt-2 flex flex-wrap items-center gap-3">
-                          <span className="rounded-[10px] bg-white/70 px-2.5 py-1.5 text-[11px] ring-1 ring-[color:rgba(200,93,39,0.15)]">
-                            📎 {primaryProposal.evidence.fileName}
-                            {primaryProposal.evidence.fileSizeBytes && (
-                              <span className="ml-1 text-[color:var(--muted)]">
-                                ({Math.round(primaryProposal.evidence.fileSizeBytes / 1024)} KB)
-                              </span>
-                            )}
-                          </span>
-                          {primaryProposal.evidence.signedUrl ? (
-                            <a
-                              href={primaryProposal.evidence.signedUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="rounded-[12px] bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-700"
-                            >
-                              Abrir / Descargar
-                            </a>
-                          ) : (
-                            <span className="text-[11px] text-amber-700">
-                              Archivo subido — URL firmada no disponible temporalmente
-                            </span>
-                          )}
-                        </div>
+                        <EvidencePreview evidence={primaryProposal.evidence} variant="primary" />
                       ) : (
                         <form
                           action={uploadEvidenceAction}
@@ -597,36 +575,13 @@ export default async function AssetDetailPage({
                       </button>
                     </form>
 
-                    {/* Evidencia real de la propuesta alternativa (SPEC-47) */}
+                    {/* Evidencia real de la propuesta alternativa (SPEC-47, IMPL-20260506-49) */}
                     <div className="mt-4 border-t border-[color:var(--line)] pt-4">
                       <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">
                         Evidencia real
                       </p>
                       {secondaryProposal.hasEvidence && secondaryProposal.evidence ? (
-                        <div className="mt-2 flex flex-wrap items-center gap-3">
-                          <span className="rounded-[10px] bg-slate-50 px-2.5 py-1.5 text-[11px] ring-1 ring-[color:var(--line)]">
-                            📎 {secondaryProposal.evidence.fileName}
-                            {secondaryProposal.evidence.fileSizeBytes && (
-                              <span className="ml-1 text-[color:var(--muted)]">
-                                ({Math.round(secondaryProposal.evidence.fileSizeBytes / 1024)} KB)
-                              </span>
-                            )}
-                          </span>
-                          {secondaryProposal.evidence.signedUrl ? (
-                            <a
-                              href={secondaryProposal.evidence.signedUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="rounded-[12px] bg-slate-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-slate-700"
-                            >
-                              Abrir / Descargar
-                            </a>
-                          ) : (
-                            <span className="text-[11px] text-amber-700">
-                              Archivo subido — URL firmada no disponible temporalmente
-                            </span>
-                          )}
-                        </div>
+                        <EvidencePreview evidence={secondaryProposal.evidence} variant="secondary" />
                       ) : (
                         <form
                           action={uploadEvidenceAction}
