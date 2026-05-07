@@ -1,30 +1,30 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** Sin corte activo — V1 cerrada
+**ID activo:** ARCH-20260506-42 — Paquete de especificaciones de superficies guiadas por IA planificado
 **Fecha de actualizacion:** 2026-05-06  
-**Estado general:** V1 cerrada y publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos, contratos externos endurecidos, continuidad conversacional por entidad, consumo remoto tenant-aware y estadisticas resumidas derivadas visibles sobre Supabase y Vercel
+**Estado general:** V1 cerrada y publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos, contratos externos endurecidos, continuidad conversacional por entidad, consumo remoto tenant-aware y estadisticas resumidas derivadas visibles sobre Supabase y Vercel. El radar priorizado del operador ya fue implementado y validado; quedan planificados los cortes 40-42 para evolucionar Disenador y Cliente hacia superficies guiadas por IA con ejecucion y seguimiento.
 
 ## MICRO-SPRINT ACTIVO
 
-### MICRO-SPRINT: Cierre V1
+### MICRO-SPRINT: Paquete de SPECs de superficies guiadas por IA
 
 **Fecha:** 2026-05-06  
 **Proyecto:** Bridge  
-**Duracion estimada:** Sesion cerrada
+**Duracion estimada:** 2-4 horas
 
 ### Entregable Demostrable
 
-> Bridge V1 queda cerrada con su cadena derivada completa y validada de punta a punta para el tenant piloto.
+> Bridge ya tiene implementado y validado el radar priorizado del operador, mientras conserva trazado el paquete restante para ejecucion del disenador, workspace guiado y cliente ligero.
 
 ### Como se Demuestra
 
-1. abrir la URL productiva de Bridge,
-2. abrir la superficie de contexto para agentes,
-3. confirmar tenant real `vectoria` y snapshot vigente,
-4. validar contexto derivado, contratos endurecidos y lectura resumida en `/contexto-agentes`,
-5. comprobar que la capa derivada no reemplaza la fuente primaria,
-6. confirmar que no queda ningún corte activo dentro de V1.
+1. abrir la SPEC 39 y el checkpoint `CHECKPOINT_IMPL-20260506-39_radar_priorizado_operador.md`,
+2. confirmar que `/operador` ya expone el radar priorizado por proyecto con datos reales y vacio honesto,
+3. abrir las SPECs 40, 41 y 42,
+4. confirmar que el disenador ya tiene trazado el modelo de ejecucion, sesiones y workspace,
+5. confirmar que el cliente queda definido como superficie ligera guiada,
+6. validar que la secuencia restante de implementacion queda lista para delegarse.
 
 ## ESTADO COMPROBABLE ACTUAL
 
@@ -62,10 +62,14 @@
 30. El corte `ARCH-20260506-34 / IMPL-20260506-34` ya publica una capa reusable de consumo remoto tenant-aware con trazabilidad explícita desde `/contexto-agentes`.
 31. El corte `ARCH-20260506-35 / IMPL-20260506-36` ya publica estadísticas resumidas derivadas del snapshot con lectura compacta y reusable desde `/contexto-agentes`.
 32. El corte `ARCH-20260506-36 / IMPL-20260506-37` ya endurece `externalContracts` con referencias y versión canónicas, dejando la capa contractual lista para cierre de V1.
+33. El corte `ARCH-20260506-39 / IMPL-20260506-39` ya implementa el radar priorizado del operador por proyecto en `/operador`, con scoring trazable, vacio honesto y validación completa por build y tests.
 
 ### [~] En curso
 
-1. Sin cortes activos dentro de V1.
+1. El paquete guiado por IA sigue activo sobre el marco ya definido por `ARCH-20260506-37` y `ARCH-20260506-38`.
+2. `ARCH-20260506-40` queda como siguiente corte para el modelo de ejecucion del disenador con sesiones y estados.
+3. `ARCH-20260506-41` queda como siguiente corte para el workspace del disenador guiado por IA.
+4. `ARCH-20260506-42` queda como siguiente corte para el cliente ligero guiado por IA.
 
 ### [ ] Pendiente
 
@@ -73,10 +77,10 @@
 
 ## Ultimo Corte Cerrado
 
-1. `ARCH-20260506-36 / IMPL-20260506-37` queda cerrado como corte completado y validado con compilación, tests, revisión y documentación.
-2. `externalContracts` ya expone referencias canónicas mediante `buildHandoffRef()` y `EXTERNAL_CONTRACT_VERSION`, sin romper la inspección en `/contexto-agentes`.
-3. Los commits del cierre técnico son `faa7e36`, `12ac29f` y `4d86a55`.
-4. La V1 queda sin corte activo y lo restante pasa explícitamente a fase posterior.
+1. `ARCH-20260506-39 / IMPL-20260506-39` queda cerrado como corte completado y validado con compilación, tests, revisión y documentación.
+2. `/operador` ya dejó atrás la shell estática y publica un radar priorizado por proyecto con `priorityScore`, `riskLevel`, `suggestedAction`, `suggestedModule`, `idleHours` y `sourceRefs` derivados de datos reales.
+3. El checkpoint canónico del cierre es `context/checkpoints/CHECKPOINT_IMPL-20260506-39_radar_priorizado_operador.md`.
+4. El paquete posterior mantiene planificados los cortes 40, 41 y 42 como siguiente secuencia de implementación.
 
 ## Artefactos Clave
 
@@ -135,6 +139,13 @@
 52. context/checkpoints/CHECKPOINT_IMPL-20260506-36_estadisticas_resumidas_v1.md
 53. context/SPECs/SPEC_ARCH-20260506-36_endurecimiento_contratos_externos_v1.md
 54. context/checkpoints/CHECKPOINT_IMPL-20260506-37_endurecimiento_contratos_externos.md
+55. context/SPECs/SPEC_ARCH-20260506-37_copiloto_operativo_vivo_operador_disenador.md
+56. context/SPECs/SPEC_ARCH-20260506-38_superficies_guiadas_por_ia_tres_capas.md
+57. context/SPECs/SPEC_ARCH-20260506-39_radar_priorizado_operador_por_proyecto.md
+58. context/SPECs/SPEC_ARCH-20260506-40_modelo_ejecucion_disenador_sesiones_y_estados.md
+59. context/SPECs/SPEC_ARCH-20260506-41_workspace_disenador_guiado.md
+60. context/SPECs/SPEC_ARCH-20260506-42_cliente_ligero_guiado.md
+61. context/checkpoints/CHECKPOINT_IMPL-20260506-39_radar_priorizado_operador.md
 
 ## Decisiones Ya Tomadas
 
@@ -188,10 +199,15 @@
 30. Implementar consumo remoto con tenancy reforzado.
 31. Implementar estadísticas resumidas derivadas del snapshot.
 32. Endurecer contratos externos de agentes sobre objetos vivos.
+33. Implementar radar priorizado del operador por proyecto.
 
 ### [~] Planificado para el siguiente corte
 
-1. Sin corte activo. La V1 queda cerrada.
+1. Implementar copiloto operativo vivo para operador y disenador con datos reales y lectura priorizada por IA.
+2. Implementar arquitectura de superficies guiadas por IA con capas de radar, ejecucion y seguimiento para Operador, Disenador y Cliente.
+3. Implementar modelo de ejecucion del disenador con sesiones y estados.
+4. Implementar workspace del disenador guiado por IA.
+5. Implementar cliente ligero guiado por IA.
 
 ### [ ] Posterior
 
@@ -210,8 +226,8 @@
 
 ## Siguiente Paso Recomendado
 
-Con V1 cerrada, el siguiente paso recomendado queda en fase posterior y no bloquea el release actual:
+Con el radar priorizado del operador ya validado, el siguiente paso recomendado es continuar el paquete guiado por IA sin reabrir V1 base:
 
-1. handoffs remotos completos para agentes,
-2. evaluación de API pública final estable,
-3. analytics históricos y capas posteriores.
+1. implementar `ARCH-20260506-40` para el modelo de ejecucion del disenador con sesiones y estados,
+2. encadenar `ARCH-20260506-41` para el workspace del disenador guiado,
+3. cerrar `ARCH-20260506-42` para la superficie ligera del cliente.
