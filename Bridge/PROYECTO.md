@@ -1,13 +1,13 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** ARCH-20260506-42 — Paquete de especificaciones de superficies guiadas por IA planificado
+**ID activo:** ARCH-20260506-45 — Activo creativo detallado planificado
 **Fecha de actualizacion:** 2026-05-06  
-**Estado general:** V1 cerrada y publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos, contratos externos endurecidos, continuidad conversacional por entidad, consumo remoto tenant-aware y estadisticas resumidas derivadas visibles sobre Supabase y Vercel. El radar priorizado del operador ya fue implementado y validado; quedan planificados los cortes 40-42 para evolucionar Disenador y Cliente hacia superficies guiadas por IA con ejecucion y seguimiento.
+**Estado general:** V1 cerrada y publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos, contratos externos endurecidos, continuidad conversacional por entidad, consumo remoto tenant-aware y estadisticas resumidas derivadas visibles sobre Supabase y Vercel. Operador y Disenador ya tienen superficies reales publicadas; el siguiente corte planificado aterriza la vista detallada del activo creativo como centro de trabajo y revision.
 
 ## MICRO-SPRINT ACTIVO
 
-### MICRO-SPRINT: Paquete de SPECs de superficies guiadas por IA
+### MICRO-SPRINT: Activo creativo detallado
 
 **Fecha:** 2026-05-06  
 **Proyecto:** Bridge  
@@ -15,16 +15,16 @@
 
 ### Entregable Demostrable
 
-> Bridge ya tiene implementado y validado el radar priorizado del operador, mientras conserva trazado el paquete restante para ejecucion del disenador, workspace guiado y cliente ligero.
+> Bridge da el siguiente paso para que cada activo tenga su propia ficha creativa con prompt, contexto, propuestas y regreso a Bridge para revision.
 
 ### Como se Demuestra
 
-1. abrir la SPEC 39 y el checkpoint `CHECKPOINT_IMPL-20260506-39_radar_priorizado_operador.md`,
-2. confirmar que `/operador` ya expone el radar priorizado por proyecto con datos reales y vacio honesto,
-3. abrir las SPECs 40, 41 y 42,
-4. confirmar que el disenador ya tiene trazado el modelo de ejecucion, sesiones y workspace,
-5. confirmar que el cliente queda definido como superficie ligera guiada,
-6. validar que la secuencia restante de implementacion queda lista para delegarse.
+1. abrir el modulo de Activos,
+2. entrar desde un activo o desde el workspace del disenador a la vista detallada del activo,
+3. confirmar que se ve el prompt fuente, el contexto y la herramienta sugerida,
+4. confirmar que la ficha representa propuestas candidatas y revision,
+5. validar que el flujo Bridge -> Adobe -> Bridge queda claro,
+6. comprobar que los vacios V1 se muestran sin inventar persistencia inexistente.
 
 ## ESTADO COMPROBABLE ACTUAL
 
@@ -63,13 +63,13 @@
 31. El corte `ARCH-20260506-35 / IMPL-20260506-36` ya publica estadísticas resumidas derivadas del snapshot con lectura compacta y reusable desde `/contexto-agentes`.
 32. El corte `ARCH-20260506-36 / IMPL-20260506-37` ya endurece `externalContracts` con referencias y versión canónicas, dejando la capa contractual lista para cierre de V1.
 33. El corte `ARCH-20260506-39 / IMPL-20260506-39` ya implementa el radar priorizado del operador por proyecto en `/operador`, con scoring trazable, vacio honesto y validación completa por build y tests.
+34. El corte `ARCH-20260506-40-41 / IMPL-20260506-44` ya implementa el workspace real del disenador en `/disenador`, con capa de datos reusable, cola guiada, flujo Bridge -> Adobe -> Bridge y validacion completa por build y tests.
 
 ### [~] En curso
 
 1. El paquete guiado por IA sigue activo sobre el marco ya definido por `ARCH-20260506-37` y `ARCH-20260506-38`.
-2. `ARCH-20260506-40` queda como siguiente corte para el modelo de ejecucion del disenador con sesiones y estados.
-3. `ARCH-20260506-41` queda como siguiente corte para el workspace del disenador guiado por IA.
-4. `ARCH-20260506-42` queda como siguiente corte para el cliente ligero guiado por IA.
+2. `ARCH-20260506-45` queda como siguiente corte para la vista detallada del activo creativo y propuestas versionadas.
+3. `ARCH-20260506-42` queda como siguiente corte para el cliente ligero guiado por IA.
 
 ### [ ] Pendiente
 
@@ -77,10 +77,10 @@
 
 ## Ultimo Corte Cerrado
 
-1. `ARCH-20260506-39 / IMPL-20260506-39` queda cerrado como corte completado y validado con compilación, tests, revisión y documentación.
-2. `/operador` ya dejó atrás la shell estática y publica un radar priorizado por proyecto con `priorityScore`, `riskLevel`, `suggestedAction`, `suggestedModule`, `idleHours` y `sourceRefs` derivados de datos reales.
-3. El checkpoint canónico del cierre es `context/checkpoints/CHECKPOINT_IMPL-20260506-39_radar_priorizado_operador.md`.
-4. El paquete posterior mantiene planificados los cortes 40, 41 y 42 como siguiente secuencia de implementación.
+1. `ARCH-20260506-40-41 / IMPL-20260506-44` queda cerrado como corte completado y validado con compilación, tests, revisión y documentación.
+2. `/disenador` ya dejó atrás la shell estática y publica un workspace guiado con tarea activa, cola priorizada, prompt fuente, estación Adobe y resumen de jornada.
+3. El checkpoint canónico del cierre es `context/checkpoints/CHECKPOINT_IMPL-20260506-44_workspace_disenador_guiado.md`.
+4. El siguiente corte recomendado es la vista detallada del activo creativo antes de avanzar al Cliente.
 
 ## Artefactos Clave
 
@@ -146,6 +146,8 @@
 59. context/SPECs/SPEC_ARCH-20260506-41_workspace_disenador_guiado.md
 60. context/SPECs/SPEC_ARCH-20260506-42_cliente_ligero_guiado.md
 61. context/checkpoints/CHECKPOINT_IMPL-20260506-39_radar_priorizado_operador.md
+62. context/checkpoints/CHECKPOINT_IMPL-20260506-44_workspace_disenador_guiado.md
+63. context/SPECs/SPEC_ARCH-20260506-45_vista_detallada_activo_creativo_y_propuestas.md
 
 ## Decisiones Ya Tomadas
 
@@ -200,14 +202,13 @@
 31. Implementar estadísticas resumidas derivadas del snapshot.
 32. Endurecer contratos externos de agentes sobre objetos vivos.
 33. Implementar radar priorizado del operador por proyecto.
+34. Implementar modelo de ejecucion del disenador con sesiones y estados.
+35. Implementar workspace del disenador guiado por IA.
 
 ### [~] Planificado para el siguiente corte
 
-1. Implementar copiloto operativo vivo para operador y disenador con datos reales y lectura priorizada por IA.
-2. Implementar arquitectura de superficies guiadas por IA con capas de radar, ejecucion y seguimiento para Operador, Disenador y Cliente.
-3. Implementar modelo de ejecucion del disenador con sesiones y estados.
-4. Implementar workspace del disenador guiado por IA.
-5. Implementar cliente ligero guiado por IA.
+1. Implementar vista detallada del activo creativo con propuestas versionadas y flujo Bridge -> Adobe -> Bridge.
+2. Implementar cliente ligero guiado por IA.
 
 ### [ ] Posterior
 
@@ -226,8 +227,8 @@
 
 ## Siguiente Paso Recomendado
 
-Con el radar priorizado del operador ya validado, el siguiente paso recomendado es continuar el paquete guiado por IA sin reabrir V1 base:
+Con Operador y Disenador ya publicados, el siguiente paso recomendado es cerrar la unidad real de trabajo creativo antes de pasar al Cliente:
 
-1. implementar `ARCH-20260506-40` para el modelo de ejecucion del disenador con sesiones y estados,
-2. encadenar `ARCH-20260506-41` para el workspace del disenador guiado,
-3. cerrar `ARCH-20260506-42` para la superficie ligera del cliente.
+1. implementar `ARCH-20260506-45` para la vista detallada del activo creativo,
+2. consolidar propuestas y revision dentro del activo,
+3. cerrar despues `ARCH-20260506-42` para la superficie ligera del cliente.
