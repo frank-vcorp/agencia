@@ -540,9 +540,13 @@ async function generateSignedUrl(storagePath: string): Promise<string | null> {
     if (!res.ok) return null;
     const data = (await res.json()) as { signedURL?: string };
     if (!data.signedURL) return null;
-    // signedURL puede ser absoluta o relativa; normalizamos a URL completa
+    // signedURL puede ser absoluta o relativa; Supabase suele devolverla relativa
+    // a /storage/v1, asi que la completamos explicitamente para evitar URLs rotas.
     if (data.signedURL.startsWith("http")) return data.signedURL;
-    return `${supabaseEnv.url}${data.signedURL}`;
+    const normalizedPath = data.signedURL.startsWith("/")
+      ? data.signedURL
+      : `/${data.signedURL}`;
+    return `${supabaseEnv.url}/storage/v1${normalizedPath}`;
   } catch {
     return null;
   }
