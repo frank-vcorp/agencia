@@ -1,6 +1,6 @@
 /**
- * IMPL-20260506-46
- * Respaldo: context/SPECs/SPEC_ARCH-20260506-46_cierre_activo_propuestas_persistentes_y_revision.md
+ * IMPL-20260506-47
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-47_activo_archivos_y_evidencias_reales.md
  *
  * Vista detallada del activo creativo — unidad real de trabajo en Bridge.
  * Accesible desde /activos y desde /disenador.
@@ -25,7 +25,9 @@ import {
 import {
   getFullAssetDetail,
   insertAssetProposal,
+  insertProposalEvidence,
   updateProposalDecision,
+  uploadEvidenceToStorage,
   REVIEW_DECISION_LABELS,
   REVIEW_DECISION_COLORS,
   type ReviewState,
@@ -121,6 +123,35 @@ export default async function AssetDetailPage({
     const decision   = String(formData.get("decision") ?? "").trim() as ReviewDecision;
     if (!proposalId || !decision) return;
     await updateProposalDecision(proposalId, decision);
+    revalidatePath(`/activos/${id}`);
+  }
+
+  // ─── Server action: subir evidencia real a una propuesta (SPEC-47) ────────
+  async function uploadEvidenceAction(formData: FormData) {
+    "use server";
+    const tenantId   = String(formData.get("tenantId") ?? "").trim();
+    const assetId    = String(formData.get("assetId") ?? "").trim();
+    const proposalId = String(formData.get("proposalId") ?? "").trim();
+    const file       = formData.get("file");
+    if (!tenantId || !assetId || !proposalId || !(file instanceof File) || file.size === 0) return;
+
+    const ext         = file.name.split(".").pop() ?? "bin";
+    const uniqueId    = crypto.randomUUID();
+    const storagePath = `${tenantId}/${assetId}/${proposalId}/${uniqueId}.${ext}`;
+    const buffer      = await file.arrayBuffer();
+    const uploaded    = await uploadEvidenceToStorage(storagePath, buffer, file.type || "application/octet-stream");
+
+    if (uploaded) {
+      await insertProposalEvidence({
+        tenantId,
+        assetId,
+        proposalId,
+        fileName:       file.name,
+        mimeType:       file.type || "application/octet-stream",
+        storagePath,
+        fileSizeBytes:  file.size
+      });
+    }
     revalidatePath(`/activos/${id}`);
   }
 
@@ -438,6 +469,61 @@ export default async function AssetDetailPage({
                         Guardar decision
                       </button>
                     </form>
+
+                    {/* Evidencia real de la propuesta principal (SPEC-47) */}
+                    <div className="mt-4 border-t border-[color:rgba(200,93,39,0.15)] pt-4">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--accent-deep)]">
+                        Evidencia real
+                      </p>
+                      {primaryProposal.hasEvidence && primaryProposal.evidence ? (
+                        <div className="mt-2 flex flex-wrap items-center gap-3">
+                          <span className="rounded-[10px] bg-white/70 px-2.5 py-1.5 text-[11px] ring-1 ring-[color:rgba(200,93,39,0.15)]">
+                            📎 {primaryProposal.evidence.fileName}
+                            {primaryProposal.evidence.fileSizeBytes && (
+                              <span className="ml-1 text-[color:var(--muted)]">
+                                ({Math.round(primaryProposal.evidence.fileSizeBytes / 1024)} KB)
+                              </span>
+                            )}
+                          </span>
+                          {primaryProposal.evidence.signedUrl ? (
+                            <a
+                              href={primaryProposal.evidence.signedUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded-[12px] bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-700"
+                            >
+                              Abrir / Descargar
+                            </a>
+                          ) : (
+                            <span className="text-[11px] text-amber-700">
+                              Archivo subido — URL firmada no disponible temporalmente
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <form
+                          action={uploadEvidenceAction}
+                          encType="multipart/form-data"
+                          className="mt-2 flex flex-wrap items-center gap-2"
+                        >
+                          <input type="hidden" name="tenantId" value={asset.tenantId} />
+                          <input type="hidden" name="assetId" value={asset.id} />
+                          <input type="hidden" name="proposalId" value={primaryProposal.id} />
+                          <input
+                            type="file"
+                            name="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/quicktime"
+                            className="text-[11px] text-[color:var(--muted)] file:mr-2 file:rounded-[10px] file:border-0 file:bg-[color:var(--accent-soft)] file:px-2.5 file:py-1 file:text-[11px] file:font-semibold file:text-[color:var(--accent-deep)]"
+                          />
+                          <button
+                            type="submit"
+                            className="rounded-[12px] bg-[color:var(--accent-deep)] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:opacity-90"
+                          >
+                            Subir evidencia
+                          </button>
+                        </form>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -484,6 +570,61 @@ export default async function AssetDetailPage({
                         Guardar decision
                       </button>
                     </form>
+
+                    {/* Evidencia real de la propuesta alternativa (SPEC-47) */}
+                    <div className="mt-4 border-t border-[color:var(--line)] pt-4">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">
+                        Evidencia real
+                      </p>
+                      {secondaryProposal.hasEvidence && secondaryProposal.evidence ? (
+                        <div className="mt-2 flex flex-wrap items-center gap-3">
+                          <span className="rounded-[10px] bg-slate-50 px-2.5 py-1.5 text-[11px] ring-1 ring-[color:var(--line)]">
+                            📎 {secondaryProposal.evidence.fileName}
+                            {secondaryProposal.evidence.fileSizeBytes && (
+                              <span className="ml-1 text-[color:var(--muted)]">
+                                ({Math.round(secondaryProposal.evidence.fileSizeBytes / 1024)} KB)
+                              </span>
+                            )}
+                          </span>
+                          {secondaryProposal.evidence.signedUrl ? (
+                            <a
+                              href={secondaryProposal.evidence.signedUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded-[12px] bg-slate-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-slate-700"
+                            >
+                              Abrir / Descargar
+                            </a>
+                          ) : (
+                            <span className="text-[11px] text-amber-700">
+                              Archivo subido — URL firmada no disponible temporalmente
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <form
+                          action={uploadEvidenceAction}
+                          encType="multipart/form-data"
+                          className="mt-2 flex flex-wrap items-center gap-2"
+                        >
+                          <input type="hidden" name="tenantId" value={asset.tenantId} />
+                          <input type="hidden" name="assetId" value={asset.id} />
+                          <input type="hidden" name="proposalId" value={secondaryProposal.id} />
+                          <input
+                            type="file"
+                            name="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/quicktime"
+                            className="text-[11px] text-[color:var(--muted)] file:mr-2 file:rounded-[10px] file:border-0 file:bg-slate-100 file:px-2.5 file:py-1 file:text-[11px] file:font-semibold file:text-slate-600"
+                          />
+                          <button
+                            type="submit"
+                            className="rounded-[12px] bg-slate-700 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:opacity-90"
+                          >
+                            Subir evidencia
+                          </button>
+                        </form>
+                      )}
+                    </div>
                   </div>
                 )}
 

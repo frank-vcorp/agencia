@@ -1,6 +1,6 @@
 /**
- * IMPL-20260506-46
- * Respaldo: context/SPECs/SPEC_ARCH-20260506-46_cierre_activo_propuestas_persistentes_y_revision.md
+ * IMPL-20260506-47
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-47_activo_archivos_y_evidencias_reales.md
  *
  * Capa reusable server-side para la vista detallada del activo creativo.
  * Contrato mínimo (SPEC-45): assetDetail, assetContext, promptVersion,
@@ -8,6 +8,8 @@
  * sourceRefs, gaps.
  * Contrato extendido (SPEC-46): primaryProposal, secondaryProposal,
  * proposalComparisonNote, reviewDecision — persistencia real de propuestas.
+ * Contrato extendido (SPEC-47): ProposalEvidence, upload real a Storage,
+ * signed URL por propuesta — cierra el vacio file_upload.
  */
 import { getAssetChat, type EntityChat } from "./chat";
 import { suggestCreativeTool, type CreativeTool } from "./designer-workspace";
@@ -49,7 +51,25 @@ export type ReviewState = {
 };
 
 /**
- * Propuesta candidata del disenador (SPEC-46 §1).
+ * Evidencia real asociada a una propuesta del disenador (SPEC-47).
+ * V1: tabla asset_proposal_evidences + bucket proposal-evidences en Supabase Storage.
+ */
+export type ProposalEvidence = {
+  id: string;
+  proposalId: string;
+  assetId: string;
+  fileName: string;
+  mimeType: string;
+  /** Ruta relativa dentro del bucket proposal-evidences. */
+  storagePath: string;
+  fileSizeBytes: number | null;
+  uploadedAt: string;
+  /** URL firmada de Supabase Storage (expira en 1h); null si no se pudo generar. */
+  signedUrl: string | null;
+};
+
+/**
+ * Propuesta candidata del disenador (SPEC-46 §1 + SPEC-47 evidencia).
  * V1: tabla asset_proposals existe desde migracion 20260506060000.
  */
 export type ProposalDraft = {
@@ -62,6 +82,10 @@ export type ProposalDraft = {
   promptVersionId: string | null;
   reviewDecision: ReviewDecision;
   createdAt: string;
+  /** Evidencia real subida a esta propuesta; null si aun no hay archivo. SPEC-47. */
+  evidence: ProposalEvidence | null;
+  /** true si la propuesta tiene al menos una evidencia real subida. SPEC-47. */
+  hasEvidence: boolean;
 };
 
 /** Referencia de contexto extraida del referencesJson del prompt. */
@@ -133,11 +157,10 @@ const CREATIVE_TOOL_META: Record<CreativeTool, { label: string; description: str
   }
 };
 
-// ─── Vacios honestos de V1 (reducidos en SPEC-46) ────────────────────────────
+// ─── Vacios honestos de V1 (reducidos en SPEC-47 — file_upload cerrado) ─────
 
 const V1_GAPS: string[] = [
   "proposal_comparison: comparador visual binario entre propuestas no disponible en V1",
-  "file_upload: carga binaria de archivos no implementada en V1",
   "client_approval: aprobacion final del cliente no disponible en esta ficha V1",
   "analytics_per_asset: historial de metricas por activo no disponible en V1"
 ];
@@ -188,7 +211,8 @@ export function buildV1ProposalDrafts(): ProposalDraft[] {
 
 /**
  * Normaliza una fila de asset_proposals a ProposalDraft.
- * IMPL-20260506-46
+ * evidence y hasEvidence se enriquecen despues con attachEvidenceToProposals.
+ * IMPL-20260506-46 (extendido SPEC-47)
  */
 export function normalizeProposalRow(row: ProposalRow): ProposalDraft {
   return {
@@ -198,8 +222,52 @@ export function normalizeProposalRow(row: ProposalRow): ProposalDraft {
     toolUsed:        row.tool_used as CreativeTool,
     promptVersionId: row.prompt_version_id,
     reviewDecision:  row.review_decision as ReviewDecision,
-    createdAt:       row.created_at
+    createdAt:       row.created_at,
+    evidence:        null,
+    hasEvidence:     false
   };
+}
+
+/**
+ * Normaliza una fila de asset_proposal_evidences a ProposalEvidence (sin signedUrl).
+ * La URL firmada se resuelve de forma async en fetchEvidencesForProposals.
+ * IMPL-20260506-47
+ */
+export function normalizeEvidenceRow(
+  row: EvidenceRow
+): Omit<ProposalEvidence, "signedUrl"> {
+  return {
+    id:             row.id,
+    proposalId:     row.proposal_id,
+    assetId:        row.asset_id,
+    fileName:       row.file_name,
+    mimeType:       row.mime_type,
+    storagePath:    row.storage_path,
+    fileSizeBytes:  row.file_size_bytes,
+    uploadedAt:     row.uploaded_at
+  };
+}
+
+/**
+ * Enriquece una lista de ProposalDraft con sus evidencias correspondientes.
+ * Funcion pura: recibe proposals y evidencias ya resueltas.
+ * IMPL-20260506-47
+ */
+export function attachEvidenceToProposals(
+  proposals: ProposalDraft[],
+  evidences: ProposalEvidence[]
+): ProposalDraft[] {
+  const byProposal = new Map<string, ProposalEvidence>();
+  for (const ev of evidences) {
+    // Tomar solo la mas reciente si hay varias por propuesta (ya vienen ordenadas desc)
+    if (!byProposal.has(ev.proposalId)) {
+      byProposal.set(ev.proposalId, ev);
+    }
+  }
+  return proposals.map((p) => {
+    const ev = byProposal.get(p.id) ?? null;
+    return { ...p, evidence: ev, hasEvidence: ev !== null };
+  });
 }
 
 /**
@@ -267,6 +335,19 @@ export function buildCreativeToolSuggestion(pieceTypeCode: string): {
 }
 
 // ─── Tipos de filas DB ────────────────────────────────────────────────────────
+
+/** Fila de asset_proposal_evidences (SPEC-47). */
+export type EvidenceRow = {
+  id: string;
+  tenant_id: string;
+  asset_id: string;
+  proposal_id: string;
+  file_name: string;
+  mime_type: string;
+  storage_path: string;
+  file_size_bytes: number | null;
+  uploaded_at: string;
+};
 
 type AssetRow = {
   id: string;
@@ -434,6 +515,143 @@ export async function insertAssetProposal(input: {
 }
 
 /**
+ * Genera una URL firmada de Supabase Storage para una evidencia.
+ * Expira en 3600 segundos (1 hora).
+ * Devuelve null si la generacion falla o Supabase no esta configurado.
+ * IMPL-20260506-47
+ */
+async function generateSignedUrl(storagePath: string): Promise<string | null> {
+  if (!isSupabaseConfigured) return null;
+  const serviceKey = getServerApiKey();
+  try {
+    const res = await fetch(
+      `${supabaseEnv.url}/storage/v1/object/sign/proposal-evidences/${storagePath}`,
+      {
+        method: "POST",
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ expiresIn: 3600 }),
+        cache: "no-store"
+      }
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { signedURL?: string };
+    if (!data.signedURL) return null;
+    // signedURL puede ser absoluta o relativa; normalizamos a URL completa
+    if (data.signedURL.startsWith("http")) return data.signedURL;
+    return `${supabaseEnv.url}${data.signedURL}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Obtiene las evidencias mas recientes de una lista de propuestas.
+ * Genera signed URLs para cada evidencia encontrada.
+ * IMPL-20260506-47
+ */
+async function fetchEvidencesForProposals(
+  proposalIds: string[]
+): Promise<ProposalEvidence[]> {
+  if (!isSupabaseConfigured || proposalIds.length === 0) return [];
+  const params = new URLSearchParams({
+    select: "id,tenant_id,asset_id,proposal_id,file_name,mime_type,storage_path,file_size_bytes,uploaded_at",
+    proposal_id: `in.(${proposalIds.join(",")})`,
+    order: "uploaded_at.desc"
+  });
+  try {
+    const rows = await postgrest<EvidenceRow[]>(
+      `asset_proposal_evidences?${params.toString()}`,
+      { method: "GET" }
+    );
+    const evidences = await Promise.all(
+      rows.map(async (row) => {
+        const base = normalizeEvidenceRow(row);
+        const signedUrl = await generateSignedUrl(row.storage_path);
+        return { ...base, signedUrl };
+      })
+    );
+    return evidences;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Sube un archivo binario al bucket proposal-evidences de Supabase Storage.
+ * Requiere service_role key. Devuelve true si el upload fue exitoso.
+ * IMPL-20260506-47
+ */
+export async function uploadEvidenceToStorage(
+  storagePath: string,
+  fileBuffer: ArrayBuffer,
+  mimeType: string
+): Promise<boolean> {
+  if (!isSupabaseConfigured) return false;
+  const serviceKey = getServerApiKey();
+  try {
+    const res = await fetch(
+      `${supabaseEnv.url}/storage/v1/object/proposal-evidences/${storagePath}`,
+      {
+        method: "POST",
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": mimeType,
+          "x-upsert": "true"
+        },
+        body: fileBuffer,
+        cache: "no-store"
+      }
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Persiste la referencia de una evidencia subida en asset_proposal_evidences.
+ * Requiere service_role key configurada.
+ * IMPL-20260506-47
+ */
+export async function insertProposalEvidence(input: {
+  tenantId: string;
+  assetId: string;
+  proposalId: string;
+  fileName: string;
+  mimeType: string;
+  storagePath: string;
+  fileSizeBytes: number | null;
+}): Promise<ProposalEvidence | null> {
+  if (!isSupabaseConfigured) return null;
+  const body = {
+    tenant_id:       input.tenantId,
+    asset_id:        input.assetId,
+    proposal_id:     input.proposalId,
+    file_name:       input.fileName,
+    mime_type:       input.mimeType,
+    storage_path:    input.storagePath,
+    file_size_bytes: input.fileSizeBytes ?? null
+  };
+  try {
+    const rows = await postgrest<EvidenceRow[]>("asset_proposal_evidences", {
+      method: "POST",
+      body: JSON.stringify(body)
+    });
+    if (!rows[0]) return null;
+    const base = normalizeEvidenceRow(rows[0]);
+    const signedUrl = await generateSignedUrl(rows[0].storage_path);
+    return { ...base, signedUrl };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Actualiza la decision operativa de una propuesta existente.
  * Requiere service_role key configurada.
  * IMPL-20260506-46
@@ -489,10 +707,14 @@ export async function getFullAssetDetail(assetId: string): Promise<AssetDetailFu
   const activePrompt =
     promptHistory.find((p) => p.status === "active") ?? promptHistory[0] ?? null;
 
-  const [chat, proposalDrafts] = await Promise.all([
+  const [chat, rawProposalDrafts] = await Promise.all([
     getAssetChat(assetId),
     fetchAssetProposals(assetId)
   ]);
+
+  const proposalIds = rawProposalDrafts.map((p) => p.id);
+  const evidences = await fetchEvidencesForProposals(proposalIds);
+  const proposalDrafts = attachEvidenceToProposals(rawProposalDrafts, evidences);
 
   const { primary, secondary, comparisonNote } = derivePrimaryAndSecondary(proposalDrafts);
 

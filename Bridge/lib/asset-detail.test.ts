@@ -1,22 +1,27 @@
 /**
- * IMPL-20260506-46
- * Respaldo: context/SPECs/SPEC_ARCH-20260506-46_cierre_activo_propuestas_persistentes_y_revision.md
+ * IMPL-20260506-47
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-47_activo_archivos_y_evidencias_reales.md
  *
  * Tests de las funciones puras de la capa asset-detail.
- * Las funciones async (getFullAssetDetail, insertAssetProposal) no se testean aqui — requieren DB.
+ * Las funciones async (getFullAssetDetail, insertAssetProposal, uploadEvidenceToStorage)
+ * no se testean aqui — requieren DB/Storage.
  */
 import { describe, expect, it } from "vitest";
 
 import {
+  attachEvidenceToProposals,
   buildCreativeToolSuggestion,
   buildSourceRefs,
   buildV1ProposalDrafts,
   derivePrimaryAndSecondary,
+  normalizeEvidenceRow,
   normalizeProposalRow,
   resolveOperativeDecision,
   resolveReviewState,
   type AssetPromptVersion,
+  type EvidenceRow,
   type ProposalDraft,
+  type ProposalEvidence,
   type ProposalRow
 } from "./asset-detail";
 
@@ -221,6 +226,12 @@ describe("asset-detail — normalizeProposalRow", () => {
     expect(draft.createdAt).toBe("2026-05-06T10:00:00Z");
   });
 
+  it("evidence es null y hasEvidence es false por defecto (SPEC-47)", () => {
+    const draft = normalizeProposalRow(baseRow);
+    expect(draft.evidence).toBeNull();
+    expect(draft.hasEvidence).toBe(false);
+  });
+
   it("normaliza prompt_version_id null", () => {
     const draft = normalizeProposalRow({ ...baseRow, prompt_version_id: null });
     expect(draft.promptVersionId).toBeNull();
@@ -237,6 +248,113 @@ describe("asset-detail — normalizeProposalRow", () => {
   });
 });
 
+// ─── Tests SPEC-47: normalizeEvidenceRow ─────────────────────────────────────
+
+describe("asset-detail — normalizeEvidenceRow (SPEC-47)", () => {
+  const baseEvidenceRow: EvidenceRow = {
+    id:              "ev-001",
+    tenant_id:       "tenant-abc",
+    asset_id:        "asset-xyz",
+    proposal_id:     "prop-001",
+    file_name:       "logo_final_v2.png",
+    mime_type:       "image/png",
+    storage_path:    "tenant-abc/asset-xyz/prop-001/ev-001.png",
+    file_size_bytes: 204800,
+    uploaded_at:     "2026-05-06T12:00:00Z"
+  };
+
+  it("normaliza correctamente una fila completa", () => {
+    const ev = normalizeEvidenceRow(baseEvidenceRow);
+    expect(ev.id).toBe("ev-001");
+    expect(ev.proposalId).toBe("prop-001");
+    expect(ev.assetId).toBe("asset-xyz");
+    expect(ev.fileName).toBe("logo_final_v2.png");
+    expect(ev.mimeType).toBe("image/png");
+    expect(ev.storagePath).toBe("tenant-abc/asset-xyz/prop-001/ev-001.png");
+    expect(ev.fileSizeBytes).toBe(204800);
+    expect(ev.uploadedAt).toBe("2026-05-06T12:00:00Z");
+  });
+
+  it("normaliza file_size_bytes null", () => {
+    const ev = normalizeEvidenceRow({ ...baseEvidenceRow, file_size_bytes: null });
+    expect(ev.fileSizeBytes).toBeNull();
+  });
+
+  it("normaliza mime_type pdf", () => {
+    const ev = normalizeEvidenceRow({ ...baseEvidenceRow, mime_type: "application/pdf" });
+    expect(ev.mimeType).toBe("application/pdf");
+  });
+});
+
+// ─── Tests SPEC-47: attachEvidenceToProposals ─────────────────────────────────
+
+const makeEvidence = (overrides: Partial<ProposalEvidence>): ProposalEvidence => ({
+  id:             "ev-001",
+  proposalId:     "p1",
+  assetId:        "asset-xyz",
+  fileName:       "pieza.png",
+  mimeType:       "image/png",
+  storagePath:    "path/pieza.png",
+  fileSizeBytes:  1024,
+  uploadedAt:     "2026-05-06T12:00:00Z",
+  signedUrl:      "https://supabase.io/sign/pieza.png?token=abc",
+  ...overrides
+});
+
+describe("asset-detail — attachEvidenceToProposals (SPEC-47)", () => {
+  it("sin evidencias deja proposals sin cambio (evidence null, hasEvidence false)", () => {
+    const proposals = [makeProposal({ id: "p1" }), makeProposal({ id: "p2" })];
+    const result = attachEvidenceToProposals(proposals, []);
+    expect(result[0].hasEvidence).toBe(false);
+    expect(result[0].evidence).toBeNull();
+    expect(result[1].hasEvidence).toBe(false);
+  });
+
+  it("asigna evidencia correctamente por proposalId", () => {
+    const proposals = [makeProposal({ id: "p1" }), makeProposal({ id: "p2" })];
+    const evidences = [makeEvidence({ proposalId: "p2", fileName: "banner.jpg" })];
+    const result = attachEvidenceToProposals(proposals, evidences);
+    expect(result[0].hasEvidence).toBe(false);
+    expect(result[0].evidence).toBeNull();
+    expect(result[1].hasEvidence).toBe(true);
+    expect(result[1].evidence?.fileName).toBe("banner.jpg");
+  });
+
+  it("si hay multiples evidencias por propuesta, toma la primera (mas reciente, ordenadas desc)", () => {
+    const proposals = [makeProposal({ id: "p1" })];
+    const evidences = [
+      makeEvidence({ id: "ev-new", proposalId: "p1", uploadedAt: "2026-05-06T15:00:00Z", fileName: "v2.png" }),
+      makeEvidence({ id: "ev-old", proposalId: "p1", uploadedAt: "2026-05-06T10:00:00Z", fileName: "v1.png" })
+    ];
+    const result = attachEvidenceToProposals(proposals, evidences);
+    expect(result[0].evidence?.id).toBe("ev-new");
+    expect(result[0].evidence?.fileName).toBe("v2.png");
+  });
+
+  it("no muta el array original de proposals", () => {
+    const proposals = [makeProposal({ id: "p1" })];
+    const evidences = [makeEvidence({ proposalId: "p1" })];
+    const result = attachEvidenceToProposals(proposals, evidences);
+    expect(result[0]).not.toBe(proposals[0]);
+    expect(proposals[0].hasEvidence).toBe(false);
+  });
+
+  it("devuelve array con mismo length que proposals", () => {
+    const proposals = [makeProposal({ id: "p1" }), makeProposal({ id: "p2" }), makeProposal({ id: "p3" })];
+    const evidences = [makeEvidence({ proposalId: "p1" })];
+    const result = attachEvidenceToProposals(proposals, evidences);
+    expect(result).toHaveLength(3);
+  });
+
+  it("signedUrl null se propaga correctamente", () => {
+    const proposals = [makeProposal({ id: "p1" })];
+    const evidences = [makeEvidence({ proposalId: "p1", signedUrl: null })];
+    const result = attachEvidenceToProposals(proposals, evidences);
+    expect(result[0].hasEvidence).toBe(true);
+    expect(result[0].evidence?.signedUrl).toBeNull();
+  });
+});
+
 // ─── Tests SPEC-46: derivePrimaryAndSecondary ─────────────────────────────────
 
 const makeProposal = (overrides: Partial<ProposalDraft>): ProposalDraft => ({
@@ -247,6 +365,8 @@ const makeProposal = (overrides: Partial<ProposalDraft>): ProposalDraft => ({
   promptVersionId: null,
   reviewDecision:  "pending",
   createdAt:       "2026-05-06T10:00:00Z",
+  evidence:        null,
+  hasEvidence:     false,
   ...overrides
 });
 
