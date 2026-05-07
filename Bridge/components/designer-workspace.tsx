@@ -7,7 +7,6 @@ import Link from "next/link";
 
 import {
   getAvailableActions,
-  suggestCreativeTool,
   type CreativeTool,
   type DesignerAction,
   type DesignerTask,
@@ -263,7 +262,7 @@ function ActiveTaskCard({ task }: { task: DesignerTask }) {
 // ─── Tarjeta compacta de cola ─────────────────────────────────────────────────
 
 function QueueTaskCard({ task }: { task: DesignerTask }) {
-  const toolLabel = TOOL_LABELS[suggestCreativeTool(task.pieceTypeCode)];
+  const toolLabel = TOOL_LABELS[task.suggestedTool];
 
   return (
     <article className="panel flex flex-wrap items-start justify-between gap-3 rounded-[22px] px-4 py-4 ring-1 ring-[color:var(--line)]">
