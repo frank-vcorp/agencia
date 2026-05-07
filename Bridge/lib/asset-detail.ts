@@ -32,6 +32,32 @@ export type ReviewDecision =
   | "approved_internal";
 
 /**
+ * Decision final del cliente sobre el activo (SPEC-51 §2).
+ * pending_client  — pendiente de aprobacion del cliente
+ * approved_client — aprobado por el cliente
+ * rejected_changes — cliente solicita cambios o rechaza
+ */
+export type ClientApprovalStatus =
+  | "pending_client"
+  | "approved_client"
+  | "rejected_changes";
+
+/**
+ * Registro operativo de la decision final del cliente (SPEC-51 §2).
+ * Una fila por activo en asset_client_approvals.
+ */
+export type ClientApproval = {
+  id: string;
+  assetId: string;
+  tenantId: string;
+  status: ClientApprovalStatus;
+  /** Comentario corto opcional del operador al registrar la decision. */
+  comment: string | null;
+  decidedAt: string;
+  createdAt: string;
+};
+
+/**
  * Estado de revision y flujo del activo (SPEC-45 §4).
  * V1: isBlocked siempre false — requiere tabla designer_tasks.
  */
@@ -88,13 +114,60 @@ export type ProposalDraft = {
   hasEvidence: boolean;
 };
 
+/**
+ * Resumen historico compacto del activo (SPEC-51 §3).
+ * Derivado desde los datos ya existentes — sin tabla nueva.
+ */
+export type AssetAnalytics = {
+  /** ISO string de creacion del activo. */
+  createdAt: string;
+  /** Numero total de propuestas registradas. */
+  proposalCount: number;
+  /** Propuestas con al menos una evidencia subida. */
+  evidenceCount: number;
+  /** ISO string de la ultima actividad detectada (updated_at, propuesta o aprobacion). */
+  lastActivityAt: string | null;
+  /** Dias desde creacion hasta primera aprobacion interna; null si no ha ocurrido. */
+  daysToInternalApproval: number | null;
+  /** Dias desde creacion hasta aprobacion del cliente; null si no ha ocurrido. */
+  daysToClientApproval: number | null;
+};
+
+/**
+ * Vista de comparacion visual entre propuesta principal y alternativa (SPEC-51 §1).
+ * kind="images"          — ambas tienen evidencia de imagen con signedUrl disponible.
+ * kind="no_images"       — no aplica comparacion visual (mime no imagen, URL no disponible, etc.).
+ * kind="single_proposal" — no hay propuesta secundaria para comparar.
+ */
+export type ComparisonView =
+  | {
+      kind: "images";
+      primary: {
+        signedUrl: string;
+        fileName: string;
+        toolUsed: string;
+        mimeType: string;
+        fileSizeBytes: number | null;
+      };
+      secondary: {
+        signedUrl: string;
+        fileName: string;
+        toolUsed: string;
+        mimeType: string;
+        fileSizeBytes: number | null;
+      };
+    }
+  | { kind: "no_images"; reason: string }
+  | { kind: "single_proposal"; reason: string }
+  | null;
+
 /** Referencia de contexto extraida del referencesJson del prompt. */
 export type SourceRef = {
   key: string;
   value: string;
 };
 
-/** Vista detallada completa de un activo (SPEC-45 + SPEC-46 contrato minimo). */
+/** Vista detallada completa de un activo (SPEC-45 + SPEC-46 + SPEC-51 contrato cerrado). */
 export type AssetDetailFull = {
   /** Activo base con historial de versiones de prompt (SPEC-45 §1). */
   assetDetail: {
@@ -132,7 +205,13 @@ export type AssetDetailFull = {
   conversationThread: EntityChat;
   /** Referencias de contexto derivadas del referencesJson del prompt activo. */
   sourceRefs: SourceRef[];
-  /** Vacios honestos documentados (reducidos en SPEC-46 respecto a SPEC-45). */
+  /** Comparacion visual entre propuesta principal y alternativa (SPEC-51 §1). */
+  comparisonView: ComparisonView;
+  /** Decision final del cliente registrada por el operador (SPEC-51 §2). */
+  clientApproval: ClientApproval | null;
+  /** Resumen historico compacto del activo (SPEC-51 §3). */
+  assetAnalytics: AssetAnalytics;
+  /** Vacios honestos — vacio tras SPEC-51: todos los gaps fueron cerrados. */
   gaps: string[];
 };
 
@@ -157,13 +236,12 @@ const CREATIVE_TOOL_META: Record<CreativeTool, { label: string; description: str
   }
 };
 
-// ─── Vacios honestos de V1 (reducidos en SPEC-47 — file_upload cerrado) ─────
+// ─── Vacios honestos — cerrados en SPEC-51 ────────────────────────────────────
+// proposal_comparison  ✓ SPEC-51 §1
+// client_approval      ✓ SPEC-51 §2
+// analytics_per_asset  ✓ SPEC-51 §3
 
-const V1_GAPS: string[] = [
-  "proposal_comparison: comparador visual binario entre propuestas no disponible en V1",
-  "client_approval: aprobacion final del cliente no disponible en esta ficha V1",
-  "analytics_per_asset: historial de metricas por activo no disponible en V1"
-];
+const V1_GAPS: string[] = [];
 
 // ─── Labels y helpers de decision operativa ───────────────────────────────────
 
@@ -179,6 +257,18 @@ export const REVIEW_DECISION_COLORS: Record<ReviewDecision, string> = {
   needs_adjustment:  "bg-amber-50 text-amber-700 ring-amber-200",
   in_review:         "bg-violet-50 text-violet-700 ring-violet-200",
   approved_internal: "bg-emerald-50 text-emerald-700 ring-emerald-200"
+};
+
+export const CLIENT_APPROVAL_LABELS: Record<ClientApprovalStatus, string> = {
+  pending_client:   "Pendiente de aprobacion",
+  approved_client:  "Aprobado por cliente",
+  rejected_changes: "Requiere cambios"
+};
+
+export const CLIENT_APPROVAL_COLORS: Record<ClientApprovalStatus, string> = {
+  pending_client:   "bg-amber-50 text-amber-700 ring-amber-200",
+  approved_client:  "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  rejected_changes: "bg-red-50 text-red-700 ring-red-200"
 };
 
 // ─── Funciones puras (testeables) ─────────────────────────────────────────────
@@ -321,6 +411,95 @@ export function buildSourceRefs(prompt: AssetPromptVersion | null): SourceRef[] 
 }
 
 /**
+ * Construye la vista de comparacion visual entre propuestas (SPEC-51 §1).
+ * Solo aplica si ambas propuestas tienen evidencia de imagen con URL firmada.
+ * Degrada honestamente si no aplica.
+ * IMPL-20260506-51
+ */
+export function buildComparisonView(
+  primary: ProposalDraft | null,
+  secondary: ProposalDraft | null
+): ComparisonView {
+  if (!primary || !secondary) {
+    return { kind: "single_proposal", reason: "Solo hay una propuesta registrada" };
+  }
+  if (!primary.hasEvidence || !secondary.hasEvidence) {
+    return { kind: "no_images", reason: "Una o ambas propuestas no tienen evidencia subida" };
+  }
+  const pMime = primary.evidence!.mimeType;
+  const sMime = secondary.evidence!.mimeType;
+  if (!pMime.startsWith("image/") || !sMime.startsWith("image/")) {
+    return { kind: "no_images", reason: "Comparacion visual aplica solo para evidencias de imagen" };
+  }
+  if (!primary.evidence!.signedUrl || !secondary.evidence!.signedUrl) {
+    return { kind: "no_images", reason: "URL firmada no disponible para una o ambas evidencias" };
+  }
+  return {
+    kind: "images",
+    primary: {
+      signedUrl:    primary.evidence!.signedUrl,
+      fileName:     primary.evidence!.fileName,
+      toolUsed:     primary.toolUsed,
+      mimeType:     pMime,
+      fileSizeBytes: primary.evidence!.fileSizeBytes
+    },
+    secondary: {
+      signedUrl:    secondary.evidence!.signedUrl,
+      fileName:     secondary.evidence!.fileName,
+      toolUsed:     secondary.toolUsed,
+      mimeType:     sMime,
+      fileSizeBytes: secondary.evidence!.fileSizeBytes
+    }
+  };
+}
+
+/**
+ * Deriva el resumen historico compacto del activo desde datos ya disponibles.
+ * No requiere tabla nueva.
+ * IMPL-20260506-51
+ */
+export function buildAssetAnalytics(
+  asset: Asset,
+  proposals: ProposalDraft[],
+  clientApproval: ClientApproval | null
+): AssetAnalytics {
+  const evidenceCount = proposals.filter((p) => p.hasEvidence).length;
+
+  // lastActivityAt: maximo entre updatedAt, ultima propuesta y ultima decision del cliente
+  const candidateDates: string[] = [asset.updatedAt];
+  if (proposals.length > 0) candidateDates.push(proposals[0].createdAt); // desc-sorted
+  if (clientApproval) candidateDates.push(clientApproval.decidedAt);
+  const lastActivityAt = candidateDates.reduce((max, d) => (d > max ? d : max), candidateDates[0]) ?? null;
+
+  // daysToInternalApproval: primera propuesta con approved_internal
+  const internallyApproved = proposals.find((p) => p.reviewDecision === "approved_internal");
+  const daysToInternalApproval = internallyApproved
+    ? Math.round(
+        (new Date(internallyApproved.createdAt).getTime() - new Date(asset.createdAt).getTime()) /
+          86_400_000
+      )
+    : null;
+
+  // daysToClientApproval: si hay aprobacion del cliente
+  const daysToClientApproval =
+    clientApproval?.status === "approved_client"
+      ? Math.round(
+          (new Date(clientApproval.decidedAt).getTime() - new Date(asset.createdAt).getTime()) /
+            86_400_000
+        )
+      : null;
+
+  return {
+    createdAt:              asset.createdAt,
+    proposalCount:          proposals.length,
+    evidenceCount,
+    lastActivityAt,
+    daysToInternalApproval,
+    daysToClientApproval
+  };
+}
+
+/**
  * Construye la sugerencia de herramienta creativa para el tipo de pieza.
  * Reutiliza la logica del workspace del disenador (SPEC-40).
  * IMPL-20260506-46
@@ -393,7 +572,30 @@ export type ProposalRow = {
   created_at: string;
 };
 
+/** Fila de asset_client_approvals (SPEC-51). */
+type ClientApprovalRow = {
+  id: string;
+  tenant_id: string;
+  asset_id: string;
+  status: string;
+  comment: string | null;
+  decided_at: string;
+  created_at: string;
+};
+
 // ─── Helpers internos ─────────────────────────────────────────────────────────
+
+function normalizeClientApprovalRow(row: ClientApprovalRow): ClientApproval {
+  return {
+    id:         row.id,
+    assetId:    row.asset_id,
+    tenantId:   row.tenant_id,
+    status:     row.status as ClientApprovalStatus,
+    comment:    row.comment,
+    decidedAt:  row.decided_at,
+    createdAt:  row.created_at
+  };
+}
 
 function getServerApiKey(): string {
   return process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseEnv.anonKey;
@@ -674,6 +876,64 @@ export async function updateProposalDecision(
 }
 
 /**
+ * Obtiene la decision final del cliente para un activo.
+ * Devuelve null si no hay registro o si Supabase no esta configurado.
+ * IMPL-20260506-51
+ */
+async function fetchClientApproval(assetId: string): Promise<ClientApproval | null> {
+  if (!isSupabaseConfigured) return null;
+  const params = new URLSearchParams({
+    select: "id,tenant_id,asset_id,status,comment,decided_at,created_at",
+    asset_id: `eq.${assetId}`,
+    limit: "1"
+  });
+  try {
+    const rows = await postgrest<ClientApprovalRow[]>(
+      `asset_client_approvals?${params.toString()}`,
+      { method: "GET" }
+    );
+    return rows[0] ? normalizeClientApprovalRow(rows[0]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Registra o actualiza la decision final del cliente para un activo.
+ * Usa ON CONFLICT asset_id para upsert (UNIQUE constraint en la tabla).
+ * Requiere service_role key.
+ * IMPL-20260506-51
+ */
+export async function upsertClientApproval(input: {
+  tenantId: string;
+  assetId: string;
+  status: ClientApprovalStatus;
+  comment: string | null;
+}): Promise<ClientApproval | null> {
+  if (!isSupabaseConfigured) return null;
+  const body = {
+    tenant_id:  input.tenantId,
+    asset_id:   input.assetId,
+    status:     input.status,
+    comment:    input.comment ?? null,
+    decided_at: new Date().toISOString()
+  };
+  try {
+    const rows = await postgrest<ClientApprovalRow[]>(
+      "asset_client_approvals?on_conflict=asset_id",
+      {
+        method:  "POST",
+        body:    JSON.stringify(body),
+        headers: { Prefer: "return=representation,resolution=merge-duplicates" }
+      }
+    );
+    return rows[0] ? normalizeClientApprovalRow(rows[0]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Obtiene la vista detallada completa de un activo por ID.
  * Reune: activo, historial de prompts, chat, herramienta sugerida,
  * estado de revision, propuestas persistidas (SPEC-46) y vacios honestos.
@@ -711,9 +971,10 @@ export async function getFullAssetDetail(assetId: string): Promise<AssetDetailFu
   const activePrompt =
     promptHistory.find((p) => p.status === "active") ?? promptHistory[0] ?? null;
 
-  const [chat, rawProposalDrafts] = await Promise.all([
+  const [chat, rawProposalDrafts, clientApproval] = await Promise.all([
     getAssetChat(assetId),
-    fetchAssetProposals(assetId)
+    fetchAssetProposals(assetId),
+    fetchClientApproval(assetId)
   ]);
 
   const proposalIds = rawProposalDrafts.map((p) => p.id);
@@ -721,6 +982,8 @@ export async function getFullAssetDetail(assetId: string): Promise<AssetDetailFu
   const proposalDrafts = attachEvidenceToProposals(rawProposalDrafts, evidences);
 
   const { primary, secondary, comparisonNote } = derivePrimaryAndSecondary(proposalDrafts);
+  const comparisonView  = buildComparisonView(primary, secondary);
+  const assetAnalytics  = buildAssetAnalytics(asset, proposalDrafts, clientApproval);
 
   return {
     assetDetail: { asset, promptHistory },
@@ -740,6 +1003,9 @@ export async function getFullAssetDetail(assetId: string): Promise<AssetDetailFu
     reviewState:              resolveReviewState(asset.status),
     conversationThread:       chat,
     sourceRefs:               buildSourceRefs(activePrompt),
-    gaps:                     V1_GAPS
+    comparisonView,
+    clientApproval,
+    assetAnalytics,
+    gaps:                     V1_GAPS  // vacio: todos los gaps cerrados en SPEC-51
   };
 }

@@ -1,6 +1,6 @@
 /**
- * IMPL-20260506-47
- * Respaldo: context/SPECs/SPEC_ARCH-20260506-47_activo_archivos_y_evidencias_reales.md
+ * IMPL-20260506-51
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-51_cierre_final_activo_comparacion_aprobacion_analytics.md
  *
  * Tests de las funciones puras de la capa asset-detail.
  * Las funciones async (getFullAssetDetail, insertAssetProposal, uploadEvidenceToStorage)
@@ -10,6 +10,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   attachEvidenceToProposals,
+  buildAssetAnalytics,
+  buildComparisonView,
   buildCreativeToolSuggestion,
   buildSourceRefs,
   buildV1ProposalDrafts,
@@ -19,11 +21,13 @@ import {
   resolveOperativeDecision,
   resolveReviewState,
   type AssetPromptVersion,
+  type ClientApproval,
   type EvidenceRow,
   type ProposalDraft,
   type ProposalEvidence,
   type ProposalRow
 } from "./asset-detail";
+import type { Asset } from "./assets";
 
 describe("asset-detail — resolveReviewState", () => {
   it("draft -> readyForProduction true, resto false", () => {
@@ -431,5 +435,185 @@ describe("asset-detail — resolveOperativeDecision", () => {
       makeProposal({ id: "p1", isPrimary: false, reviewDecision: "in_review" })
     ];
     expect(resolveOperativeDecision(proposals)).toBe("in_review");
+  });
+});
+
+// ─── Tests SPEC-51: buildComparisonView ──────────────────────────────────────
+
+const makeEvidenceForComparison = (overrides: Partial<ProposalEvidence>): ProposalEvidence => ({
+  id:             "ev-001",
+  proposalId:     "p1",
+  assetId:        "asset-xyz",
+  fileName:       "pieza.png",
+  mimeType:       "image/png",
+  storagePath:    "path/pieza.png",
+  fileSizeBytes:  2048,
+  uploadedAt:     "2026-05-06T12:00:00Z",
+  signedUrl:      "https://storage.example.com/signed/pieza.png?token=abc",
+  ...overrides
+});
+
+describe("asset-detail — buildComparisonView (SPEC-51)", () => {
+  it("null primary retorna single_proposal", () => {
+    const r = buildComparisonView(null, null);
+    expect(r?.kind).toBe("single_proposal");
+  });
+
+  it("null secondary retorna single_proposal", () => {
+    const primary = makeProposal({ id: "p1", isPrimary: true });
+    const r = buildComparisonView(primary, null);
+    expect(r?.kind).toBe("single_proposal");
+  });
+
+  it("primary sin evidencia retorna no_images", () => {
+    const primary   = makeProposal({ id: "p1", isPrimary: true, hasEvidence: false, evidence: null });
+    const secondary = makeProposal({ id: "p2", hasEvidence: true, evidence: makeEvidenceForComparison({ proposalId: "p2" }) });
+    const r = buildComparisonView(primary, secondary);
+    expect(r?.kind).toBe("no_images");
+  });
+
+  it("secondary sin evidencia retorna no_images", () => {
+    const primary   = makeProposal({ id: "p1", isPrimary: true, hasEvidence: true, evidence: makeEvidenceForComparison({ proposalId: "p1" }) });
+    const secondary = makeProposal({ id: "p2", hasEvidence: false, evidence: null });
+    const r = buildComparisonView(primary, secondary);
+    expect(r?.kind).toBe("no_images");
+  });
+
+  it("evidencia PDF retorna no_images", () => {
+    const primary   = makeProposal({ id: "p1", isPrimary: true, hasEvidence: true, evidence: makeEvidenceForComparison({ proposalId: "p1", mimeType: "application/pdf" }) });
+    const secondary = makeProposal({ id: "p2", hasEvidence: true, evidence: makeEvidenceForComparison({ proposalId: "p2" }) });
+    const r = buildComparisonView(primary, secondary);
+    expect(r?.kind).toBe("no_images");
+  });
+
+  it("evidencia video retorna no_images", () => {
+    const primary   = makeProposal({ id: "p1", isPrimary: true, hasEvidence: true, evidence: makeEvidenceForComparison({ proposalId: "p1", mimeType: "video/mp4" }) });
+    const secondary = makeProposal({ id: "p2", hasEvidence: true, evidence: makeEvidenceForComparison({ proposalId: "p2" }) });
+    const r = buildComparisonView(primary, secondary);
+    expect(r?.kind).toBe("no_images");
+  });
+
+  it("ambas imagen sin signedUrl retorna no_images", () => {
+    const primary   = makeProposal({ id: "p1", isPrimary: true, hasEvidence: true, evidence: makeEvidenceForComparison({ proposalId: "p1", signedUrl: null }) });
+    const secondary = makeProposal({ id: "p2", hasEvidence: true, evidence: makeEvidenceForComparison({ proposalId: "p2" }) });
+    const r = buildComparisonView(primary, secondary);
+    expect(r?.kind).toBe("no_images");
+  });
+
+  it("ambas imagen con signedUrl retorna images con datos correctos", () => {
+    const evP = makeEvidenceForComparison({ proposalId: "p1", signedUrl: "https://url-primary", fileName: "principal.png", mimeType: "image/png", fileSizeBytes: 1024 });
+    const evS = makeEvidenceForComparison({ proposalId: "p2", signedUrl: "https://url-secondary", fileName: "alternativa.jpg", mimeType: "image/jpeg", fileSizeBytes: 2048 });
+    const primary   = makeProposal({ id: "p1", isPrimary: true,  toolUsed: "firefly",      hasEvidence: true, evidence: evP });
+    const secondary = makeProposal({ id: "p2", isPrimary: false, toolUsed: "adobe_express", hasEvidence: true, evidence: evS });
+    const r = buildComparisonView(primary, secondary);
+    expect(r?.kind).toBe("images");
+    if (r?.kind === "images") {
+      expect(r.primary.signedUrl).toBe("https://url-primary");
+      expect(r.primary.fileName).toBe("principal.png");
+      expect(r.primary.toolUsed).toBe("firefly");
+      expect(r.primary.fileSizeBytes).toBe(1024);
+      expect(r.secondary.signedUrl).toBe("https://url-secondary");
+      expect(r.secondary.fileName).toBe("alternativa.jpg");
+      expect(r.secondary.toolUsed).toBe("adobe_express");
+      expect(r.secondary.fileSizeBytes).toBe(2048);
+    }
+  });
+
+  it("image/webp tambien es imagen valida", () => {
+    const ev = makeEvidenceForComparison({ mimeType: "image/webp" });
+    const primary   = makeProposal({ id: "p1", isPrimary: true,  hasEvidence: true, evidence: { ...ev, proposalId: "p1" } });
+    const secondary = makeProposal({ id: "p2", isPrimary: false, hasEvidence: true, evidence: { ...ev, proposalId: "p2" } });
+    expect(buildComparisonView(primary, secondary)?.kind).toBe("images");
+  });
+});
+
+// ─── Tests SPEC-51: buildAssetAnalytics ──────────────────────────────────────
+
+const makeAsset = (overrides: Partial<Asset>): Asset => ({
+  id:                  "asset-001",
+  tenantId:            "tenant-abc",
+  clientId:            "client-xyz",
+  projectId:           "project-123",
+  quotationId:         null,
+  quotationVersionId:  null,
+  briefId:             null,
+  applicationCode:     "social_media",
+  pieceTypeCode:       "imagen",
+  placementCode:       "feed",
+  formatCode:          "square",
+  title:               "Banner verano",
+  status:              "draft",
+  createdAt:           "2026-05-01T08:00:00Z",
+  updatedAt:           "2026-05-06T10:00:00Z",
+  ...overrides
+});
+
+const makeClientApproval = (overrides: Partial<ClientApproval>): ClientApproval => ({
+  id:         "ca-001",
+  assetId:    "asset-001",
+  tenantId:   "tenant-abc",
+  status:     "approved_client",
+  comment:    null,
+  decidedAt:  "2026-05-10T12:00:00Z",
+  createdAt:  "2026-05-10T12:00:00Z",
+  ...overrides
+});
+
+describe("asset-detail — buildAssetAnalytics (SPEC-51)", () => {
+  it("sin propuestas devuelve contadores en cero", () => {
+    const analytics = buildAssetAnalytics(makeAsset({}), [], null);
+    expect(analytics.proposalCount).toBe(0);
+    expect(analytics.evidenceCount).toBe(0);
+    expect(analytics.daysToInternalApproval).toBeNull();
+    expect(analytics.daysToClientApproval).toBeNull();
+    expect(analytics.createdAt).toBe("2026-05-01T08:00:00Z");
+  });
+
+  it("cuenta propuestas y evidencias correctamente", () => {
+    const proposals = [
+      makeProposal({ id: "p1", hasEvidence: true, evidence: makeEvidenceForComparison({ proposalId: "p1" }) }),
+      makeProposal({ id: "p2", hasEvidence: false, evidence: null }),
+      makeProposal({ id: "p3", hasEvidence: true, evidence: makeEvidenceForComparison({ proposalId: "p3" }) })
+    ];
+    const analytics = buildAssetAnalytics(makeAsset({}), proposals, null);
+    expect(analytics.proposalCount).toBe(3);
+    expect(analytics.evidenceCount).toBe(2);
+  });
+
+  it("lastActivityAt es el maximo entre updatedAt, propuesta y decision cliente", () => {
+    const asset     = makeAsset({ updatedAt: "2026-05-06T10:00:00Z" });
+    const proposals = [makeProposal({ createdAt: "2026-05-08T09:00:00Z" })];
+    const ca        = makeClientApproval({ decidedAt: "2026-05-10T12:00:00Z" });
+    const analytics = buildAssetAnalytics(asset, proposals, ca);
+    expect(analytics.lastActivityAt).toBe("2026-05-10T12:00:00Z");
+  });
+
+  it("daysToInternalApproval calculado desde primera propuesta approved_internal", () => {
+    const asset = makeAsset({ createdAt: "2026-05-01T00:00:00Z" });
+    const proposals = [
+      makeProposal({ id: "p1", reviewDecision: "approved_internal", createdAt: "2026-05-04T00:00:00Z" })
+    ];
+    const analytics = buildAssetAnalytics(asset, proposals, null);
+    expect(analytics.daysToInternalApproval).toBe(3);
+  });
+
+  it("daysToInternalApproval null si no hay approved_internal", () => {
+    const proposals = [makeProposal({ reviewDecision: "pending" })];
+    expect(buildAssetAnalytics(makeAsset({}), proposals, null).daysToInternalApproval).toBeNull();
+  });
+
+  it("daysToClientApproval calculado cuando hay aprobacion del cliente", () => {
+    const asset = makeAsset({ createdAt: "2026-05-01T00:00:00Z" });
+    const ca    = makeClientApproval({ status: "approved_client", decidedAt: "2026-05-06T00:00:00Z" });
+    expect(buildAssetAnalytics(asset, [], ca).daysToClientApproval).toBe(5);
+  });
+
+  it("daysToClientApproval null si cliente no ha aprobado", () => {
+    const ca = makeClientApproval({ status: "pending_client" });
+    expect(buildAssetAnalytics(makeAsset({}), [], ca).daysToClientApproval).toBeNull();
+  });
+
+  it("daysToClientApproval null si no hay clientApproval", () => {
+    expect(buildAssetAnalytics(makeAsset({}), [], null).daysToClientApproval).toBeNull();
   });
 });

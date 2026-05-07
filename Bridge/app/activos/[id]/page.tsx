@@ -28,10 +28,14 @@ import {
   insertProposalEvidence,
   updateProposalDecision,
   uploadEvidenceToStorage,
+  upsertClientApproval,
   REVIEW_DECISION_LABELS,
   REVIEW_DECISION_COLORS,
+  CLIENT_APPROVAL_LABELS,
+  CLIENT_APPROVAL_COLORS,
   type ReviewState,
-  type ReviewDecision
+  type ReviewDecision,
+  type ClientApprovalStatus
 } from "@/lib/asset-detail";
 import { EvidencePreview } from "./EvidencePreview";
 
@@ -83,6 +87,9 @@ export default async function AssetDetailPage({
     reviewState,
     conversationThread,
     sourceRefs,
+    comparisonView,
+    clientApproval,
+    assetAnalytics,
     gaps
   } = detail;
 
@@ -183,7 +190,17 @@ export default async function AssetDetailPage({
   }
 
   const ALL_CREATIVE_TOOLS = ["firefly", "adobe_express", "photoshop"] as const;
-  const TOOL_LABELS = {
+
+  // ─── Server action: aprobacion final del cliente (SPEC-51) ───────────────
+  async function upsertClientApprovalAction(formData: FormData) {
+    "use server";
+    const tenantId = String(formData.get("tenantId") ?? "").trim();
+    const status   = String(formData.get("status") ?? "").trim() as ClientApprovalStatus;
+    const comment  = String(formData.get("comment") ?? "").trim() || null;
+    if (!tenantId || !status) return;
+    await upsertClientApproval({ tenantId, assetId: id, status, comment });
+    revalidatePath(`/activos/${id}`);
+  }  const TOOL_LABELS = {
     firefly: "Adobe Firefly",
     adobe_express: "Adobe Express",
     photoshop: "Photoshop",
@@ -619,6 +636,72 @@ export default async function AssetDetailPage({
                   </div>
                 )}
 
+                {/* Comparacion visual lado a lado (SPEC-51 §1) */}
+                {comparisonView && comparisonView.kind === "images" && (
+                  <div className="rounded-[20px] bg-white/90 px-5 py-5 ring-1 ring-[color:var(--line)]">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
+                      Comparacion visual
+                    </p>
+                    <p className="mt-1 text-[11px] text-[color:var(--muted)]">
+                      Principal vs Alternativa — lado a lado
+                    </p>
+                    <div className="mt-4 grid grid-cols-2 gap-4">
+                      {/* Principal */}
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--accent-deep)]">
+                          Principal
+                        </p>
+                        <div className="overflow-hidden rounded-[14px] ring-2 ring-[color:rgba(200,93,39,0.25)]">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={comparisonView.primary.signedUrl}
+                            alt={comparisonView.primary.fileName}
+                            className="h-48 w-full object-cover"
+                          />
+                        </div>
+                        <div className="space-y-1 text-[10px] text-[color:var(--muted)]">
+                          <p className="truncate font-medium">{comparisonView.primary.fileName}</p>
+                          <p>{comparisonView.primary.toolUsed}</p>
+                          {comparisonView.primary.fileSizeBytes && (
+                            <p>{Math.round(comparisonView.primary.fileSizeBytes / 1024)} KB</p>
+                          )}
+                        </div>
+                      </div>
+                      {/* Alternativa */}
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--muted)]">
+                          Alternativa
+                        </p>
+                        <div className="overflow-hidden rounded-[14px] ring-1 ring-[color:var(--line)]">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={comparisonView.secondary.signedUrl}
+                            alt={comparisonView.secondary.fileName}
+                            className="h-48 w-full object-cover"
+                          />
+                        </div>
+                        <div className="space-y-1 text-[10px] text-[color:var(--muted)]">
+                          <p className="truncate font-medium">{comparisonView.secondary.fileName}</p>
+                          <p>{comparisonView.secondary.toolUsed}</p>
+                          {comparisonView.secondary.fileSizeBytes && (
+                            <p>{Math.round(comparisonView.secondary.fileSizeBytes / 1024)} KB</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {comparisonView && comparisonView.kind === "no_images" && (
+                  <div className="rounded-[14px] bg-slate-50 px-4 py-3 ring-1 ring-[color:var(--line)]">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">
+                      Comparacion visual
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-[color:var(--muted)]">
+                      {comparisonView.reason}
+                    </p>
+                  </div>
+                )}
+
                 {/* Propuestas adicionales (mas de 2) */}
                 {proposalDrafts.length > 2 && (
                   <p className="text-[11px] text-[color:var(--muted)]">
@@ -745,22 +828,147 @@ export default async function AssetDetailPage({
             </form>
           </section>
 
+          {/* Aprobacion final del cliente (SPEC-51 §2) */}
+          <section className="panel rounded-[30px] px-6 py-6">
+            <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
+              Aprobacion del cliente
+            </p>
+            <h2 className="mt-2 font-[family-name:var(--font-heading)] text-lg font-bold tracking-tight">
+              Decision final
+            </h2>
+
+            {clientApproval ? (
+              <div className="mt-4 space-y-3">
+                <div
+                  className={`rounded-[16px] px-4 py-3 ring-1 ${CLIENT_APPROVAL_COLORS[clientApproval.status]}`}
+                >
+                  <p className="text-[10px] uppercase tracking-[0.2em] opacity-70">
+                    Estado actual
+                  </p>
+                  <p className="mt-1 text-sm font-semibold">
+                    {CLIENT_APPROVAL_LABELS[clientApproval.status]}
+                  </p>
+                  {clientApproval.comment && (
+                    <p className="mt-2 text-xs leading-5 opacity-80">{clientApproval.comment}</p>
+                  )}
+                  <p className="mt-2 text-[10px] opacity-60">
+                    {new Date(clientApproval.decidedAt).toLocaleDateString("es-MX", {
+                      day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+                    })}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-[color:var(--muted)]">
+                Pendiente de registro. Usa el formulario para registrar la decision del cliente.
+              </p>
+            )}
+
+            <form action={upsertClientApprovalAction} className="mt-4 space-y-3 border-t border-[color:var(--line)] pt-4">
+              <input type="hidden" name="tenantId" value={asset.tenantId} />
+              <select
+                name="status"
+                defaultValue={clientApproval?.status ?? "pending_client"}
+                className="w-full rounded-[12px] border border-[color:var(--line)] bg-white/80 px-2.5 py-1.5 text-[11px] outline-none focus:ring-2 focus:ring-[color:var(--accent-deep)]"
+              >
+                <option value="pending_client">Pendiente de aprobacion</option>
+                <option value="approved_client">Aprobado por cliente</option>
+                <option value="rejected_changes">Requiere cambios</option>
+              </select>
+              <input
+                type="text"
+                name="comment"
+                defaultValue={clientApproval?.comment ?? ""}
+                placeholder="Comentario corto opcional..."
+                maxLength={300}
+                className="w-full rounded-[12px] border border-[color:var(--line)] bg-white/80 px-2.5 py-1.5 text-[11px] outline-none focus:ring-2 focus:ring-[color:var(--accent-deep)]"
+              />
+              <button
+                type="submit"
+                className="w-full rounded-[12px] bg-[color:var(--accent-deep)] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:opacity-90"
+              >
+                Registrar decision
+              </button>
+            </form>
+          </section>
+
+          {/* Analytics minimos por activo (SPEC-51 §3) */}
+          <section className="panel rounded-[30px] px-6 py-6">
+            <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
+              Lectura historica
+            </p>
+            <h2 className="mt-2 font-[family-name:var(--font-heading)] text-lg font-bold tracking-tight">
+              Analytics del activo
+            </h2>
+            <dl className="mt-4 space-y-2">
+              <div className="flex items-center justify-between rounded-[12px] bg-white/70 px-3 py-2 ring-1 ring-[color:var(--line)]">
+                <dt className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--muted)]">Creado</dt>
+                <dd className="text-[11px] font-medium">
+                  {new Date(assetAnalytics.createdAt).toLocaleDateString("es-MX", {
+                    day: "2-digit", month: "short", year: "numeric"
+                  })}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between rounded-[12px] bg-white/70 px-3 py-2 ring-1 ring-[color:var(--line)]">
+                <dt className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--muted)]">Propuestas</dt>
+                <dd className="text-[11px] font-medium">{assetAnalytics.proposalCount}</dd>
+              </div>
+              <div className="flex items-center justify-between rounded-[12px] bg-white/70 px-3 py-2 ring-1 ring-[color:var(--line)]">
+                <dt className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--muted)]">Con evidencia</dt>
+                <dd className="text-[11px] font-medium">{assetAnalytics.evidenceCount}</dd>
+              </div>
+              {assetAnalytics.lastActivityAt && (
+                <div className="flex items-center justify-between rounded-[12px] bg-white/70 px-3 py-2 ring-1 ring-[color:var(--line)]">
+                  <dt className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--muted)]">Ultima actividad</dt>
+                  <dd className="text-[11px] font-medium">
+                    {new Date(assetAnalytics.lastActivityAt).toLocaleDateString("es-MX", {
+                      day: "2-digit", month: "short", year: "numeric"
+                    })}
+                  </dd>
+                </div>
+              )}
+              {assetAnalytics.daysToInternalApproval !== null && (
+                <div className="flex items-center justify-between rounded-[12px] bg-emerald-50 px-3 py-2 ring-1 ring-emerald-200">
+                  <dt className="text-[10px] uppercase tracking-[0.18em] text-emerald-700">Dias a aprobacion interna</dt>
+                  <dd className="text-[11px] font-semibold text-emerald-800">{assetAnalytics.daysToInternalApproval}d</dd>
+                </div>
+              )}
+              {assetAnalytics.daysToClientApproval !== null && (
+                <div className="flex items-center justify-between rounded-[12px] bg-[color:var(--accent-soft)] px-3 py-2 ring-1 ring-[color:rgba(200,93,39,0.18)]">
+                  <dt className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--accent-deep)]">Dias a aprobacion cliente</dt>
+                  <dd className="text-[11px] font-semibold text-[color:var(--accent-deep)]">{assetAnalytics.daysToClientApproval}d</dd>
+                </div>
+              )}
+            </dl>
+          </section>
+
           {/* Vacios honestos V1 */}
           <section className="panel rounded-[30px] px-6 py-6">
             <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
               Estado del corte
             </p>
             <h2 className="mt-2 font-[family-name:var(--font-heading)] text-lg font-bold tracking-tight">
-              Vacios honestos V1
+              {gaps.length === 0 ? "Ficha cerrada" : "Vacios honestos"}
             </h2>
-            <ul className="mt-4 space-y-2">
-              {gaps.map((gap) => (
-                <li key={gap} className="flex items-start gap-2">
-                  <span className="mt-0.5 shrink-0 text-[color:var(--muted)]">○</span>
-                  <span className="text-[11px] leading-5 text-[color:var(--muted)]">{gap}</span>
-                </li>
-              ))}
-            </ul>
+            {gaps.length === 0 ? (
+              <div className="mt-4 rounded-[14px] bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
+                <p className="text-sm font-medium text-emerald-800">
+                  Todos los gaps fueron cerrados en SPEC-51.
+                </p>
+                <p className="mt-1 text-xs leading-5 text-emerald-700">
+                  Comparacion visual, aprobacion del cliente y analytics historicos disponibles en esta ficha.
+                </p>
+              </div>
+            ) : (
+              <ul className="mt-4 space-y-2">
+                {gaps.map((gap) => (
+                  <li key={gap} className="flex items-start gap-2">
+                    <span className="mt-0.5 shrink-0 text-[color:var(--muted)]">○</span>
+                    <span className="text-[11px] leading-5 text-[color:var(--muted)]">{gap}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         </div>
       </div>
