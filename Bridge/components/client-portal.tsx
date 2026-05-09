@@ -1,6 +1,7 @@
 /**
- * IMPL-20260508-21
+ * IMPL-20260508-21 | IMPL-20260509-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260508-21_cliente_pwa_resultados_y_leads_v1.md
+ * IMPL-20260509-01: Ajuste responsive — grid 2 columnas en lg+ debajo del bloque héroe.
  */
 "use client";
 
@@ -323,11 +324,19 @@ function LeadsYSeguimientoBlock({ portal }: { portal: ClientPortal }) {
 export function ClientPortalView({ portal }: { portal: ClientPortal }) {
   return (
     <div className="space-y-5 pb-10">
+      {/* Bloque héroe — ancho completo en todos los breakpoints */}
       <QueSigueBlock portal={portal} />
-      <EstadoDelProyectoBlock portal={portal} />
-      <RevisionesBlock portal={portal} />
-      <ResultadosPorCanalBlock portal={portal} />
-      <LeadsYSeguimientoBlock portal={portal} />
+      {/* Grid 2 columnas en desktop; columna única en mobile/tablet */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="space-y-5">
+          <EstadoDelProyectoBlock portal={portal} />
+          <RevisionesBlock portal={portal} />
+        </div>
+        <div className="space-y-5">
+          <ResultadosPorCanalBlock portal={portal} />
+          <LeadsYSeguimientoBlock portal={portal} />
+        </div>
+      </div>
     </div>
   );
 }
