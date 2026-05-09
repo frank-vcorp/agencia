@@ -1,0 +1,20 @@
+{
+  "name": "Tu proyecto — Cliente",
+  "short_name": "Cliente",
+  "description": "Revisa el avance, las propuestas y los resultados de tu proyecto con VectorIA.",
+  "start_url": "/cliente",
+  "scope": "/cliente",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4efe8",
+  "theme_color": "#c85d27",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/logo-vectoria.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
