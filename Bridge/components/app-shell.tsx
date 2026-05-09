@@ -1,6 +1,7 @@
 /**
- * FIX-20260505-01
+ * FIX-20260505-01 | IMPL-20260508-23
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-26_crm_ligero_operativo_y_seguimiento_minimo_v1.md
+ * Ajuste: /cliente omite sidebar/header del shell general (PWA ligera).
  */
 "use client";
 
@@ -28,6 +29,12 @@ export function AppShell({
   moduleMetrics?: ModuleMetrics;
 }) {
   const pathname = usePathname();
+
+  // Ruta /cliente → PWA ligera; no exponer la cabina general de Bridge
+  if (pathname.startsWith("/cliente")) {
+    return <>{children}</>;
+  }
+
   const mobileLinks = [...shellMeta.roles, ...shellMeta.modules];
   const modulesWithMetrics = shellMeta.modules.map((item) => {
     const nextMetric = moduleMetrics?.[item.key as keyof ModuleMetrics];
