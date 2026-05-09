@@ -79,8 +79,10 @@ Fuera de alcance deliberado:
 
 ## Estado de Publicacion
 
-Pendiente de commit y push selectivo del corte 52 desde esta sesion.
+Publicado en `main` desde esta sesion.
 
-La autenticacion git ya fue restablecida con `gh auth login` y el `git push --dry-run` contra `origin/main` ya responde correctamente.
+Commit publicado: `2dbacf3`.
+
+La autenticacion git fue restablecida con `gh auth login` y el push a `origin/main` se ejecuto correctamente.
 
 La migracion remota `work_sessions` no pudo verificarse desde este entorno porque `supabase migration list` fallo al conectar al Postgres remoto con `connect: permission denied`; el codigo si quedo validado localmente.
