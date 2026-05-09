@@ -85,4 +85,4 @@ Commit publicado: `2dbacf3`.
 
 La autenticacion git fue restablecida con `gh auth login` y el push a `origin/main` se ejecuto correctamente.
 
-La migracion remota `work_sessions` no pudo verificarse desde este entorno porque `supabase migration list` fallo al conectar al Postgres remoto con `connect: permission denied`; el codigo si quedo validado localmente.
+La migracion remota `work_sessions` ya fue aplicada correctamente con `supabase db push`; `supabase migration list` ahora muestra `20260506090000` alineada en local y remoto.
