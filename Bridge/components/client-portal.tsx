@@ -67,7 +67,7 @@ const REVIEW_DECISION_STYLES: Record<string, string> = {
 function QueSigueBlock({ portal }: { portal: ClientPortal }) {
   const action = portal.nextClientAction;
   return (
-    <section className="panel rounded-[30px] px-6 py-6">
+    <section className="panel rounded-[30px] px-5 py-5">
       <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
         Qué sigue
       </p>
@@ -120,7 +120,7 @@ function StageIndicator({ stage }: { stage: ProjectStageItem }) {
 function EstadoDelProyectoBlock({ portal }: { portal: ClientPortal }) {
   const { projectStatusSummary } = portal;
   return (
-    <section className="panel rounded-[30px] px-6 py-6">
+    <section className="panel rounded-[30px] px-5 py-5">
       <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
         Estado del proyecto
       </p>
@@ -184,7 +184,7 @@ function ReviewItemCard({ item }: { item: ReviewItem }) {
 function RevisionesBlock({ portal }: { portal: ClientPortal }) {
   const { reviewItems } = portal;
   return (
-    <section className="panel rounded-[30px] px-6 py-6">
+    <section className="panel rounded-[30px] px-5 py-5">
       <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
         Revisiones pendientes
       </p>
@@ -244,7 +244,7 @@ function ChannelCard({ channel }: { channel: ChannelResult }) {
 function ResultadosPorCanalBlock({ portal }: { portal: ClientPortal }) {
   const { channels } = portal.channelResultsSummary;
   return (
-    <section className="panel rounded-[30px] px-6 py-6">
+    <section className="panel rounded-[30px] px-5 py-5">
       <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
         Resultados por canal
       </p>
@@ -295,7 +295,7 @@ function LeadRow({ lead }: { lead: ClientLeadSummary }) {
 function LeadsYSeguimientoBlock({ portal }: { portal: ClientPortal }) {
   const { leads, totalVisible } = portal.crmLeadSummary;
   return (
-    <section className="panel rounded-[30px] px-6 py-6">
+    <section className="panel rounded-[30px] px-5 py-5">
       <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
         Leads y seguimiento
       </p>
@@ -323,16 +323,16 @@ function LeadsYSeguimientoBlock({ portal }: { portal: ClientPortal }) {
 
 export function ClientPortalView({ portal }: { portal: ClientPortal }) {
   return (
-    <div className="space-y-5 pb-10">
+    <div className="space-y-4 pb-8">
       {/* Bloque héroe — ancho completo en todos los breakpoints */}
       <QueSigueBlock portal={portal} />
       {/* Grid 2 columnas en desktop; columna única en mobile/tablet */}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className="space-y-5">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="space-y-4">
           <EstadoDelProyectoBlock portal={portal} />
           <RevisionesBlock portal={portal} />
         </div>
-        <div className="space-y-5">
+        <div className="space-y-4">
           <ResultadosPorCanalBlock portal={portal} />
           <LeadsYSeguimientoBlock portal={portal} />
         </div>
