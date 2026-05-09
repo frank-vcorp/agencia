@@ -1,13 +1,13 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** ARCH-20260506-47 — Activo con archivos y evidencias reales planificado
+**ID activo:** ARCH-20260506-52 — Disenador con sesiones reales planificado
 **Fecha de actualizacion:** 2026-05-06  
-**Estado general:** V1 cerrada y publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos, contratos externos endurecidos, continuidad conversacional por entidad, consumo remoto tenant-aware y estadisticas resumidas derivadas visibles sobre Supabase y Vercel. Operador, Disenador y la ficha del activo ya avanzaron con propuestas y decision operativa; el siguiente corte planificado cierra evidencias reales y upload de archivos antes de pasar a Cliente.
+**Estado general:** V1 cerrada y publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos, contratos externos endurecidos, continuidad conversacional por entidad, consumo remoto tenant-aware y estadisticas resumidas derivadas visibles sobre Supabase y Vercel. Operador y la ficha del activo ya quedaron fuertes; antes de abrir Cliente, el siguiente corte planificado vuelve a `/disenador` para cerrar sesiones reales y jornada util.
 
 ## MICRO-SPRINT ACTIVO
 
-### MICRO-SPRINT: Evidencias reales del activo
+### MICRO-SPRINT: Disenador con sesiones reales
 
 **Fecha:** 2026-05-06  
 **Proyecto:** Bridge  
@@ -15,16 +15,16 @@
 
 ### Entregable Demostrable
 
-> Bridge cierra el activo como unidad tangible de trabajo creativo, permitiendo devolver archivos reales y evidencias dentro de la misma ficha.
+> Bridge vuelve a `/disenador` y convierte el workspace en una mesa de trabajo real, con sesiones persistidas y cierre de jornada confiable.
 
 ### Como se Demuestra
 
 1. abrir el modulo de Activos,
 2. entrar desde un activo o desde el workspace del disenador a la ficha detallada,
-3. confirmar que una propuesta puede recibir un archivo o evidencia real,
-4. confirmar que la ficha muestra el nombre del archivo y la accion de abrir o descargar,
-5. validar que el flujo de devolucion desde Adobe ya no depende solo de una nota,
-6. comprobar que el gap de `file_upload` desaparece de los vacios honestos.
+3. confirmar que el disenador puede iniciar, bloquear, retomar y terminar desde `/disenador`,
+4. confirmar que el resumen diario refleja trabajo de hoy y no acumulado historico,
+5. validar que la tarea activa se sincroniza mejor con el activo,
+6. comprobar que los vacios V1 principales del workspace se reducen o desaparecen.
 
 ## ESTADO COMPROBABLE ACTUAL
 
@@ -68,7 +68,7 @@
 ### [~] En curso
 
 1. El paquete guiado por IA sigue activo sobre el marco ya definido por `ARCH-20260506-37` y `ARCH-20260506-38`.
-2. `ARCH-20260506-47` queda como siguiente corte para cerrar evidencias reales y upload del activo creativo.
+2. `ARCH-20260506-52` queda como siguiente corte para cerrar sesiones reales y jornada util del disenador.
 3. `ARCH-20260506-42` queda despues de ese cierre como siguiente corte para el cliente ligero guiado por IA.
 
 ### [ ] Pendiente
@@ -80,7 +80,7 @@
 1. `ARCH-20260506-40-41 / IMPL-20260506-44` queda cerrado como corte completado y validado con compilación, tests, revisión y documentación.
 2. `/disenador` ya dejó atrás la shell estática y publica un workspace guiado con tarea activa, cola priorizada, prompt fuente, estación Adobe y resumen de jornada.
 3. El checkpoint canónico del cierre es `context/checkpoints/CHECKPOINT_IMPL-20260506-44_workspace_disenador_guiado.md`.
-4. El siguiente corte recomendado es cerrar upload y evidencias reales del activo antes de avanzar al Cliente.
+4. El siguiente corte recomendado es volver a `/disenador` para cerrar sesiones reales antes de avanzar al Cliente.
 
 ## Artefactos Clave
 
@@ -207,7 +207,7 @@
 
 ### [~] Planificado para el siguiente corte
 
-1. Implementar activo con archivos y evidencias reales.
+1. Implementar disenador con sesiones reales y cierre de jornada util.
 2. Implementar cliente ligero guiado por IA.
 
 ### [ ] Posterior
@@ -227,8 +227,8 @@
 
 ## Siguiente Paso Recomendado
 
-Con Operador, Disenador y la ficha del activo ya avanzados, el siguiente paso recomendado es cerrar la unidad tangible de trabajo creativo antes de pasar al Cliente:
+Con Operador y la ficha del activo ya fuertes, el siguiente paso recomendado es volver a `/disenador` antes de pasar al Cliente:
 
-1. implementar `ARCH-20260506-47` para upload y evidencias reales del activo,
-2. reducir el principal vacio material del activo antes de abrir una nueva superficie,
+1. implementar `ARCH-20260506-52` para sesiones reales, bloqueos y cierre de jornada del disenador,
+2. cerrar la capa de ejecucion del workspace antes de abrir una nueva superficie,
 3. cerrar despues `ARCH-20260506-42` para la superficie ligera del cliente.

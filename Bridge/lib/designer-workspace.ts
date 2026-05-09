@@ -1,7 +1,8 @@
 /**
- * IMPL-20260506-44
+ * IMPL-20260506-44 | IMPL-20260506-52
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-40_modelo_ejecucion_disenador_sesiones_y_estados.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-41_workspace_disenador_guiado.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-52_disenador_sesiones_reales_y_cierre_jornada.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 
@@ -50,13 +51,59 @@ export type DesignerTask = {
   updatedAt: string;
 };
 
+export type DesignerProposalDraft = {
+  id: string;
+  isPrimary: boolean;
+  note: string;
+  toolUsed: CreativeTool;
+  reviewDecision: string;
+  promptVersionId: string | null;
+  evidenceFileName: string | null;
+  hasEvidence: boolean;
+  createdAt: string;
+};
+
 export type DailyStats = {
   completedCount: number;
   inProgressCount: number;
   readyToStartCount: number;
   blockedCount: number;
-  /** V1: sin tabla work_sessions — tiempo efectivo no disponible. */
+  /** Tiempo efectivo disponible desde work_sessions — ver dailyStatsToday para hoy. */
   effectiveMinutesNote: string;
+};
+
+/** Estado operativo de una sesion de trabajo. IMPL-20260506-52 */
+export type WorkSessionStatus = "active" | "blocked" | "completed";
+
+/**
+ * Sesion de trabajo activa o bloqueada del disenador.
+ * Derivada desde work_sessions WHERE status IN ('active','blocked'). IMPL-20260506-52
+ */
+export type ActiveSession = {
+  sessionId: string;
+  assetId: string;
+  status: WorkSessionStatus;
+  startedAt: string;
+  blockedReason: string | null;
+  /** Minutos transcurridos desde started_at hasta ahora (aproximado). */
+  elapsedMinutes: number;
+};
+
+/**
+ * Estadisticas de la jornada filtradas al dia actual.
+ * Derivadas desde work_sessions con started_at >= hoy 00:00. IMPL-20260506-52
+ */
+export type DailyStatsToday = {
+  /** Sesiones completadas hoy (no acumulado historico). */
+  completedCountToday: number;
+  /** Minutos efectivos hoy (suma de duracion de sesiones completadas). */
+  effectiveMinutesToday: number;
+  /** Tiempo acumulado en estado blocked hoy (minutos desde started_at hasta updated_at). */
+  blockedMinutesToday: number;
+  /** ISO de la ultima sesion terminada hoy, o null si ninguna. */
+  lastSessionEndedAt: string | null;
+  /** Fecha de referencia usada para el filtro ('YYYY-MM-DD'). */
+  date: string;
 };
 
 export type DesignerWorkspace = {
@@ -69,9 +116,13 @@ export type DesignerWorkspace = {
   /** Cola de pendientes activos (excluye completados), ordenada por score desc. */
   taskQueue: DesignerTask[];
   dailyStats: DailyStats;
-  /** V1: tabla asset_proposals pendiente — propuestas registradas manualmente. */
-  proposalDraftsNote: string;
-  /** Vacios honestos documentados de V1. */
+  /** Sesion activa o bloqueada del disenador. IMPL-20260506-52 */
+  activeSession: ActiveSession | null;
+  /** Estadisticas filtradas al dia actual derivadas de work_sessions. IMPL-20260506-52 */
+  dailyStatsToday: DailyStatsToday;
+  /** Propuestas reales del activo enfocado (tarea activa o siguiente sugerida). */
+  proposalDrafts: DesignerProposalDraft[];
+  /** Vacios honestos documentados. */
   gaps: string[];
   isEmpty: boolean;
 };
@@ -80,10 +131,13 @@ export type DesignerWorkspace = {
 
 /**
  * Mapea el estado del activo al estado operativo del disenador.
- * V1: `blocked` no se puede derivar de asset status (requiere designer_tasks).
- * IMPL-20260506-44
+ * Si hay una sesion bloqueada para ese activo, retorna 'blocked'. IMPL-20260506-52
  */
-export function mapAssetStatusToDesignerStatus(status: string): DesignerTaskStatus {
+export function mapAssetStatusToDesignerStatus(
+  status: string,
+  sessionStatus?: WorkSessionStatus
+): DesignerTaskStatus {
+  if (sessionStatus === "blocked") return "blocked";
   switch (status) {
     case "draft":
       return "ready_to_start";
@@ -149,9 +203,8 @@ export function scoreDesignerTask(
 }
 
 /**
- * Deriva estadisticas de la jornada desde la lista de tareas.
- * V1: sin tabla work_sessions, sin filtro de "hoy".
- * IMPL-20260506-44
+ * Deriva estadisticas de la jornada desde la lista de tareas (acumulado historico).
+ * Para el filtro diario real usar deriveDailyStatsFromSessions. IMPL-20260506-44
  */
 export function deriveDailyStats(tasks: DesignerTask[]): DailyStats {
   return {
@@ -160,20 +213,87 @@ export function deriveDailyStats(tasks: DesignerTask[]): DailyStats {
     readyToStartCount: tasks.filter((t) => t.status === "ready_to_start").length,
     blockedCount: tasks.filter((t) => t.status === "blocked").length,
     effectiveMinutesNote:
-      "No disponible en V1 — requiere tabla work_sessions para registrar sesiones"
+      "V1: el resumen historico no expone tiempo efectivo; ver work_sessions y dailyStatsToday para el dia actual"
   };
 }
 
-// ─── Vacios honestos de V1 ────────────────────────────────────────────────────
+// ─── Tipos internos de sesion (derivacion desde DB) ──────────────────────────
 
-const V1_GAPS = [
-  "work_sessions: tabla no existe — duracion y tiempo efectivo de sesion no disponible",
-  "designer_tasks: tabla no existe — estado blocked no persiste, depende de asset status",
-  "asset_proposals: tabla no existe — propuestas de regreso a Bridge se registran manualmente",
-  "daily_time_filter: completedCount incluye todos los completados, no solo los de hoy"
-];
+/** Fila interna de work_sessions tal como viene de la DB. */
+export type WorkSessionRow = {
+  id: string;
+  asset_id: string;
+  started_at: string;
+  ended_at: string | null;
+  status: string;
+  blocked_reason: string | null;
+};
 
-// ─── Tipos de filas DB ────────────────────────────────────────────────────────
+/**
+ * Construye un ActiveSession desde una fila de work_sessions.
+ * Retorna null si la fila no existe o tiene status 'completed'. IMPL-20260506-52
+ */
+export function buildActiveSession(row: WorkSessionRow | null): ActiveSession | null {
+  if (!row || row.status === "completed") return null;
+  const status = row.status as WorkSessionStatus;
+  const startedMs = new Date(row.started_at).getTime();
+  const nowMs = Date.now();
+  const elapsedMinutes = Math.floor((nowMs - startedMs) / 60_000);
+  return {
+    sessionId: row.id,
+    assetId: row.asset_id,
+    status,
+    startedAt: row.started_at,
+    blockedReason: row.blocked_reason,
+    elapsedMinutes
+  };
+}
+
+/**
+ * Deriva estadisticas filtradas al dia actual desde work_sessions.
+ * Solo cuenta sesiones cuyo started_at >= inicio del dia indicado. IMPL-20260506-52
+ */
+export function deriveDailyStatsFromSessions(
+  sessions: WorkSessionRow[],
+  date: string
+): DailyStatsToday {
+  const completed = sessions.filter((s) => s.status === "completed");
+  const blocked = sessions.filter((s) => s.status === "blocked");
+
+  let effectiveMinutesToday = 0;
+  for (const s of completed) {
+    if (s.ended_at) {
+      const diff = new Date(s.ended_at).getTime() - new Date(s.started_at).getTime();
+      effectiveMinutesToday += Math.max(0, Math.floor(diff / 60_000));
+    }
+  }
+
+  // Para bloqueadas: tiempo desde started_at hasta ended_at (si se retoomo) o hasta now
+  let blockedMinutesToday = 0;
+  for (const s of blocked) {
+    const end = s.ended_at ? new Date(s.ended_at).getTime() : Date.now();
+    const diff = end - new Date(s.started_at).getTime();
+    blockedMinutesToday += Math.max(0, Math.floor(diff / 60_000));
+  }
+
+  const lastCompleted = completed
+    .filter((s) => s.ended_at)
+    .sort((a, b) => new Date(b.ended_at!).getTime() - new Date(a.ended_at!).getTime());
+
+  return {
+    completedCountToday: completed.length,
+    effectiveMinutesToday,
+    blockedMinutesToday,
+    lastSessionEndedAt: lastCompleted[0]?.ended_at ?? null,
+    date
+  };
+}
+
+// ─── Vacios honestos actualizados (IMPL-20260506-52) ─────────────────────────
+
+const V1_GAPS: string[] = [];
+
+// ─── Tipos internos de filas DB ───────────────────────────────────────────────
 
 type TenantRow = { id: string; slug: string };
 type ProjectRow = { id: string; client_id: string; name: string };
@@ -198,6 +318,23 @@ type PromptVersionRow = {
   version_number: number;
   prompt_text: string;
   status: string;
+};
+
+type ProposalRow = {
+  id: string;
+  asset_id: string;
+  prompt_version_id: string | null;
+  is_primary: boolean;
+  note: string;
+  tool_used: string;
+  review_decision: string;
+  created_at: string;
+};
+
+type ProposalEvidenceRow = {
+  proposal_id: string;
+  file_name: string;
+  uploaded_at: string;
 };
 
 // ─── Helpers de fetch ─────────────────────────────────────────────────────────
@@ -262,19 +399,111 @@ async function fetchClients(tenantId: string): Promise<ClientRow[]> {
   return postgrest<ClientRow[]>(`clients?${params.toString()}`);
 }
 
+/**
+ * Obtiene la sesion activa o bloqueada del disenador.
+ * Retorna la mas reciente con status IN ('active', 'blocked'). IMPL-20260506-52
+ */
+async function fetchActiveSessionRow(tenantId: string): Promise<WorkSessionRow | null> {
+  const params = new URLSearchParams({
+    select: "id,asset_id,started_at,ended_at,status,blocked_reason",
+    tenant_id: `eq.${tenantId}`,
+    status: "in.(active,blocked)",
+    order: "updated_at.desc",
+    limit: "1"
+  });
+  const rows = await postgrest<WorkSessionRow[]>(`work_sessions?${params.toString()}`);
+  return rows[0] ?? null;
+}
+
+/**
+ * Obtiene todas las sesiones cuyo started_at >= inicio del dia indicado.
+ * El parametro `todayIso` debe ser '2026-05-06T00:00:00.000Z'. IMPL-20260506-52
+ */
+async function fetchTodaySessions(
+  tenantId: string,
+  todayIso: string
+): Promise<WorkSessionRow[]> {
+  const params = new URLSearchParams({
+    select: "id,asset_id,started_at,ended_at,status,blocked_reason",
+    tenant_id: `eq.${tenantId}`,
+    started_at: `gte.${todayIso}`,
+    order: "started_at.desc"
+  });
+  return postgrest<WorkSessionRow[]>(`work_sessions?${params.toString()}`);
+}
+
+async function fetchProposalDraftsForAsset(assetId: string): Promise<DesignerProposalDraft[]> {
+  const proposalParams = new URLSearchParams({
+    select: "id,asset_id,prompt_version_id,is_primary,note,tool_used,review_decision,created_at",
+    asset_id: `eq.${assetId}`,
+    order: "created_at.desc"
+  });
+
+  const proposals = await postgrest<ProposalRow[]>(`asset_proposals?${proposalParams.toString()}`);
+  if (proposals.length === 0) return [];
+
+  const proposalIds = proposals.map((proposal) => proposal.id);
+  const evidenceParams = new URLSearchParams({
+    select: "proposal_id,file_name,uploaded_at",
+    proposal_id: `in.(${proposalIds.join(",")})`,
+    order: "uploaded_at.desc"
+  });
+
+  let evidences: ProposalEvidenceRow[] = [];
+  try {
+    evidences = await postgrest<ProposalEvidenceRow[]>(
+      `asset_proposal_evidences?${evidenceParams.toString()}`
+    );
+  } catch {
+    evidences = [];
+  }
+
+  const evidenceByProposalId = new Map<string, ProposalEvidenceRow>();
+  for (const evidence of evidences) {
+    if (!evidenceByProposalId.has(evidence.proposal_id)) {
+      evidenceByProposalId.set(evidence.proposal_id, evidence);
+    }
+  }
+
+  return proposals.map((proposal) => {
+    const evidence = evidenceByProposalId.get(proposal.id) ?? null;
+    return {
+      id: proposal.id,
+      isPrimary: proposal.is_primary,
+      note: proposal.note,
+      toolUsed: proposal.tool_used as CreativeTool,
+      reviewDecision: proposal.review_decision,
+      promptVersionId: proposal.prompt_version_id,
+      evidenceFileName: evidence?.file_name ?? null,
+      hasEvidence: Boolean(evidence),
+      createdAt: proposal.created_at
+    };
+  });
+}
+
 // ─── Funcion principal ────────────────────────────────────────────────────────
 
 /**
- * Obtiene el workspace del disenador derivado desde entidades existentes.
- * Vacios V1 documentados en el campo `gaps`.
- * IMPL-20260506-44
+ * Obtiene el workspace del disenador con sesiones reales y jornada diaria.
+ * IMPL-20260506-44 | IMPL-20260506-52
  */
 export async function getDesignerWorkspace(
   tenantSlug = supabaseEnv.defaultTenant
 ): Promise<DesignerWorkspace> {
   const generatedAt = new Date().toISOString();
-  const proposalDraftsNote =
-    "V1: tabla asset_proposals pendiente — propuestas se registran manualmente hasta ese corte";
+
+  // Inicio del dia actual en UTC para filtrar jornada
+  const now = new Date(generatedAt);
+  const todayDateStr = now.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+  const todayIso = `${todayDateStr}T00:00:00.000Z`;
+
+  const emptyDailyStatsToday: DailyStatsToday = {
+    completedCountToday: 0,
+    effectiveMinutesToday: 0,
+    blockedMinutesToday: 0,
+    lastSessionEndedAt: null,
+    date: todayDateStr
+  };
 
   const base: DesignerWorkspace = {
     tenantSlug,
@@ -283,7 +512,9 @@ export async function getDesignerWorkspace(
     nextSuggestedTask: null,
     taskQueue: [],
     dailyStats: deriveDailyStats([]),
-    proposalDraftsNote,
+    activeSession: null,
+    dailyStatsToday: emptyDailyStatsToday,
+    proposalDrafts: [],
     gaps: V1_GAPS,
     isEmpty: true
   };
@@ -293,18 +524,34 @@ export async function getDesignerWorkspace(
   const tenantId = await fetchTenantId(tenantSlug);
   if (!tenantId) return base;
 
-  const [assets, prompts, projects, clients] = await Promise.all([
-    fetchAssets(tenantId),
-    fetchActivePrompts(tenantId),
-    fetchProjects(tenantId),
-    fetchClients(tenantId)
-  ]);
+  const [assets, prompts, projects, clients, activeSessionRow, todaySessions] =
+    await Promise.all([
+      fetchAssets(tenantId),
+      fetchActivePrompts(tenantId),
+      fetchProjects(tenantId),
+      fetchClients(tenantId),
+      fetchActiveSessionRow(tenantId),
+      fetchTodaySessions(tenantId, todayIso)
+    ]);
 
-  if (assets.length === 0) return base;
+  if (assets.length === 0) {
+    return {
+      ...base,
+      activeSession: buildActiveSession(activeSessionRow),
+      dailyStatsToday: deriveDailyStatsFromSessions(todaySessions, todayDateStr)
+    };
+  }
 
   const projectMap = new Map(projects.map((p) => [p.id, p]));
   const clientMap = new Map(clients.map((c) => [c.id, c.name]));
   const promptByAsset = new Map(prompts.map((p) => [p.asset_id, p]));
+
+  // Sesion activa: enriquecer el asset correspondiente con estado blocked si aplica
+  const activeSessionAssetId = activeSessionRow?.asset_id ?? null;
+  const activeSessionStatus =
+    activeSessionRow && activeSessionRow.status !== "completed"
+      ? (activeSessionRow.status as WorkSessionStatus)
+      : undefined;
 
   const tasks: DesignerTask[] = assets.map((asset): DesignerTask => {
     const project = projectMap.get(asset.project_id);
@@ -312,14 +559,23 @@ export async function getDesignerWorkspace(
       ? (clientMap.get(project.client_id) ?? "Cliente desconocido")
       : "Cliente desconocido";
     const prompt = promptByAsset.get(asset.id) ?? null;
-    const status = mapAssetStatusToDesignerStatus(asset.status);
+    // Si este activo tiene la sesion activa/bloqueada, propagar el sessionStatus
+    const thisAssetSessionStatus =
+      asset.id === activeSessionAssetId ? activeSessionStatus : undefined;
+    const status = mapAssetStatusToDesignerStatus(asset.status, thisAssetSessionStatus);
     const suggestedTool = suggestCreativeTool(asset.piece_type_code);
     const score = scoreDesignerTask({ status, promptText: prompt?.prompt_text ?? null });
 
     let priorityReason = "";
     let suggestedAction = "";
 
-    if (status === "in_progress") {
+    if (status === "blocked") {
+      const reason = activeSessionRow?.blocked_reason ?? "";
+      priorityReason = reason
+        ? `Bloqueado: ${reason}`
+        : "Tarea bloqueada — el disenador reporto un impedimento.";
+      suggestedAction = "Resolver el bloqueo y retomar la sesion desde /disenador.";
+    } else if (status === "in_progress") {
       priorityReason = prompt
         ? "En produccion con prompt activo — listo para saltar a estacion creativa."
         : "En produccion sin prompt activo — requiere definicion antes de avanzar.";
@@ -367,14 +623,22 @@ export async function getDesignerWorkspace(
     .filter((t) => t.status !== "completed")
     .sort((a, b) => b.priorityScore - a.priorityScore);
 
-  // Tarea activa: primera in_progress (mayor score)
-  const activeTask = taskQueue.find((t) => t.status === "in_progress") ?? null;
+  // Tarea activa: priorizar blocked (sesion bloqueada), luego in_progress
+  const activeTask =
+    taskQueue.find((t) => t.status === "blocked") ??
+    taskQueue.find((t) => t.status === "in_progress") ??
+    null;
 
   // Siguiente sugerida: primera ready_to_start (distinta a activeTask)
   const nextSuggestedTask =
     taskQueue.find((t) => t.status === "ready_to_start" && t !== activeTask) ??
     taskQueue.find((t) => t.status === "ready_for_review" && t !== activeTask) ??
     null;
+
+  const focusAssetId = activeTask?.assetId ?? nextSuggestedTask?.assetId ?? null;
+  const proposalDrafts = focusAssetId
+    ? await fetchProposalDraftsForAsset(focusAssetId)
+    : [];
 
   return {
     tenantSlug,
@@ -383,7 +647,9 @@ export async function getDesignerWorkspace(
     nextSuggestedTask,
     taskQueue,
     dailyStats: deriveDailyStats(tasks),
-    proposalDraftsNote,
+    activeSession: buildActiveSession(activeSessionRow),
+    dailyStatsToday: deriveDailyStatsFromSessions(todaySessions, todayDateStr),
+    proposalDrafts,
     gaps: V1_GAPS,
     isEmpty: taskQueue.length === 0
   };

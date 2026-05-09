@@ -1,14 +1,15 @@
 /**
- * IMPL-20260506-44
+ * IMPL-20260506-44 | IMPL-20260506-52
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-41_workspace_disenador_guiado.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-40_modelo_ejecucion_disenador_sesiones_y_estados.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260506-52_disenador_sesiones_reales_y_cierre_jornada.md
  */
 import Link from "next/link";
 
+import { SessionControlButtons } from "@/components/session-control-buttons";
 import {
-  getAvailableActions,
+  type DesignerProposalDraft,
   type CreativeTool,
-  type DesignerAction,
   type DesignerTask,
   type DesignerTaskStatus,
   type DesignerWorkspace
@@ -46,27 +47,6 @@ const TOOL_DESC: Record<CreativeTool, string> = {
   other: "Redaccion y edicion de copy sin herramienta grafica."
 };
 
-const ACTION_LABELS: Record<DesignerAction, string> = {
-  start: "Iniciar tarea",
-  block: "Reportar bloqueo",
-  resume: "Retomar",
-  finish: "Terminar",
-  ready_for_review: "Marcar lista para revision"
-};
-
-const ACTION_STYLES: Record<DesignerAction, string> = {
-  start:
-    "bg-slate-900 text-white hover:bg-slate-700",
-  block:
-    "bg-red-50 text-red-700 ring-1 ring-red-200 hover:bg-red-100",
-  resume:
-    "bg-sky-50 text-sky-700 ring-1 ring-sky-200 hover:bg-sky-100",
-  finish:
-    "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100",
-  ready_for_review:
-    "bg-violet-50 text-violet-700 ring-1 ring-violet-200 hover:bg-violet-100"
-};
-
 function formatTimestamp(iso: string): string {
   try {
     return new Intl.DateTimeFormat("es-MX", {
@@ -91,32 +71,6 @@ function TaskStatusBadge({ status }: { status: DesignerTaskStatus }) {
     >
       {TASK_STATUS_LABELS[status]}
     </span>
-  );
-}
-
-// ─── Botones de control de sesion (V1: no persisten — redirigen a activos) ───
-
-function SessionControlButtons({ task }: { task: DesignerTask }) {
-  const actions = getAvailableActions(task.status);
-
-  if (actions.length === 0) return null;
-
-  return (
-    <div className="mt-4 flex flex-wrap gap-2">
-      {actions.map((action) => (
-        <Link
-          key={action}
-          href="/activos"
-          className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition ${ACTION_STYLES[action]}`}
-          title="V1: abre el modulo de activos. Persistencia de sesion en proximo corte."
-        >
-          {ACTION_LABELS[action]}
-        </Link>
-      ))}
-      <span className="self-center text-[10px] text-[color:var(--muted)]">
-        V1 — acciones disponibles en modulo Activos
-      </span>
-    </div>
   );
 }
 
@@ -172,7 +126,12 @@ function CreativeStationBlock({ task }: { task: DesignerTask }) {
 
 // ─── Tarjeta de tarea activa (pendiente principal) ────────────────────────────
 
-function ActiveTaskCard({ task }: { task: DesignerTask }) {
+interface ActiveTaskCardProps {
+  task: DesignerTask;
+  activeSession: DesignerWorkspace["activeSession"];
+}
+
+function ActiveTaskCard({ task, activeSession }: ActiveTaskCardProps) {
   return (
     <div className="panel rounded-[28px] px-5 py-5 ring-1 ring-[color:var(--line)]">
       {/* Encabezado */}
@@ -249,12 +208,12 @@ function ActiveTaskCard({ task }: { task: DesignerTask }) {
         )}
       </div>
 
-      {/* Control de sesion */}
+      {/* Control de sesion — componente cliente con acciones reales */}
       <div className="mt-5 border-t border-[color:var(--line)] pt-4">
         <p className="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted)]">
           Control de sesion
         </p>
-        <SessionControlButtons task={task} />
+        <SessionControlButtons task={task} activeSession={activeSession} />
       </div>
     </div>
   );
@@ -291,7 +250,13 @@ function QueueTaskCard({ task }: { task: DesignerTask }) {
 
 // ─── Panel de propuestas (V1: vacio honesto) ──────────────────────────────────
 
-function ProposalDraftsPanel({ note }: { note: string }) {
+function ProposalDraftsPanel({
+  proposals,
+  assetId
+}: {
+  proposals: DesignerProposalDraft[];
+  assetId: string | null;
+}) {
   return (
     <div className="panel rounded-[28px] px-5 py-5 ring-1 ring-[color:var(--line)]">
       <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
@@ -300,25 +265,64 @@ function ProposalDraftsPanel({ note }: { note: string }) {
       <p className="mt-2 font-[family-name:var(--font-heading)] text-lg font-bold tracking-tight">
         Regreso de propuestas a Bridge
       </p>
-      <div className="mt-4 rounded-[16px] bg-amber-50 px-4 py-4 ring-1 ring-amber-200">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-700">
-          Disponible en proximo corte
-        </p>
-        <p className="mt-1 text-sm leading-6 text-amber-800">{note}</p>
-      </div>
-      <div className="mt-4 space-y-2 opacity-40">
-        {[1, 2].map((n) => (
-          <div
-            key={n}
-            className="flex items-center gap-3 rounded-[16px] bg-white/70 px-4 py-3 ring-1 ring-[color:var(--line)]"
-          >
-            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--muted)]">
-              Propuesta {n}
-            </span>
-            <span className="flex-1 h-2 rounded bg-slate-200" />
-          </div>
-        ))}
-      </div>
+      {proposals.length === 0 ? (
+        <div className="mt-4 rounded-[16px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--muted)]">
+            Sin propuestas registradas aun
+          </p>
+          <p className="mt-1 text-sm leading-6 text-[color:var(--muted)]">
+            Aun no hay propuestas devueltas para este activo. Registra o revisa las propuestas desde la ficha central del activo.
+          </p>
+          {assetId && (
+            <Link
+              href={`/activos/${assetId}`}
+              className="mt-3 inline-flex items-center rounded-full bg-[color:var(--accent-soft)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--accent-deep)] transition hover:bg-[color:var(--accent-deep)] hover:text-white"
+            >
+              Ver ficha →
+            </Link>
+          )}
+        </div>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {proposals.slice(0, 2).map((proposal) => (
+            <div
+              key={proposal.id}
+              className="rounded-[16px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--accent-deep)]">
+                  {proposal.isPrimary ? "Propuesta principal" : "Propuesta alternativa"}
+                </span>
+                <span className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--muted)]">
+                  {proposal.reviewDecision}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-6">{proposal.note}</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-[color:var(--muted)]">
+                <span className="rounded bg-slate-50 px-2 py-0.5 ring-1 ring-[color:var(--line)]">
+                  {TOOL_LABELS[proposal.toolUsed]}
+                </span>
+                <span className="rounded bg-slate-50 px-2 py-0.5 ring-1 ring-[color:var(--line)]">
+                  {proposal.promptVersionId ? "Prompt origen vinculado" : "Sin prompt vinculado"}
+                </span>
+                <span className="rounded bg-slate-50 px-2 py-0.5 ring-1 ring-[color:var(--line)]">
+                  {proposal.hasEvidence
+                    ? proposal.evidenceFileName ?? "Evidencia subida"
+                    : "Sin evidencia subida"}
+                </span>
+              </div>
+            </div>
+          ))}
+          {assetId && (
+            <Link
+              href={`/activos/${assetId}`}
+              className="inline-flex items-center rounded-full bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--accent-deep)] ring-1 ring-[color:var(--line)] transition hover:bg-[color:var(--accent-soft)]"
+            >
+              Gestionar propuestas en la ficha →
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -330,48 +334,41 @@ function DailyStatsPanel({
 }: {
   workspace: Pick<
     DesignerWorkspace,
-    "dailyStats" | "generatedAt" | "tenantSlug"
+    "dailyStats" | "dailyStatsToday" | "generatedAt" | "tenantSlug"
   >;
 }) {
-  const { dailyStats, generatedAt } = workspace;
-  const total =
+  const { dailyStats, dailyStatsToday, generatedAt } = workspace;
+  const totalQueue =
     dailyStats.inProgressCount +
     dailyStats.readyToStartCount +
-    dailyStats.blockedCount +
-    dailyStats.completedCount;
+    dailyStats.blockedCount;
 
   return (
     <div className="panel rounded-[28px] px-5 py-5 ring-1 ring-[color:var(--line)]">
       <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
-        Resumen de jornada
+        Jornada de hoy — {dailyStatsToday.date}
       </p>
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+
+      {/* Metricas del dia actual (de work_sessions) */}
+      <div className="mt-3 grid grid-cols-3 gap-3">
         {[
           {
-            label: "En produccion",
-            value: dailyStats.inProgressCount,
-            color: "text-amber-700 bg-amber-50"
+            label: "Completadas hoy",
+            value: dailyStatsToday.completedCountToday,
+            color: "text-emerald-700 bg-emerald-50"
           },
           {
-            label: "Listos",
-            value: dailyStats.readyToStartCount,
+            label: "Min efectivos",
+            value: dailyStatsToday.effectiveMinutesToday,
             color: "text-sky-700 bg-sky-50"
           },
           {
-            label: "Bloqueados",
-            value: dailyStats.blockedCount,
+            label: "Min bloqueado",
+            value: dailyStatsToday.blockedMinutesToday,
             color: "text-red-700 bg-red-50"
-          },
-          {
-            label: "Completados",
-            value: dailyStats.completedCount,
-            color: "text-emerald-700 bg-emerald-50"
           }
         ].map(({ label, value, color }) => (
-          <div
-            key={label}
-            className={`rounded-[18px] px-4 py-3 text-center ${color}`}
-          >
+          <div key={label} className={`rounded-[18px] px-4 py-3 text-center ${color}`}>
             <p className="font-[family-name:var(--font-heading)] text-3xl font-bold tabular-nums">
               {value}
             </p>
@@ -379,15 +376,25 @@ function DailyStatsPanel({
           </div>
         ))}
       </div>
+
+      {/* Estado de la cola (de assets) */}
       <div className="mt-4 rounded-[14px] bg-slate-50 px-4 py-3">
         <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">
-          Total de activos en cola
+          Cola activa
         </p>
-        <p className="mt-0.5 text-sm">{total} activos gestionados</p>
-        <p className="mt-2 text-[10px] leading-5 text-[color:var(--muted)]">
-          {dailyStats.effectiveMinutesNote}
+        <p className="mt-0.5 text-sm">
+          {totalQueue} activo{totalQueue !== 1 ? "s" : ""} pendiente{totalQueue !== 1 ? "s" : ""}
+          {dailyStats.blockedCount > 0 && (
+            <span className="ml-2 text-red-600">· {dailyStats.blockedCount} bloqueado{dailyStats.blockedCount !== 1 ? "s" : ""}</span>
+          )}
         </p>
+        {dailyStatsToday.lastSessionEndedAt && (
+          <p className="mt-1 text-[10px] text-[color:var(--muted)]">
+            Ultima sesion: {formatTimestamp(dailyStatsToday.lastSessionEndedAt)}
+          </p>
+        )}
       </div>
+
       <p className="mt-3 text-[10px] text-[color:var(--muted)]">
         Generado: {formatTimestamp(generatedAt)}
       </p>
@@ -480,14 +487,14 @@ export function DesignerWorkspaceView({ workspace }: { workspace: DesignerWorksp
                 <p className="mb-3 text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
                   Tarea activa
                 </p>
-                <ActiveTaskCard task={workspace.activeTask} />
+                <ActiveTaskCard task={workspace.activeTask} activeSession={workspace.activeSession} />
               </section>
             ) : workspace.nextSuggestedTask ? (
               <section>
                 <p className="mb-3 text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
                   Siguiente sugerida por IA
                 </p>
-                <ActiveTaskCard task={workspace.nextSuggestedTask} />
+                <ActiveTaskCard task={workspace.nextSuggestedTask} activeSession={workspace.activeSession} />
               </section>
             ) : null}
 
@@ -499,7 +506,10 @@ export function DesignerWorkspaceView({ workspace }: { workspace: DesignerWorksp
             )}
 
             {/* 6. Propuestas del activo */}
-            <ProposalDraftsPanel note={workspace.proposalDraftsNote} />
+            <ProposalDraftsPanel
+              proposals={workspace.proposalDrafts}
+              assetId={(workspace.activeTask ?? workspace.nextSuggestedTask)?.assetId ?? null}
+            />
           </div>
 
           {/* Columna lateral */}
@@ -522,18 +532,29 @@ export function DesignerWorkspaceView({ workspace }: { workspace: DesignerWorksp
             <DailyStatsPanel workspace={workspace} />
 
             {/* Vacios V1 documentados */}
-            <details className="panel rounded-[22px] px-5 py-4 ring-1 ring-[color:var(--line)]">
-              <summary className="cursor-pointer text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted)]">
-                Vacios V1 documentados ({workspace.gaps.length})
-              </summary>
-              <ul className="mt-3 space-y-1.5">
-                {workspace.gaps.map((gap, i) => (
-                  <li key={i} className="text-[11px] leading-5 text-[color:var(--muted)]">
-                    • {gap}
-                  </li>
-                ))}
-              </ul>
-            </details>
+            {workspace.gaps.length > 0 ? (
+              <details className="panel rounded-[22px] px-5 py-4 ring-1 ring-[color:var(--line)]">
+                <summary className="cursor-pointer text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted)]">
+                  Vacios V1 documentados ({workspace.gaps.length})
+                </summary>
+                <ul className="mt-3 space-y-1.5">
+                  {workspace.gaps.map((gap, i) => (
+                    <li key={i} className="text-[11px] leading-5 text-[color:var(--muted)]">
+                      • {gap}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : (
+              <div className="panel rounded-[22px] px-5 py-4 ring-1 ring-emerald-200 bg-emerald-50">
+                <p className="text-[10px] uppercase tracking-[0.22em] text-emerald-700">
+                  Workspace cerrado
+                </p>
+                <p className="mt-1 text-sm leading-6 text-emerald-800">
+                  `/disenador` ya tiene sesiones reales, propuestas visibles y jornada util sin vacios honestos activos.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
