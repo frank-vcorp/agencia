@@ -1,30 +1,30 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** ARCH-20260506-52 — Disenador con sesiones reales planificado
-**Fecha de actualizacion:** 2026-05-06  
-**Estado general:** V1 cerrada y publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos, contratos externos endurecidos, continuidad conversacional por entidad, consumo remoto tenant-aware y estadisticas resumidas derivadas visibles sobre Supabase y Vercel. Operador y la ficha del activo ya quedaron fuertes; antes de abrir Cliente, el siguiente corte planificado vuelve a `/disenador` para cerrar sesiones reales y jornada util.
+**ID activo:** ARCH-20260508-21 — Cliente PWA con resultados y leads planificado
+**Fecha de actualizacion:** 2026-05-08  
+**Estado general:** Bridge ya tiene una base V1 operativa y publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos, contratos externos endurecidos, continuidad conversacional por entidad, consumo remoto tenant-aware y estadisticas resumidas derivadas visibles sobre Supabase y Vercel. Operador, Disenador y la ficha del activo ya quedaron fuertes; el siguiente corte planificado abre `/cliente` como PWA ligera para revisiones, resultados por canal y leads resumidos.
 
 ## MICRO-SPRINT ACTIVO
 
-### MICRO-SPRINT: Disenador con sesiones reales
+### MICRO-SPRINT: Cliente PWA con resultados y leads
 
-**Fecha:** 2026-05-06  
+**Fecha:** 2026-05-08  
 **Proyecto:** Bridge  
 **Duracion estimada:** 2-4 horas
 
 ### Entregable Demostrable
 
-> Bridge vuelve a `/disenador` y convierte el workspace en una mesa de trabajo real, con sesiones persistidas y cierre de jornada confiable.
+> Bridge convierte `/cliente` en una PWA ligera e instalable, con siguiente paso, revisiones, resultados por canal y leads resumidos desde el mini CRM.
 
 ### Como se Demuestra
 
-1. abrir el modulo de Activos,
-2. entrar desde un activo o desde el workspace del disenador a la ficha detallada,
-3. confirmar que el disenador puede iniciar, bloquear, retomar y terminar desde `/disenador`,
-4. confirmar que el resumen diario refleja trabajo de hoy y no acumulado historico,
-5. validar que la tarea activa se sincroniza mejor con el activo,
-6. comprobar que los vacios V1 principales del workspace se reducen o desaparecen.
+1. abrir `/cliente`,
+2. confirmar que el bloque principal indica que debe hacer ahora el cliente,
+3. validar que puede aprobar, rechazar o pedir cambios sin entrar a operacion interna,
+4. revisar resultados resumidos para Facebook, Google Ads y WhatsApp,
+5. comprobar que los leads muestran canal, nombre completo, asunto, etiquetas y fecha/hora,
+6. validar que la experiencia movil e instalable sigue siendo simple y no abrumadora.
 
 ## ESTADO COMPROBABLE ACTUAL
 
@@ -64,12 +64,12 @@
 32. El corte `ARCH-20260506-36 / IMPL-20260506-37` ya endurece `externalContracts` con referencias y versión canónicas, dejando la capa contractual lista para cierre de V1.
 33. El corte `ARCH-20260506-39 / IMPL-20260506-39` ya implementa el radar priorizado del operador por proyecto en `/operador`, con scoring trazable, vacio honesto y validación completa por build y tests.
 34. El corte `ARCH-20260506-40-41 / IMPL-20260506-44` ya implementa el workspace real del disenador en `/disenador`, con capa de datos reusable, cola guiada, flujo Bridge -> Adobe -> Bridge y validacion completa por build y tests.
+35. El corte `ARCH-20260506-52 / IMPL-20260506-52` ya cierra `/disenador` con sesiones reales, bloqueos, reanudacion, cierre de jornada util, build y tests verdes, publicacion en `main` y migracion remota `20260506090000_work_sessions_v1.sql` aplicada en Supabase.
 
 ### [~] En curso
 
 1. El paquete guiado por IA sigue activo sobre el marco ya definido por `ARCH-20260506-37` y `ARCH-20260506-38`.
-2. `ARCH-20260506-52` queda como siguiente corte para cerrar sesiones reales y jornada util del disenador.
-3. `ARCH-20260506-42` queda despues de ese cierre como siguiente corte para el cliente ligero guiado por IA.
+2. `ARCH-20260508-21` queda como siguiente corte para abrir el cliente PWA con resultados y leads.
 
 ### [ ] Pendiente
 
@@ -77,10 +77,10 @@
 
 ## Ultimo Corte Cerrado
 
-1. `ARCH-20260506-40-41 / IMPL-20260506-44` queda cerrado como corte completado y validado con compilación, tests, revisión y documentación.
-2. `/disenador` ya dejó atrás la shell estática y publica un workspace guiado con tarea activa, cola priorizada, prompt fuente, estación Adobe y resumen de jornada.
-3. El checkpoint canónico del cierre es `context/checkpoints/CHECKPOINT_IMPL-20260506-44_workspace_disenador_guiado.md`.
-4. El siguiente corte recomendado es volver a `/disenador` para cerrar sesiones reales antes de avanzar al Cliente.
+1. `ARCH-20260506-52 / IMPL-20260506-52` queda cerrado como corte completado y validado con compilación, tests, revisión, documentación y migración remota aplicada.
+2. `/disenador` ya opera como mesa real de trabajo con sesiones persistidas, bloqueos, reanudación, cierre de jornada y continuidad con el activo.
+3. El checkpoint canónico del cierre es `context/checkpoints/CHECKPOINT_IMPL-20260506-52_disenador_sesiones_reales.md`.
+4. El siguiente corte recomendado es `ARCH-20260508-21` para abrir `/cliente` como PWA ligera con revisiones, resultados y leads.
 
 ## Artefactos Clave
 
@@ -148,6 +148,9 @@
 61. context/checkpoints/CHECKPOINT_IMPL-20260506-39_radar_priorizado_operador.md
 62. context/checkpoints/CHECKPOINT_IMPL-20260506-44_workspace_disenador_guiado.md
 63. context/SPECs/SPEC_ARCH-20260506-45_vista_detallada_activo_creativo_y_propuestas.md
+64. context/SPECs/SPEC_ARCH-20260506-52_disenador_sesiones_reales_y_cierre_jornada.md
+65. context/checkpoints/CHECKPOINT_IMPL-20260506-52_disenador_sesiones_reales.md
+66. context/SPECs/SPEC_ARCH-20260508-21_cliente_pwa_resultados_y_leads_v1.md
 
 ## Decisiones Ya Tomadas
 
@@ -207,8 +210,7 @@
 
 ### [~] Planificado para el siguiente corte
 
-1. Implementar disenador con sesiones reales y cierre de jornada util.
-2. Implementar cliente ligero guiado por IA.
+1. Implementar cliente PWA con resultados y leads.
 
 ### [ ] Posterior
 
@@ -227,8 +229,8 @@
 
 ## Siguiente Paso Recomendado
 
-Con Operador y la ficha del activo ya fuertes, el siguiente paso recomendado es volver a `/disenador` antes de pasar al Cliente:
+Con Operador, Disenador y la ficha del activo ya fuertes, el siguiente paso recomendado es abrir `/cliente` como una PWA ligera de seguimiento comercial:
 
-1. implementar `ARCH-20260506-52` para sesiones reales, bloqueos y cierre de jornada del disenador,
-2. cerrar la capa de ejecucion del workspace antes de abrir una nueva superficie,
-3. cerrar despues `ARCH-20260506-42` para la superficie ligera del cliente.
+1. implementar `ARCH-20260508-21` para siguiente paso, revisiones, resultados por canal y leads resumidos,
+2. mantener la experiencia mobile-first, instalable y no abrumadora,
+3. reutilizar briefs, activos, cotizaciones, resultados y mini CRM sin convertir Cliente en backoffice.

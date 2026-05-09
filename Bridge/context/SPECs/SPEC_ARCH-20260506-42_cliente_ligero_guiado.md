@@ -6,7 +6,7 @@ Cliente ligero guiado por IA
 
 ## Estado
 
-Planificado
+Refinada por ARCH-20260508-21
 
 ## Fecha
 
