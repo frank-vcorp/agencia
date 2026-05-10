@@ -518,14 +518,14 @@ export function DesignerWorkspaceView({
             />
           </div>
 
-          {/* Columna lateral */}
-          <div className="space-y-5">
-            {/* Slot superior: chat panel u otro componente externo */}
-            {rightColumnTop}
+          {/* Columna lateral — sticky como unidad completa */}
+          <div className="flex flex-col gap-5 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)]">
+            {/* 7. Jornada de hoy */}
+            <DailyStatsPanel workspace={workspace} />
 
             {/* 2. Cola priorizada */}
             {queueWithoutActive.length > 0 && (
-              <section>
+              <section className="shrink-0">
                 <p className="mb-3 text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
                   Cola priorizada ({queueWithoutActive.length})
                 </p>
@@ -537,12 +537,9 @@ export function DesignerWorkspaceView({
               </section>
             )}
 
-            {/* 7. Cierre de jornada */}
-            <DailyStatsPanel workspace={workspace} />
-
             {/* Vacios V1 documentados */}
             {workspace.gaps.length > 0 ? (
-              <details className="panel rounded-[22px] px-5 py-4 ring-1 ring-[color:var(--line)]">
+              <details className="panel shrink-0 rounded-[22px] px-5 py-4 ring-1 ring-[color:var(--line)]">
                 <summary className="cursor-pointer text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted)]">
                   Vacios V1 documentados ({workspace.gaps.length})
                 </summary>
@@ -555,7 +552,7 @@ export function DesignerWorkspaceView({
                 </ul>
               </details>
             ) : (
-              <div className="panel rounded-[22px] px-5 py-4 ring-1 ring-emerald-200 bg-emerald-50">
+              <div className="panel shrink-0 rounded-[22px] px-5 py-4 ring-1 ring-emerald-200 bg-emerald-50">
                 <p className="text-[10px] uppercase tracking-[0.22em] text-emerald-700">
                   Workspace cerrado
                 </p>
@@ -564,6 +561,9 @@ export function DesignerWorkspaceView({
                 </p>
               </div>
             )}
+
+            {/* Chat panel — ocupa el espacio restante */}
+            {rightColumnTop}
           </div>
         </div>
       )}
