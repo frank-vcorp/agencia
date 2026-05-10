@@ -99,11 +99,29 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+// ─── Tipos de historial ───────────────────────────────────────────────────────
+
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string; // HH:mm d/M
+  imagePreviewUrl?: string;
+};
+
+function formatTimestamp(): string {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const d = now.getDate();
+  const M = now.getMonth() + 1;
+  return `${hh}:${mm} ${d}/${M}`;
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export function DesignerChatPanel({ assetContext }: DesignerChatPanelProps) {
   const [message, setMessage] = useState("");
-  const [reply, setReply] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Imagen adjunta
@@ -112,7 +130,7 @@ export function DesignerChatPanel({ assetContext }: DesignerChatPanelProps) {
   const [imageMimeType, setImageMimeType] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const replyAreaRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const placeholder = assetContext
     ? `Pregúntame cómo trabajar este activo en ${assetContext.tool}`
@@ -167,8 +185,17 @@ export function DesignerChatPanel({ assetContext }: DesignerChatPanelProps) {
     const trimmed = message.trim();
     if (!trimmed || loading) return;
 
+    const userMsg: ChatMessage = {
+      role: "user",
+      content: trimmed,
+      timestamp: formatTimestamp(),
+      imagePreviewUrl: imagePreviewUrl ?? undefined,
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
-    setReply(null);
+    setMessage("");
+    clearImage();
 
     try {
       const body: Record<string, unknown> = { message: trimmed };
@@ -184,21 +211,27 @@ export function DesignerChatPanel({ assetContext }: DesignerChatPanelProps) {
 
       const data = (await res.json()) as { reply?: string; error?: string };
 
-      if (data.reply) {
-        setReply(data.reply);
-        // Scroll al área de respuesta
-        setTimeout(() => {
-          replyAreaRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }, 50);
-      } else {
-        setReply(data.error ?? "Sin respuesta del asistente.");
-      }
+      const assistantMsg: ChatMessage = {
+        role: "assistant",
+        content: data.reply ?? data.error ?? "Sin respuesta del asistente.",
+        timestamp: formatTimestamp(),
+      };
+
+      setMessages((prev) => [...prev, assistantMsg]);
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 50);
     } catch {
-      setReply("No pude conectarme al asistente. Intenta de nuevo.");
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "No pude conectarme al asistente. Intenta de nuevo.",
+          timestamp: formatTimestamp(),
+        },
+      ]);
     } finally {
       setLoading(false);
-      setMessage("");
-      clearImage();
     }
   }
 
@@ -223,16 +256,9 @@ export function DesignerChatPanel({ assetContext }: DesignerChatPanelProps) {
         </p>
       </div>
 
-      {/* Área de respuesta */}
-      <div className="flex-1 overflow-y-auto px-4 py-3" ref={replyAreaRef}>
-        {reply ? (
-          <div className="rounded-[16px] bg-[color:var(--background-soft)] px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--muted)]">
-              Asistente
-            </p>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{reply}</p>
-          </div>
-        ) : (
+      {/* Historial de mensajes */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        {messages.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <p className="max-w-[200px] text-center text-[11px] leading-5 text-[color:var(--muted)]">
               {assetContext
@@ -240,7 +266,49 @@ export function DesignerChatPanel({ assetContext }: DesignerChatPanelProps) {
                 : "Escribe una pregunta sobre producción creativa con Adobe"}
             </p>
           </div>
+        ) : (
+          messages.map((msg, i) => (
+            <div
+              key={i}
+              className={`flex flex-col gap-1 ${msg.role === "user" ? "items-end" : "items-start"}`}
+            >
+              {/* Imagen adjunta del usuario */}
+              {msg.imagePreviewUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={msg.imagePreviewUrl}
+                  alt="Imagen adjunta"
+                  className="h-16 w-16 rounded-lg object-cover ring-1 ring-[color:var(--line)]"
+                />
+              )}
+              <div
+                className={`max-w-[85%] rounded-[16px] px-3 py-2 ${
+                  msg.role === "user"
+                    ? "bg-slate-900 text-white"
+                    : "bg-[color:var(--background-soft)] text-[color:var(--foreground)]"
+                }`}
+              >
+                <p className="whitespace-pre-wrap text-sm leading-6">{msg.content}</p>
+              </div>
+              <p className="text-[10px] text-[color:var(--muted)]">{msg.timestamp}</p>
+            </div>
+          ))
         )}
+
+        {/* Indicador de carga */}
+        {loading && (
+          <div className="flex flex-col items-start gap-1">
+            <div className="rounded-[16px] bg-[color:var(--background-soft)] px-3 py-2">
+              <span className="flex gap-1">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[color:var(--muted)] [animation-delay:0ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[color:var(--muted)] [animation-delay:150ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[color:var(--muted)] [animation-delay:300ms]" />
+              </span>
+            </div>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Preview de imagen adjunta */}
@@ -312,23 +380,17 @@ export function DesignerChatPanel({ assetContext }: DesignerChatPanelProps) {
           {message.length}/500
         </p>
 
-        {/* Pista de carga */}
-        {loading && (
-          <p className="mt-1 text-center text-[11px] text-[color:var(--muted)]">
-            Consultando...
-          </p>
-        )}
-
-        {/* Input file oculto */}
+        {/* Input oculto para imagen */}
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
           className="hidden"
           onChange={handleFileChange}
-          aria-label="Seleccionar imagen"
+          aria-hidden="true"
         />
       </div>
     </aside>
   );
 }
+
