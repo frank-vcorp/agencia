@@ -49,7 +49,7 @@ El diseñador llega, ve el activo asignado y produce. No define el estilo ni dec
 **Gemini Flash (Google AI)** — capa gratuita para v1.
 
 - SDK: `@google/generative-ai`
-- Modelo: `gemini-1.5-flash` o `gemini-2.0-flash` (el disponible en la capa gratuita)
+- Modelo: `gemini-2.5-flash` — estable, multimodal, mejor relación precio-rendimiento (mayo 2026)
 - API Key: variable de entorno `GEMINI_API_KEY`
 - Limites capa gratuita: 15 RPM, 1M tokens/dia — suficiente para el volumen inicial
 
