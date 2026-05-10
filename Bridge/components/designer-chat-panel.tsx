@@ -6,7 +6,7 @@
  * Panel de chat lateral del asistente de produccion creativa.
  * Solo se usa en /disenador — interactividad requiere Client Component.
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -131,6 +131,41 @@ export function DesignerChatPanel({ assetContext }: DesignerChatPanelProps) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Clave de localStorage por activo (o "general" si no hay contexto)
+  const storageKey = `bridge:chat:${assetContext?.name ?? "general"}`;
+
+  // ─── Restaurar historial desde localStorage al montar ───────────────────
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as ChatMessage[];
+        if (Array.isArray(parsed)) setMessages(parsed);
+      }
+    } catch {
+      // localStorage no disponible o dato corrupto — ignorar
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  // ─── Persistir historial en localStorage al cambiar ─────────────────────
+  useEffect(() => {
+    if (messages.length === 0) return;
+    try {
+      // Guardar sin imagePreviewUrl (blob URL no sobrevive recarga)
+      const toStore = messages.map(({ imagePreviewUrl: _, ...rest }) => rest);
+      localStorage.setItem(storageKey, JSON.stringify(toStore));
+    } catch {
+      // Ignorar errores de cuota
+    }
+  }, [messages, storageKey]);
+
+  function clearHistory() {
+    setMessages([]);
+    try { localStorage.removeItem(storageKey); } catch { /* noop */ }
+  }
 
   const placeholder = assetContext
     ? `Pregúntame cómo trabajar este activo en ${assetContext.tool}`
@@ -219,7 +254,8 @@ export function DesignerChatPanel({ assetContext }: DesignerChatPanelProps) {
 
       setMessages((prev) => [...prev, assistantMsg]);
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        const el = scrollContainerRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
       }, 50);
     } catch {
       setMessages((prev) => [
@@ -251,13 +287,23 @@ export function DesignerChatPanel({ assetContext }: DesignerChatPanelProps) {
         <span className="text-[color:var(--accent)]">
           <ChatIcon />
         </span>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted)]">
+        <p className="flex-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted)]">
           Asistente de producción
         </p>
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={clearHistory}
+            className="text-[10px] text-[color:var(--muted)] underline underline-offset-2 hover:text-red-500 transition"
+            title="Cerrar conversación y limpiar historial"
+          >
+            Cerrar
+          </button>
+        )}
       </div>
 
       {/* Historial de mensajes */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3" ref={scrollContainerRef}>
         {messages.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <p className="max-w-[200px] text-center text-[11px] leading-5 text-[color:var(--muted)]">
