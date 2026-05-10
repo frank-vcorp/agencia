@@ -1,30 +1,29 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** ARCH-20260508-21 — Cliente PWA con resultados y leads planificado
-**Fecha de actualizacion:** 2026-05-08  
-**Estado general:** Bridge ya tiene una base V1 operativa y publicada con briefing persistido, identidad minima operativa, contenedor real client-project, activos operables, dashboard accionable, CRM ligero, contexto derivado, handoffs remotos, contratos externos endurecidos, continuidad conversacional por entidad, consumo remoto tenant-aware y estadisticas resumidas derivadas visibles sobre Supabase y Vercel. Operador, Disenador y la ficha del activo ya quedaron fuertes; el siguiente corte planificado abre `/cliente` como PWA ligera para revisiones, resultados por canal y leads resumidos.
+**ID activo:** Sin corte activo — Ciclo completo del Activo ya cerrado, pendiente definir siguiente prioridad
+**Fecha de actualizacion:** 2026-05-10  
+**Estado general:** Bridge ya tiene una base V1 operativa completa: Operador, Diseñador, Cliente y **ciclo completo del Activo** (vista detallada + propuestas persistentes + evidencias reales + comparación + aprobación + analytics) están implementados y funcionando en producción. Pendiente definir siguiente prioridad entre: Copiloto IA, login cliente público, versionado avanzado, o notificaciones en tiempo real.
 
-## MICRO-SPRINT ACTIVO
+## MICRO-SPRINT COMPLETADO (Auditoría)
 
-### MICRO-SPRINT: Cliente PWA con resultados y leads
+### AUDITORÍA: Ciclo completo del Activo creativo ✓
 
-**Fecha:** 2026-05-08  
+**Fecha:** 2026-05-10  
 **Proyecto:** Bridge  
-**Duracion estimada:** 2-4 horas
+**Estado:** Ya estaba completado (sesión 6-may-2026)
 
-### Entregable Demostrable
+### Hallazgos
 
-> Bridge convierte `/cliente` en una PWA ligera e instalable, con siguiente paso, revisiones, resultados por canal y leads resumidos desde el mini CRM.
-
-### Como se Demuestra
-
-1. abrir `/cliente`,
-2. confirmar que el bloque principal indica que debe hacer ahora el cliente,
-3. validar que puede aprobar, rechazar o pedir cambios sin entrar a operacion interna,
-4. revisar resultados resumidos para Facebook, Google Ads y WhatsApp,
-5. comprobar que los leads muestran canal, nombre completo, asunto, etiquetas y fecha/hora,
-6. validar que la experiencia movil e instalable sigue siendo simple y no abrumadora.
+La implementación del ciclo completo del activo ya estaba cerrada:
+1. Vista detallada `/activos/[id]` con 10 secciones operativas
+2. Propuestas con persistencia real en DB (`asset_proposals`)
+3. Evidencias reales con upload a Storage + signed URLs + miniaturas
+4. Comparación visual lado a lado de propuestas  
+5. Aprobación del cliente con registro operativo
+6. Analytics por activo (días hasta aprobación)
+7. Build y 304 tests pasando
+8. Checkpoint de auditoría: `CHECKPOINT_IMPL-20260510-01`
 
 ## ESTADO COMPROBABLE ACTUAL
 
@@ -65,11 +64,12 @@
 33. El corte `ARCH-20260506-39 / IMPL-20260506-39` ya implementa el radar priorizado del operador por proyecto en `/operador`, con scoring trazable, vacio honesto y validación completa por build y tests.
 34. El corte `ARCH-20260506-40-41 / IMPL-20260506-44` ya implementa el workspace real del disenador en `/disenador`, con capa de datos reusable, cola guiada, flujo Bridge -> Adobe -> Bridge y validacion completa por build y tests.
 35. El corte `ARCH-20260506-52 / IMPL-20260506-52` ya cierra `/disenador` con sesiones reales, bloqueos, reanudacion, cierre de jornada util, build y tests verdes, publicacion en `main` y migracion remota `20260506090000_work_sessions_v1.sql` aplicada en Supabase.
+36. El corte `ARCH-20260508-21 / IMPL-20260508-21` ya implementa `/cliente` como PWA ligera con queSigue, estadoDelProyecto, revisiones, resultadosPorCanal y leadsYSeguimiento, con ajustes responsive (IMPL-20260509-01) y optimizacion de densidad publicados en produccion.
+37. El ciclo completo del Activo creativo ya fue implementado en la sesión del 6-may-2026 con los cortes `IMPL-20260506-45` (vista detallada), `IMPL-20260506-46` (propuestas persistentes), `IMPL-20260506-47` (evidencias reales), `IMPL-20260506-49` (miniaturas) e `IMPL-20260506-51` (comparación visual, aprobación cliente, analytics).
 
 ### [~] En curso
 
-1. El paquete guiado por IA sigue activo sobre el marco ya definido por `ARCH-20260506-37` y `ARCH-20260506-38`.
-2. `ARCH-20260508-21` queda como siguiente corte para abrir el cliente PWA con resultados y leads.
+1. Sin corte activo. Auditoría completada: ciclo del Activo ya cerrado.
 
 ### [ ] Pendiente
 
@@ -77,10 +77,33 @@
 
 ## Ultimo Corte Cerrado
 
-1. `ARCH-20260506-52 / IMPL-20260506-52` queda cerrado como corte completado y validado con compilación, tests, revisión, documentación y migración remota aplicada.
-2. `/disenador` ya opera como mesa real de trabajo con sesiones persistidas, bloqueos, reanudación, cierre de jornada y continuidad con el activo.
-3. El checkpoint canónico del cierre es `context/checkpoints/CHECKPOINT_IMPL-20260506-52_disenador_sesiones_reales.md`.
-4. El siguiente corte recomendado es `ARCH-20260508-21` para abrir `/cliente` como PWA ligera con revisiones, resultados y leads.
+1. Auditoría `IMPL-20260510-01` confirmó que el ciclo completo del Activo creativo ya estaba cerrado desde 6-may-2026.
+2. `/activos/[id]` opera como ficha detallada completa con propuestas, evidencias, comparación, aprobación y analytics.
+3. El checkpoint de auditoría es `context/checkpoints/CHECKPOINT_IMPL-20260510-01_ficha_activo_auditoria_estado.md`.
+
+## Opciones para Siguiente Corte
+
+Funcionalidad genuinamente nueva pendiente:
+
+**A. Copiloto IA para Operador y Diseñador** (SPECs 37, 38)  
+- Señal viva determinística + lectura priorizada por IA
+- Dashboards que responden: ¿Qué cambió? ¿Qué necesita atención?  
+- Reduce fricción operativa diaria
+
+**B. Login Cliente Público**  
+- Cliente puede entrar con su propia sesión (no operador registrando por él)
+- Aprobación pública de propuestas  
+- Notificaciones cuando hay revisiones pendientes
+
+**C. Versionado Avanzado de Propuestas**  
+- Historial completo de ajustes del diseñador
+- Comparación entre versiones
+- Rollback a propuesta anterior
+
+**D. Notificaciones en Tiempo Real**  
+- WebSockets o Server-Sent Events
+- Estado del activo actualiza en vivo
+- Alertas cuando propuesta está lista para revisar
 
 ## Artefactos Clave
 

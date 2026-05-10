@@ -6,7 +6,7 @@ Disenador con sesiones reales y cierre de jornada util
 
 ## Estado
 
-Planificado
+Cerrado
 
 ## Fecha
 
