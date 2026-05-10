@@ -245,7 +245,7 @@ export function DesignerChatPanel({ assetContext }: DesignerChatPanelProps) {
   // ─── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <aside className="flex w-full flex-col rounded-[28px] bg-white/80 ring-1 ring-[color:var(--line)] lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]">
+    <aside className="flex w-full flex-col overflow-hidden rounded-[28px] bg-white/80 ring-1 ring-[color:var(--line)] lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)]">
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-[color:var(--line)] px-4 py-3">
         <span className="text-[color:var(--accent)]">
