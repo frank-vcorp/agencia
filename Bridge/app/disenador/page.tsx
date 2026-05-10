@@ -24,14 +24,9 @@ export default async function DisenadorPage() {
     : undefined;
 
   return (
-    <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-      {/* Contenido principal del workspace */}
-      <div className="min-w-0 flex-1">
-        <DesignerWorkspaceView workspace={workspace} />
-      </div>
-
-      {/* Asistente de produccion — barra lateral derecha */}
-      <DesignerChatPanel assetContext={assetContext} />
-    </div>
+    <DesignerWorkspaceView
+      workspace={workspace}
+      rightColumnTop={<DesignerChatPanel assetContext={assetContext} />}
+    />
   );
 }

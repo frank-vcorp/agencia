@@ -437,7 +437,13 @@ function DesignerEmpty() {
 
 // ─── Componente principal del workspace ──────────────────────────────────────
 
-export function DesignerWorkspaceView({ workspace }: { workspace: DesignerWorkspace }) {
+export function DesignerWorkspaceView({
+  workspace,
+  rightColumnTop
+}: {
+  workspace: DesignerWorkspace;
+  rightColumnTop?: React.ReactNode;
+}) {
   // Cola sin la tarea activa (se muestra separada)
   const queueWithoutActive = workspace.taskQueue.filter(
     (t) => t !== workspace.activeTask
@@ -514,6 +520,9 @@ export function DesignerWorkspaceView({ workspace }: { workspace: DesignerWorksp
 
           {/* Columna lateral */}
           <div className="space-y-5">
+            {/* Slot superior: chat panel u otro componente externo */}
+            {rightColumnTop}
+
             {/* 2. Cola priorizada */}
             {queueWithoutActive.length > 0 && (
               <section>
