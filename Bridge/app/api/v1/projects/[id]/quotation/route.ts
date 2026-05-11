@@ -250,8 +250,7 @@ export async function POST(
       version_number: nextVersionNumber,
       title: title.trim(),
       body_markdown: bodyMarkdown.trim(),
-      admin_status: "draft",
-      created_by_agent_id: "bridge-mcp"
+      admin_status: "draft"
     })
   });
 
