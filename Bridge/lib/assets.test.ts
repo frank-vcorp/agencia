@@ -3,7 +3,7 @@
  * Respaldo: context/ACTIVOS_OPERABLES_V1.md, context/CATALOGO_ACTIVOS_V1.md,
  *           context/SPECs/SPEC_ARCH-20260505-24_activos_vinculados_a_cotizacion_y_project_v1.md
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi, type MockInstance } from "vitest";
 
 import {
   APPLICATION_CODES,
@@ -128,5 +128,99 @@ describe("assets — nextPromptVersionNumber", () => {
       { versionNumber: 4 }
     ];
     expect(nextPromptVersionNumber(versions as AssetPromptVersion[])).toBe(5);
+  });
+});
+
+// ─── createOrUpdateAssetPrompt ─────────────────────────────────────────────────
+
+import { createOrUpdateAssetPrompt } from "./assets";
+
+describe("createOrUpdateAssetPrompt", () => {
+  let fetchMock: MockInstance;
+
+  beforeEach(() => {
+    // @ts-expect-error - reemplazar fetch global en tests
+    fetchMock = vi.spyOn(globalThis, "fetch");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://fake.supabase.co");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "fake-anon-key");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  function makeJsonResponse(data: unknown, status = 200) {
+    return Promise.resolve(
+      new Response(JSON.stringify(data), {
+        status,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+  }
+
+  it("lanza asset_not_found si el asset no pertenece al tenant", async () => {
+    fetchMock.mockReturnValueOnce(makeJsonResponse([])); // assets query → vacío
+    await expect(
+      createOrUpdateAssetPrompt("bad-id", "tenant-1", "spec")
+    ).rejects.toThrow("asset_not_found");
+  });
+
+  it("crea version 1 cuando no existen versiones previas", async () => {
+    fetchMock
+      .mockReturnValueOnce(makeJsonResponse([{ id: "asset-1" }])) // assets check
+      .mockReturnValueOnce(makeJsonResponse([]))                   // versiones existentes
+      .mockReturnValueOnce(                                        // POST nueva versión
+        makeJsonResponse([{
+          id: "ver-1",
+          tenant_id: "tenant-1",
+          asset_id: "asset-1",
+          version_number: 1,
+          prompt_text: "spec",
+          references_json: null,
+          status: "active",
+          created_by_user_id: null,
+          created_by_agent_id: "vscode-agent",
+          created_at: "2026-05-10T00:00:00Z"
+        }])
+      );
+
+    const result = await createOrUpdateAssetPrompt("asset-1", "tenant-1", "spec");
+    expect(result.versionNumber).toBe(1);
+    expect(result.status).toBe("active");
+    expect(result.createdByAgentId).toBe("vscode-agent");
+  });
+
+  it("supersede version activa anterior y crea version 2", async () => {
+    fetchMock
+      .mockReturnValueOnce(makeJsonResponse([{ id: "asset-1" }]))   // assets check
+      .mockReturnValueOnce(makeJsonResponse([                        // versiones existentes
+        { id: "ver-1", version_number: 1, status: "active" }
+      ]))
+      .mockReturnValueOnce(makeJsonResponse([{ id: "ver-1" }]))     // PATCH superseded
+      .mockReturnValueOnce(                                          // POST nueva versión
+        makeJsonResponse([{
+          id: "ver-2",
+          tenant_id: "tenant-1",
+          asset_id: "asset-1",
+          version_number: 2,
+          prompt_text: "spec v2",
+          references_json: null,
+          status: "active",
+          created_by_user_id: null,
+          created_by_agent_id: "vscode-agent",
+          created_at: "2026-05-10T01:00:00Z"
+        }])
+      );
+
+    const result = await createOrUpdateAssetPrompt("asset-1", "tenant-1", "spec v2");
+    expect(result.versionNumber).toBe(2);
+    expect(result.status).toBe("active");
+
+    // Verificar que el PATCH de superseded fue llamado
+    const patchCall = fetchMock.mock.calls.find(([url]) =>
+      typeof url === "string" && url.includes("id=eq.ver-1")
+    );
+    expect(patchCall).toBeDefined();
   });
 });

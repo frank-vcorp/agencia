@@ -465,3 +465,141 @@ export async function getContextIdsForDefaultTenant(): Promise<{
 
   return { tenantId, clientId, projectId, quotationId };
 }
+
+// ─── Funciones auxiliares exportadas para rutas API ──────────────────────────
+
+/**
+ * Resuelve el tenantId dado su slug.
+ * Retorna null si no existe.
+ */
+export async function getTenantIdBySlug(slug: string): Promise<string | null> {
+  return getTenantId(slug);
+}
+
+/**
+ * Obtiene un activo por su ID verificando que pertenece al tenant.
+ * Retorna null si no existe o no pertenece al tenant.
+ */
+export async function getAssetById(
+  assetId: string,
+  tenantId: string
+): Promise<Asset | null> {
+  const params = new URLSearchParams({
+    select:
+      "id,tenant_id,client_id,project_id,quotation_id,quotation_version_id,brief_id," +
+      "application_code,piece_type_code,placement_code,format_code,title,status,created_at,updated_at",
+    id: `eq.${assetId}`,
+    tenant_id: `eq.${tenantId}`,
+    limit: "1"
+  });
+  const rows = await postgrest<AssetRow[]>(`assets?${params.toString()}`, { method: "GET" });
+  return rows[0] ? normalizeAssetRow(rows[0]) : null;
+}
+
+/**
+ * Obtiene el prompt activo de un activo (exportado para las rutas API).
+ */
+export async function getActivePrompt(assetId: string): Promise<AssetPromptVersion | null> {
+  return getActivePromptForAsset(assetId);
+}
+
+/**
+ * Obtiene el resumen del brief de un activo (primeras 500 chars del contenido).
+ * Retorna null si no hay briefId o no se encuentra el brief.
+ */
+export async function getBriefSummaryForAsset(briefId: string): Promise<string | null> {
+  const params = new URLSearchParams({
+    select: "id,consolidated_content,raw_content",
+    id: `eq.${briefId}`,
+    limit: "1"
+  });
+  const rows = await postgrest<{
+    id: string;
+    consolidated_content: string | null;
+    raw_content: string | null;
+  }[]>(`briefs?${params.toString()}`, { method: "GET" });
+
+  if (!rows[0]) return null;
+  const content = rows[0].consolidated_content ?? rows[0].raw_content ?? null;
+  if (!content) return null;
+  return content.slice(0, 500);
+}
+
+// ─── createOrUpdateAssetPrompt ────────────────────────────────────────────────
+
+/**
+ * IMPL-20260510-08
+ * Respaldo: context/SPECs/SPEC_ARCH-20260510-08_mcp_server_bridge_para_agentes_vscode.md
+ *
+ * Crea una nueva versión activa de la spec de producción para un activo,
+ * marcando la versión activa anterior como superseded.
+ * Si assetId no pertenece al tenant lanza Error("asset_not_found").
+ */
+export async function createOrUpdateAssetPrompt(
+  assetId: string,
+  tenantId: string,
+  promptText: string,
+  agentId: string = "vscode-agent"
+): Promise<AssetPromptVersion> {
+  // Verificar que el asset existe y pertenece al tenant
+  const assetParams = new URLSearchParams({
+    select: "id",
+    id: `eq.${assetId}`,
+    tenant_id: `eq.${tenantId}`,
+    limit: "1"
+  });
+  const assetRows = await postgrest<{ id: string }[]>(
+    `assets?${assetParams.toString()}`,
+    { method: "GET" }
+  );
+  if (assetRows.length === 0) {
+    throw new Error("asset_not_found");
+  }
+
+  // Obtener todas las versiones para calcular el siguiente número
+  const versionsParams = new URLSearchParams({
+    select: "id,version_number,status",
+    asset_id: `eq.${assetId}`,
+    order: "version_number.desc"
+  });
+  const versionRows = await postgrest<{ id: string; version_number: number; status: string }[]>(
+    `asset_prompt_versions?${versionsParams.toString()}`,
+    { method: "GET" }
+  );
+
+  const nextVersionNumber = versionRows.length > 0
+    ? Math.max(...versionRows.map((v) => v.version_number)) + 1
+    : 1;
+
+  // Marcar versiones activas anteriores como superseded
+  const activeIds = versionRows
+    .filter((v) => v.status === "active")
+    .map((v) => v.id);
+
+  for (const id of activeIds) {
+    await postgrest<PromptVersionRow[]>(
+      `asset_prompt_versions?id=eq.${id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status: "superseded" })
+      }
+    );
+  }
+
+  // Crear nueva versión activa
+  const newRows = await postgrest<PromptVersionRow[]>("asset_prompt_versions", {
+    method: "POST",
+    body: JSON.stringify({
+      tenant_id: tenantId,
+      asset_id: assetId,
+      version_number: nextVersionNumber,
+      prompt_text: promptText,
+      status: "active",
+      created_by_agent_id: agentId
+    })
+  });
+
+  const newRow = newRows[0];
+  if (!newRow) throw new Error("asset_prompt_version:create_failed");
+  return normalizePromptVersionRow(newRow);
+}

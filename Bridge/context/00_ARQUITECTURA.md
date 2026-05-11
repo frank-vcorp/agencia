@@ -318,6 +318,36 @@ Resuelve:
 4. contexto comercial,
 5. siguiente accion sugerida.
 
+### 12. Comunicacion Transaccional (MCT)
+
+Resuelve:
+
+1. aviso automatico al cliente al ser creado (portal + acceso),
+2. aviso automatico al operador cuando el brief esta completo,
+3. aviso automatico al cliente cuando la cotizacion esta vigente,
+4. aviso automatico al cliente cuando su activo esta entregado.
+
+Canal V1: email via Resend. Canal V2: WhatsApp como canal secundario.
+
+Principio rector: Bridge dispara el aviso. No es responsabilidad del operador.
+
+Ver SPEC-09 para especificacion completa.
+
+### 13. Capa Local de Contexto (VS Code)
+
+Resuelve:
+
+1. copias .md de briefs, propuestas y prompts de produccion en el workspace de VS Code,
+2. consulta offline sin invocar al agente ni conectarse a Bridge,
+3. artefactos de trabajo local generados automaticamente por las herramientas MCP.
+
+Estructura: `context/clientes/[slug]/brief.md`, `propuesta.md`, `prompts-produccion.md`.
+
+Principio rector: Bridge es la fuente de verdad. Las copias locales son artefactos
+de trabajo regenerables — no reemplazan a Supabase. No se versionan en git.
+
+Ver SPEC-10 para especificacion completa.
+
 ## Flujos Arquitectonicos Criticos
 
 ### Flujo A. Brief a estructura
@@ -354,6 +384,24 @@ Resuelve:
 2. operador revisa,
 3. cliente ve lo habilitado,
 4. agentes consultan contexto comercial resumido.
+
+### Flujo F. Onboarding y comunicacion automatica
+
+1. agente crea cliente en Bridge desde VS Code via MCP,
+2. Bridge dispara MCT automaticamente con acceso al portal del cliente,
+3. cliente llena brief conversacional en su portal,
+4. Bridge detecta brief completo y dispara MCT al operador,
+5. agente lee brief via MCP y guarda copia local en VS Code,
+6. agente genera propuesta usando la copia local del brief,
+7. agente escribe cotizacion en Bridge via MCP y guarda copia local,
+8. Bridge dispara MCT automaticamente con la cotizacion al cliente.
+
+### Flujo G. Copias locales y flujo sin conexion
+
+1. cada operacion MCP que lee datos de cliente genera copia .md local,
+2. el operador puede consultar briefs, propuestas y prompts en VS Code sin invocar al agente,
+3. si Bridge no esta disponible, el operador trabaja con las copias locales,
+4. al reconectarse, el agente puede sincronizar el estado actualizando las copias.
 
 ## Riesgos de Arquitectura a Controlar
 

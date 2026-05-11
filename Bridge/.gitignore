@@ -6,3 +6,8 @@ coverage
 .env.local
 supabase/.temp
 *.tsbuildinfo
+# MCP server — contiene secrets
+.vscode/mcp.json
+mcp/dist/
+# Copias locales de clientes — artefactos de trabajo, no del repo
+context/clientes/
