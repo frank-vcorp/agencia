@@ -1,0 +1,15 @@
+{
+  "servers": {
+    "bridge": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${workspaceFolder}/mcp/dist/index.js"],
+      "env": {
+        "BRIDGE_URL": "http://localhost:3000",
+        "BRIDGE_MCP_SECRET": "<genera-con-openssl-rand-hex-32>",
+        "BRIDGE_TENANT_SLUG": "vectoria",
+        "BRIDGE_WORKSPACE_ROOT": "${workspaceFolder}"
+      }
+    }
+  }
+}
