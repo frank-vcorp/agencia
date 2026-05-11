@@ -604,3 +604,151 @@ export async function createOrUpdateAssetPrompt(
   if (!newRow) throw new Error("asset_prompt_version:create_failed");
   return normalizePromptVersionRow(newRow);
 }
+
+// ─── Funciones de creación MCP (IMPL-20260510-14) ────────────────────────────
+// Respaldo: context/SPECs/SPEC_ARCH-20260510-14_mcp_crear_cliente_proyecto_activo.md
+
+/**
+ * Helper de inserción con manejo de errores Postgres (ej. 23505 unicidad).
+ * A diferencia de `postgrest`, no descarta el cuerpo del error antes de lanzar.
+ */
+async function postgrestInsert<T>(table: string, body: unknown): Promise<T> {
+  const key = getServerApiKey();
+  const res = await fetch(`${supabaseEnv.url}/rest/v1/${table}`, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    cache: "no-store",
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (err?.code === "23505") throw new Error("name_conflict");
+    throw new Error(`supabase_postgrest_error:${res.status}`);
+  }
+
+  return (await res.json()) as T;
+}
+
+export type CreateClientInput = {
+  name: string;
+  legalName?: string;
+  status?: "active" | "prospect" | "inactive";
+  primaryContactName?: string;
+  primaryContactChannel?: string;
+  notes?: string;
+};
+
+export type CreateProjectInput = {
+  clientId: string;
+  name: string;
+  projectType: "lanzamiento" | "presencia" | "contenido" | "campana" | "interno";
+  objective?: string;
+  status?: "draft" | "active" | "paused" | "completed" | "archived";
+  startDate?: string;
+  endDate?: string;
+};
+
+export type CreateAssetViaProjectInput = {
+  projectId: string;
+  title: string;
+  applicationCode: string;
+  pieceTypeCode: string;
+  placementCode: string;
+  formatCode: string;
+  status?: string;
+};
+
+/**
+ * Crea un nuevo cliente en el tenant indicado.
+ * Lanza Error('name_conflict') si ya existe un cliente con ese nombre en el tenant.
+ */
+export async function createClient(
+  tenantId: string,
+  data: CreateClientInput
+): Promise<{ id: string; name: string; status: string }> {
+  const rows = await postgrestInsert<{ id: string; name: string; status: string }[]>("clients", {
+    tenant_id: tenantId,
+    name: data.name.trim(),
+    legal_name: data.legalName ?? null,
+    status: data.status ?? "active",
+    primary_contact_name: data.primaryContactName ?? null,
+    primary_contact_channel: data.primaryContactChannel ?? null,
+    notes: data.notes ?? null
+  });
+
+  const row = rows[0];
+  if (!row) throw new Error("clients:create_failed");
+  return row;
+}
+
+/**
+ * Crea un nuevo proyecto asociado a un cliente en el tenant indicado.
+ * Lanza Error('name_conflict') si ya existe un proyecto con ese nombre en (tenant, client).
+ */
+export async function createProject(
+  tenantId: string,
+  data: CreateProjectInput
+): Promise<{ id: string; name: string; project_type: string; status: string; client_id: string }> {
+  const rows = await postgrestInsert<
+    { id: string; name: string; project_type: string; status: string; client_id: string }[]
+  >("projects", {
+    tenant_id: tenantId,
+    client_id: data.clientId,
+    name: data.name.trim(),
+    project_type: data.projectType,
+    objective: data.objective ?? null,
+    status: data.status ?? "draft",
+    start_date: data.startDate ?? null,
+    end_date: data.endDate ?? null
+  });
+
+  const row = rows[0];
+  if (!row) throw new Error("projects:create_failed");
+  return row;
+}
+
+/**
+ * Crea un nuevo activo ligado a un proyecto existente.
+ * Resuelve el client_id automáticamente consultando el proyecto.
+ * Lanza Error('project_not_found') si el proyecto no existe en el tenant.
+ */
+export async function createAssetForProject(
+  tenantId: string,
+  data: CreateAssetViaProjectInput
+): Promise<Asset> {
+  // Obtener client_id desde el proyecto
+  const projectParams = new URLSearchParams({
+    select: "id,client_id",
+    id: `eq.${data.projectId}`,
+    tenant_id: `eq.${tenantId}`,
+    limit: "1"
+  });
+  const projectRows = await postgrest<{ id: string; client_id: string }[]>(
+    `projects?${projectParams.toString()}`,
+    { method: "GET" }
+  );
+  if (!projectRows[0]) throw new Error("project_not_found");
+  const clientId = projectRows[0].client_id;
+
+  const rows = await postgrestInsert<AssetRow[]>("assets", {
+    tenant_id: tenantId,
+    client_id: clientId,
+    project_id: data.projectId,
+    application_code: data.applicationCode,
+    piece_type_code: data.pieceTypeCode,
+    placement_code: data.placementCode,
+    format_code: data.formatCode,
+    title: data.title.trim(),
+    status: data.status ?? "draft"
+  });
+
+  const row = rows[0];
+  if (!row) throw new Error("assets:create_failed");
+  return normalizeAssetRow(row);
+}

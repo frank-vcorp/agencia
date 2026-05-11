@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 /**
- * IMPL-20260510-08 | IMPL-20260510-10
+ * IMPL-20260510-08 | IMPL-20260510-10 | IMPL-20260510-14
  * Respaldo: context/SPECs/SPEC_ARCH-20260510-08_mcp_server_bridge_para_agentes_vscode.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260510-10_extension_mcp_cotizaciones_y_copias_locales.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260510-14_mcp_crear_cliente_proyecto_activo.md
  *
  * Entry point del MCP server de Bridge.
- * Expone 5 herramientas vía stdio para agentes VS Code (GitHub Copilot):
+ * Expone 8 herramientas vía stdio para agentes VS Code (GitHub Copilot):
  *   - bridge_list_assets
  *   - bridge_get_asset_context
  *   - bridge_write_production_spec
  *   - bridge_get_brief
  *   - bridge_write_quotation
+ *   - bridge_create_client
+ *   - bridge_create_project
+ *   - bridge_create_asset
  *
  * Uso: node dist/index.js
  * Configurar en .vscode/mcp.json con BRIDGE_URL, BRIDGE_MCP_SECRET, BRIDGE_TENANT_SLUG, BRIDGE_WORKSPACE_ROOT.
@@ -45,6 +49,18 @@ import {
   writeQuotationToolDefinition,
   handleWriteQuotation
 } from "./tools/write-quotation.js";
+import {
+  createClientToolDefinition,
+  handleCreateClient
+} from "./tools/create-client.js";
+import {
+  createProjectToolDefinition,
+  handleCreateProject
+} from "./tools/create-project.js";
+import {
+  createAssetToolDefinition,
+  handleCreateAsset
+} from "./tools/create-asset.js";
 
 async function main() {
   const config = loadConfig();
@@ -62,7 +78,10 @@ async function main() {
       getAssetContextToolDefinition,
       writeProductionSpecToolDefinition,
       getBriefToolDefinition,
-      writeQuotationToolDefinition
+      writeQuotationToolDefinition,
+      createClientToolDefinition,
+      createProjectToolDefinition,
+      createAssetToolDefinition
     ]
   }));
 
@@ -91,6 +110,18 @@ async function main() {
 
       case "bridge_write_quotation":
         text = await handleWriteQuotation(client, args ?? {}, config.workspaceRoot);
+        break;
+
+      case "bridge_create_client":
+        text = await handleCreateClient(client, args ?? {});
+        break;
+
+      case "bridge_create_project":
+        text = await handleCreateProject(client, args ?? {});
+        break;
+
+      case "bridge_create_asset":
+        text = await handleCreateAsset(client, args ?? {});
         break;
 
       default:

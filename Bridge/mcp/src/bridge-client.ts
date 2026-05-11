@@ -91,6 +91,66 @@ export type QuotationWriteResult = {
   emailSent: boolean;
 };
 
+// ─── Tipos para creación de entidades (IMPL-20260510-14) ──────────────────────
+
+export type ClientCreateInput = {
+  name: string;
+  legalName?: string;
+  status?: string;
+  primaryContactName?: string;
+  primaryContactChannel?: string;
+  notes?: string;
+};
+
+export type ClientCreateResult = {
+  ok: true;
+  clientId: string;
+  name: string;
+  status: string;
+  message: string;
+};
+
+export type ProjectCreateInput = {
+  clientId: string;
+  name: string;
+  projectType: string;
+  objective?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
+export type ProjectCreateResult = {
+  ok: true;
+  projectId: string;
+  name: string;
+  projectType: string;
+  status: string;
+  clientId: string;
+  message: string;
+};
+
+export type AssetCreateInput = {
+  projectId: string;
+  title: string;
+  applicationCode: string;
+  pieceTypeCode: string;
+  placementCode: string;
+  formatCode: string;
+  status?: string;
+};
+
+export type AssetCreateResult = {
+  ok: true;
+  assetId: string;
+  title: string;
+  applicationCode: string;
+  pieceTypeCode: string;
+  status: string;
+  projectId: string;
+  message: string;
+};
+
 export class BridgeClient {
   private readonly baseUrl: string;
   private readonly secret: string;
@@ -186,5 +246,43 @@ export class BridgeClient {
     });
 
     return (await res.json()) as QuotationWriteResult | BridgeErrorResult;
+  }
+
+  // ─── Métodos de creación (IMPL-20260510-14) ──────────────────────────────────
+
+  async createClient(
+    input: ClientCreateInput
+  ): Promise<ClientCreateResult | BridgeErrorResult> {
+    const res = await fetch(`${this.baseUrl}/api/v1/clients`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(input)
+    });
+
+    return (await res.json()) as ClientCreateResult | BridgeErrorResult;
+  }
+
+  async createProject(
+    input: ProjectCreateInput
+  ): Promise<ProjectCreateResult | BridgeErrorResult> {
+    const res = await fetch(`${this.baseUrl}/api/v1/projects`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(input)
+    });
+
+    return (await res.json()) as ProjectCreateResult | BridgeErrorResult;
+  }
+
+  async createAsset(
+    input: AssetCreateInput
+  ): Promise<AssetCreateResult | BridgeErrorResult> {
+    const res = await fetch(`${this.baseUrl}/api/v1/assets`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(input)
+    });
+
+    return (await res.json()) as AssetCreateResult | BridgeErrorResult;
   }
 }
