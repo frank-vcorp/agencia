@@ -587,6 +587,8 @@ export async function createOrUpdateAssetPrompt(
   }
 
   // Crear nueva versión activa
+  // Nota: created_by_agent_id referencia public.service_agents(id) (UUID FK),
+  // no se envía para evitar violación de FK — queda NULL.
   const newRows = await postgrest<PromptVersionRow[]>("asset_prompt_versions", {
     method: "POST",
     body: JSON.stringify({
@@ -594,8 +596,7 @@ export async function createOrUpdateAssetPrompt(
       asset_id: assetId,
       version_number: nextVersionNumber,
       prompt_text: promptText,
-      status: "active",
-      created_by_agent_id: agentId
+      status: "active"
     })
   });
 
