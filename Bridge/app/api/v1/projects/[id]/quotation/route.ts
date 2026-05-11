@@ -53,7 +53,7 @@ type QuotationInput = {
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function getServerKey(): string {
-  return process.env.SUPABASE_SERVICE_ROLE_KEY ?? supabaseEnv.anonKey;
+  return process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseEnv.anonKey;
 }
 
 async function pgrest<T>(path: string, init?: RequestInit): Promise<T> {
@@ -117,6 +117,22 @@ function buildQuotationMarkdown(
   }
 
   return lines.join("\n");
+}
+
+function buildCommercialSummaryJson(
+  total: number,
+  currency: string,
+  summaryText: string,
+  lineItems: LineItem[],
+  notes?: string
+): Record<string, unknown> {
+  return {
+    totalEstimado: `$${total.toLocaleString("es-MX")} ${currency}`,
+    plazo: "Por definir",
+    alcance: summaryText.trim(),
+    incluye: lineItems.map((item) => item.description.trim()),
+    nota: notes?.trim() || "Sin notas adicionales"
+  };
 }
 
 // ─── Handler ───────────────────────────────────────────────────────────────────
@@ -192,109 +208,127 @@ export async function POST(
     { method: "GET" }
   ).catch(() => [] as QuotationRow[]);
 
-  let quotationId: string;
-
-  if (!quotationRows[0]) {
-    // Crear nueva cotización contenedor
-    const newQuotRows = await pgrest<QuotationRow[]>("quotations", {
-      method: "POST",
-      body: JSON.stringify({
-        tenant_id: tenantId,
-        client_id: project.client_id,
-        project_id: id,
-        status: "draft"
-      })
-    });
-
-    if (!newQuotRows[0]) {
-      return NextResponse.json({ ok: false, error: "quotation_create_failed" }, { status: 500 });
-    }
-
-    quotationId = newQuotRows[0].id;
-  } else {
-    quotationId = quotationRows[0].id;
-  }
-
-  // Determinar el siguiente número de versión
-  const versionsParams = new URLSearchParams({
-    select: "id,version_number,admin_status",
-    quotation_id: `eq.${quotationId}`,
-    order: "version_number.desc"
-  });
-
-  const existingVersions = await pgrest<QuotationVersionRow[]>(
-    `quotation_versions?${versionsParams.toString()}`,
-    { method: "GET" }
-  ).catch(() => [] as QuotationVersionRow[]);
-
-  const nextVersionNumber =
-    existingVersions.length > 0
-      ? Math.max(...existingVersions.map((v) => v.version_number)) + 1
-      : 1;
-
-  // Construir markdown del body
-  const bodyMarkdown = buildQuotationMarkdown(
-    title,
-    summaryText,
-    lineItems,
-    validUntil,
-    notes
-  );
-
-  // Crear nueva versión
-  const newVersionRows = await pgrest<QuotationVersionRow[]>("quotation_versions", {
-    method: "POST",
-    body: JSON.stringify({
-      quotation_id: quotationId,
-      tenant_id: tenantId,
-      version_number: nextVersionNumber,
-      title: title.trim(),
-      body_markdown: bodyMarkdown.trim(),
-      admin_status: "draft"
-    })
-  });
-
-  if (!newVersionRows[0]) {
-    return NextResponse.json({ ok: false, error: "version_create_failed" }, { status: 500 });
-  }
-
-  const newVersion = newVersionRows[0];
   const totalAmount = lineItems.reduce(
     (sum, item) => sum + item.quantity * item.unitPrice,
     0
   );
   const primaryCurrency = lineItems[0]?.currency ?? "MXN";
 
-  let finalStatus: "draft" | "vigente" = "draft";
-  let emailSent = false;
+  // ─── Bloque de escritura ────────────────────────────────────────────────────
+  try {
+    let quotationId: string;
 
-  if (setAsActive) {
-    // Activar la versión y marcar la cotización como enviada
-    await pgrest(
-      `quotations?id=eq.${encodeURIComponent(quotationId)}`,
-      {
-        method: "PATCH",
+    if (!quotationRows[0]) {
+      // Crear nueva cotización contenedor
+      const newQuotRows = await pgrest<QuotationRow[]>("quotations", {
+        method: "POST",
         body: JSON.stringify({
-          active_version_id: newVersion.id,
-          status: "sent"
+          tenant_id: tenantId,
+          client_id: project.client_id,
+          project_id: id,
+          status: "draft"
         })
+      });
+
+      if (!newQuotRows[0]) {
+        return NextResponse.json({ ok: false, error: "quotation_create_failed" }, { status: 500 });
       }
-    ).catch(() => null);
 
-    finalStatus = "vigente";
-    // emailSent queda false — requiere datos de contacto del cliente (V2)
-  }
+      quotationId = newQuotRows[0].id;
+    } else {
+      quotationId = quotationRows[0].id;
+    }
 
-  return NextResponse.json(
-    {
-      ok: true,
-      quotationId,
-      version: newVersion.version_number,
-      status: finalStatus,
+    // Determinar el siguiente número de versión
+    const versionsParams = new URLSearchParams({
+      select: "id,version_number,admin_status",
+      quotation_id: `eq.${quotationId}`,
+      order: "version_number.desc"
+    });
+
+    const existingVersions = await pgrest<QuotationVersionRow[]>(
+      `quotation_versions?${versionsParams.toString()}`,
+      { method: "GET" }
+    ).catch(() => [] as QuotationVersionRow[]);
+
+    const nextVersionNumber =
+      existingVersions.length > 0
+        ? Math.max(...existingVersions.map((v) => v.version_number)) + 1
+        : 1;
+
+    // Construir markdown y resumen comercial
+    const bodyMarkdown = buildQuotationMarkdown(
+      title,
+      summaryText,
+      lineItems,
+      validUntil,
+      notes
+    );
+
+    const commercialSummaryJson = buildCommercialSummaryJson(
       totalAmount,
-      currency: primaryCurrency,
-      emailSent
-    },
-    { status: 201 }
-  );
+      primaryCurrency,
+      summaryText,
+      lineItems,
+      notes
+    );
+
+    // Crear nueva versión
+    const newVersionRows = await pgrest<QuotationVersionRow[]>("quotation_versions", {
+      method: "POST",
+      body: JSON.stringify({
+        quotation_id: quotationId,
+        tenant_id: tenantId,
+        version_number: nextVersionNumber,
+        title: title.trim(),
+        body_markdown: bodyMarkdown.trim(),
+        admin_status: "draft",
+        commercial_summary_json: commercialSummaryJson,
+        internal_note: notes?.trim() || null
+      })
+    });
+
+    if (!newVersionRows[0]) {
+      return NextResponse.json({ ok: false, error: "version_create_failed" }, { status: 500 });
+    }
+
+    const newVersion = newVersionRows[0];
+    let finalStatus: "draft" | "vigente" = "draft";
+    let emailSent = false;
+
+    if (setAsActive) {
+      // Activar la versión y marcar la cotización como enviada
+      await pgrest(
+        `quotations?id=eq.${encodeURIComponent(quotationId)}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            active_version_id: newVersion.id,
+            status: "sent"
+          })
+        }
+      ).catch(() => null);
+
+      finalStatus = "vigente";
+      // emailSent queda false — requiere datos de contacto del cliente (V2)
+    }
+
+    return NextResponse.json(
+      {
+        ok: true,
+        quotationId,
+        version: newVersion.version_number,
+        status: finalStatus,
+        totalAmount,
+        currency: primaryCurrency,
+        emailSent
+      },
+      { status: 201 }
+    );
+  } catch (err) {
+    return NextResponse.json(
+      { ok: false, error: err instanceof Error ? err.message : "quotation_write_failed" },
+      { status: 500 }
+    );
+  }
 }
