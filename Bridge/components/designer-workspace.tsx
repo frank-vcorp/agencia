@@ -71,12 +71,28 @@ function TaskOperationalBadge({ task }: { task: DesignerTask }) {
   );
 }
 
-function PriorityTaskCard({ task }: { task: DesignerTask }) {
+function ClientBriefLink({
+  clientName,
+  compact = false
+}: {
+  clientName: string;
+  compact?: boolean;
+}) {
   return (
     <Link
-      href={`/activos/${task.assetId}`}
-      className="panel block rounded-[24px] bg-[color:var(--accent-soft)] px-5 py-5 ring-1 ring-[color:rgba(200,93,39,0.18)] transition hover:bg-[color:rgba(245,223,213,0.9)]"
+      href="/briefs"
+      className={`inline-flex items-center rounded-full border border-[color:rgba(200,93,39,0.22)] bg-white/75 font-semibold text-[color:var(--accent-deep)] transition hover:bg-white ${
+        compact ? "px-2.5 py-1 text-[10px]" : "px-3 py-1.5 text-[11px]"
+      }`}
     >
+      Brief del cliente: {clientName}
+    </Link>
+  );
+}
+
+function PriorityTaskCard({ task }: { task: DesignerTask }) {
+  return (
+    <article className="panel rounded-[24px] bg-[color:var(--accent-soft)] px-5 py-5 ring-1 ring-[color:rgba(200,93,39,0.18)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">
@@ -85,7 +101,9 @@ function PriorityTaskCard({ task }: { task: DesignerTask }) {
           <h3 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-bold leading-tight tracking-tight">
             {task.assetTitle}
           </h3>
-          <p className="mt-1 text-sm text-[color:var(--muted)]">{task.clientName}</p>
+          <div className="mt-2">
+            <ClientBriefLink clientName={task.clientName} />
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <TaskOperationalBadge task={task} />
@@ -100,26 +118,42 @@ function PriorityTaskCard({ task }: { task: DesignerTask }) {
 
       <div className="mt-4 flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.18em] text-[color:var(--muted)]">
         <span>Score {task.priorityScore}</span>
-        <span className="font-semibold text-[color:var(--accent-deep)]">Abrir ficha →</span>
+        <Link
+          href={`/activos/${task.assetId}`}
+          className="font-semibold text-[color:var(--accent-deep)] transition hover:underline"
+        >
+          Abrir ficha →
+        </Link>
       </div>
-    </Link>
+    </article>
   );
 }
 
 function QueueTaskCard({ task, order }: { task: DesignerTask; order: number }) {
   return (
-    <Link
-      href={`/activos/${task.assetId}`}
-      className="panel flex items-center justify-between gap-3 rounded-[20px] px-4 py-4 ring-1 ring-[color:var(--line)] transition hover:bg-white"
-    >
-      <div className="min-w-0 flex-1">
+    <article className="panel rounded-[20px] px-4 py-4 ring-1 ring-[color:var(--line)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
         <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--muted)]">Prioridad {order}</p>
         <p className="mt-1 truncate text-sm font-semibold leading-5">{task.assetTitle}</p>
+          <div className="mt-2">
+            <ClientBriefLink clientName={task.clientName} compact />
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <TaskStatusBadge status={task.status} />
+        </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <TaskStatusBadge status={task.status} />
+
+      <div className="mt-3 flex items-center justify-end">
+        <Link
+          href={`/activos/${task.assetId}`}
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent-deep)] transition hover:underline"
+        >
+          Abrir ficha →
+        </Link>
       </div>
-    </Link>
+    </article>
   );
 }
 
