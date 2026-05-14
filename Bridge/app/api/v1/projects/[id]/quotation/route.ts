@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTenantIdBySlug } from "@/lib/assets";
 import { verifyAgentToken, getTenantSlug } from "@/lib/agent-auth";
 import { supabaseEnv } from "@/lib/supabase";
+import { sendTransactionalEmail, buildWhatsAppLink } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,14 @@ type QuotationVersionRow = {
   id: string;
   version_number: number;
   admin_status: string;
+};
+
+type ClientRow = {
+  id: string;
+  name: string;
+  primary_contact_name: string | null;
+  primary_contact_email: string | null;
+  primary_contact_whatsapp: string | null;
 };
 
 type LineItem = {
@@ -295,6 +304,7 @@ export async function POST(
     const newVersion = newVersionRows[0];
     let finalStatus: "draft" | "vigente" = "draft";
     let emailSent = false;
+    let whatsAppLink: string | undefined;
 
     if (setAsActive) {
       // Activar la versión y marcar la cotización como enviada
@@ -310,7 +320,54 @@ export async function POST(
       ).catch(() => null);
 
       finalStatus = "vigente";
-      // emailSent queda false — requiere datos de contacto del cliente (V2)
+
+      // MCT: disparar quotation.active si el cliente tiene email válido (IMPL-20260513-02)
+      if (project.client_id) {
+        const clientParams = new URLSearchParams({
+          select: "id,name,primary_contact_name,primary_contact_email,primary_contact_whatsapp",
+          id: `eq.${project.client_id}`,
+          tenant_id: `eq.${tenantId}`,
+          limit: "1"
+        });
+        const clientRows = await pgrest<ClientRow[]>(
+          `clients?${clientParams.toString()}`,
+          { method: "GET" }
+        ).catch(() => [] as ClientRow[]);
+
+        const clientData = clientRows[0] ?? null;
+
+        if (clientData?.primary_contact_email) {
+          const portalUrl = process.env.BRIDGE_PORTAL_URL ?? "https://vectoria.mx";
+          const result = await sendTransactionalEmail("quotation.active", {
+            to: clientData.primary_contact_email,
+            clientName: clientData.primary_contact_name ?? clientData.name,
+            projectName: project.name,
+            quotationSummary: summaryText,
+            total: totalAmount,
+            currency: primaryCurrency,
+            portalUrl,
+            expiresAt: validUntil
+          });
+          emailSent = result.success;
+          if (!emailSent) {
+            console.warn("[quotation/POST] Email quotation.active no enviado.", { reason: result.error });
+          }
+        } else {
+          console.info("[quotation/POST] Cliente sin email de contacto, email omitido.", {
+            clientId: project.client_id
+          });
+        }
+
+        if (clientData?.primary_contact_whatsapp) {
+          const agencyName = process.env.BRIDGE_AGENCY_NAME ?? "Vectoria";
+          whatsAppLink = buildWhatsAppLink(
+            clientData.primary_contact_whatsapp,
+            `Hola, tu propuesta de ${agencyName} para "${project.name}" ya está lista. Total: $${totalAmount.toLocaleString("es-MX")} ${primaryCurrency}.`
+          );
+        }
+      } else {
+        console.info("[quotation/POST] Proyecto sin cliente asociado, email omitido.", { projectId: id });
+      }
     }
 
     return NextResponse.json(
@@ -321,7 +378,8 @@ export async function POST(
         status: finalStatus,
         totalAmount,
         currency: primaryCurrency,
-        emailSent
+        emailSent,
+        ...(whatsAppLink ? { whatsAppLink } : {})
       },
       { status: 201 }
     );

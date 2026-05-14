@@ -38,6 +38,24 @@ export type AssetContext = {
   readyForSpec: boolean;
 };
 
+export type AssetDownloadFile = {
+  evidenceId: string;
+  proposalId: string;
+  fileName: string;
+  mimeType: string;
+  storagePath: string;
+  signedUrl: string | null;
+  uploadedAt: string;
+};
+
+export type AssetFilesData = {
+  asset: {
+    id: string;
+    title: string;
+  };
+  files: AssetDownloadFile[];
+};
+
 export type PromptWriteResult = {
   ok: true;
   promptVersionId: string;
@@ -98,6 +116,8 @@ export type ClientCreateInput = {
   legalName?: string;
   status?: string;
   primaryContactName?: string;
+  primaryContactEmail?: string;
+  primaryContactWhatsapp?: string;
   primaryContactChannel?: string;
   notes?: string;
 };
@@ -233,6 +253,24 @@ export class BridgeClient {
     }
 
     return (await res.json()) as BriefData;
+  }
+
+  async getAssetFiles(assetId: string): Promise<AssetFilesData> {
+    const res = await fetch(`${this.baseUrl}/api/v1/assets/${assetId}/files`, {
+      method: "GET",
+      headers: this.headers()
+    });
+
+    if (res.status === 404) {
+      throw new Error("asset_not_found");
+    }
+
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
+
+    return (await res.json()) as AssetFilesData;
   }
 
   async writeQuotation(

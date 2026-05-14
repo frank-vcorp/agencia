@@ -101,6 +101,8 @@ export type BriefClientContainer = {
   legalName: string | null;
   status: "active" | "prospect" | "inactive";
   primaryContactName: string | null;
+  primaryContactEmail: string | null;
+  primaryContactWhatsapp: string | null;
   primaryContactChannel: string | null;
   notes: string | null;
 };
@@ -209,6 +211,8 @@ type ClientRow = {
   legal_name: string | null;
   status: BriefClientContainer["status"];
   primary_contact_name: string | null;
+  primary_contact_email: string | null;
+  primary_contact_whatsapp: string | null;
   primary_contact_channel: string | null;
   notes: string | null;
 };
@@ -413,6 +417,8 @@ function normalizeClientRow(row: ClientRow): BriefClientContainer {
     legalName: row.legal_name,
     status: row.status,
     primaryContactName: row.primary_contact_name,
+    primaryContactEmail: row.primary_contact_email,
+    primaryContactWhatsapp: row.primary_contact_whatsapp,
     primaryContactChannel: row.primary_contact_channel,
     notes: row.notes
   };

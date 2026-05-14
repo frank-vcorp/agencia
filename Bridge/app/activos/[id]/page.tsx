@@ -1,6 +1,8 @@
 /**
  * IMPL-20260506-47
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-47_activo_archivos_y_evidencias_reales.md
+ * IMPL-20260513-17
+ * Respaldo: context/AGENTE_VIKA_Y_SKILLS_TECNICAS_V1.md
  *
  * Vista detallada del activo creativo — unidad real de trabajo en Bridge.
  * Accesible desde /activos y desde /disenador.
@@ -16,10 +18,12 @@ import {
 } from "@/lib/chat";
 import {
   applicationLabel,
+  assetOperationalKindLabel,
   assetStatusLabel,
   formatLabel,
   pieceTypeLabel,
   placementLabel,
+  resolveAssetOperationalKind,
   type AssetStatus
 } from "@/lib/assets";
 import {
@@ -92,6 +96,11 @@ export default async function AssetDetailPage({
     assetAnalytics,
     gaps
   } = detail;
+  const operationalKind = resolveAssetOperationalKind(asset.title);
+  const operationalKindClass =
+    operationalKind === "captura"
+      ? "bg-white/80 text-[color:var(--muted)] ring-[color:var(--line)]"
+      : "bg-[color:var(--accent-soft)] text-[color:var(--accent-deep)] ring-[color:rgba(200,93,39,0.18)]";
 
   // ─── Server action: mensaje en el chat del activo ─────────────────────────
   async function addMessageAction(formData: FormData) {
@@ -241,11 +250,18 @@ export default async function AssetDetailPage({
               Cotizacion {assetContext.quotationId ? "referenciada" : "sin referencia"}
             </p>
           </div>
-          <span
-            className={`shrink-0 rounded-[16px] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] ring-1 ${REVIEW_STATE_COLORS[asset.status]}`}
-          >
-            {assetStatusLabel(asset.status)}
-          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            <span
+              className={`rounded-[16px] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] ring-1 ${operationalKindClass}`}
+            >
+              {assetOperationalKindLabel(operationalKind)}
+            </span>
+            <span
+              className={`rounded-[16px] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] ring-1 ${REVIEW_STATE_COLORS[asset.status]}`}
+            >
+              {assetStatusLabel(asset.status)}
+            </span>
+          </div>
         </div>
 
         {/* Nota de estado actual */}

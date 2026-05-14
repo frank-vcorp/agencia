@@ -35,7 +35,11 @@ export function AppShell({
     return <>{children}</>;
   }
 
-  const mobileLinks = [...shellMeta.roles, ...shellMeta.modules];
+  const mobileLinks = [
+    ...shellMeta.roles,
+    ...shellMeta.modules,
+    { key: "configuracion", href: "/configuracion", label: "Config", shortLabel: "Cfg", description: "" }
+  ];
   const modulesWithMetrics = shellMeta.modules.map((item) => {
     const nextMetric = moduleMetrics?.[item.key as keyof ModuleMetrics];
     return nextMetric ? { ...item, metric: nextMetric } : item;
@@ -107,7 +111,22 @@ export function AppShell({
           </nav>
         </div>
 
-        <div className="mt-auto rounded-[26px] bg-slate-900 px-4 py-4 text-white">
+        <div className="mt-auto space-y-3">
+          <Link
+            href="/configuracion"
+            className={`flex items-center justify-between rounded-2xl px-4 py-3 text-xs font-semibold transition ring-1 ${
+              isCurrent(pathname, "/configuracion")
+                ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-deep)] ring-[color:rgba(200,93,39,0.18)]"
+                : "bg-white/60 text-[color:var(--muted)] ring-[color:var(--line)] hover:bg-white/90"
+            }`}
+          >
+            <span>Configuración</span>
+            <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-[color:var(--muted)]">
+              SendGrid
+            </span>
+          </Link>
+
+          <div className="rounded-[26px] bg-slate-900 px-4 py-4 text-white">
           <p className="text-[11px] uppercase tracking-[0.22em] text-white/65">Infra lista</p>
           <p className="mt-2 font-[family-name:var(--font-heading)] text-lg font-bold">Next + Tailwind</p>
           <p className="mt-2 text-sm leading-6 text-white/72">Supabase queda desacoplado hasta cargar variables reales. El shell ya expone el estado del tenant por entorno.</p>
@@ -121,6 +140,7 @@ export function AppShell({
               <div className="mt-1 font-semibold">{isSupabaseConfigured ? "listo" : "pendiente"}</div>
             </div>
           </div>
+        </div>
         </div>
       </aside>
 

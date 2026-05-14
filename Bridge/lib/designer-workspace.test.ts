@@ -20,6 +20,7 @@ function baseTask(overrides: Partial<DesignerTask> = {}): DesignerTask {
   return {
     assetId: "asset-1",
     assetTitle: "Banner principal",
+    operationalKind: "produccion",
     projectId: "proj-1",
     projectName: "Proyecto Demo",
     clientName: "Cliente Demo",

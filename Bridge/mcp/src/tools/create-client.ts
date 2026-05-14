@@ -1,6 +1,8 @@
 /**
  * IMPL-20260510-14
  * Respaldo: context/SPECs/SPEC_ARCH-20260510-14_mcp_crear_cliente_proyecto_activo.md
+ * IMPL-20260513-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260513-01_contacto_cliente_estructurado_email_whatsapp_v1.md
  *
  * Tool: bridge_create_client
  * Crea un nuevo cliente en el tenant activo de Bridge.
@@ -32,9 +34,17 @@ export const createClientToolDefinition = {
         type: "string",
         description: "Nombre del contacto principal (opcional)"
       },
+      primaryContactEmail: {
+        type: "string",
+        description: "Email del contacto principal, ej: ana@cliente.com (opcional)"
+      },
+      primaryContactWhatsapp: {
+        type: "string",
+        description: "Número WhatsApp del contacto principal, ej: +5215512345678 (opcional)"
+      },
       primaryContactChannel: {
         type: "string",
-        description: "Canal de contacto principal, ej: 'WhatsApp: +52 55 1234 5678' (opcional)"
+        description: "Canal de contacto libre complementario, ej: 'WhatsApp oficina' (opcional)"
       },
       notes: {
         type: "string",
@@ -49,12 +59,23 @@ export async function handleCreateClient(
   client: BridgeClient,
   args: unknown
 ): Promise<string> {
-  const { name, legalName, status, primaryContactName, primaryContactChannel, notes } =
+  const {
+    name,
+    legalName,
+    status,
+    primaryContactName,
+    primaryContactEmail,
+    primaryContactWhatsapp,
+    primaryContactChannel,
+    notes
+  } =
     args as {
       name: string;
       legalName?: string;
       status?: string;
       primaryContactName?: string;
+      primaryContactEmail?: string;
+      primaryContactWhatsapp?: string;
       primaryContactChannel?: string;
       notes?: string;
     };
@@ -69,6 +90,8 @@ export async function handleCreateClient(
       legalName,
       status,
       primaryContactName,
+      primaryContactEmail,
+      primaryContactWhatsapp,
       primaryContactChannel,
       notes
     });

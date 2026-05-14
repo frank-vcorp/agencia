@@ -1,11 +1,68 @@
 # PROYECTO
 
 **Proyecto:** Bridge  
-**ID activo:** Sin corte activo — Ciclo completo del Activo ya cerrado, pendiente definir siguiente prioridad
-**Fecha de actualizacion:** 2026-05-10  
-**Estado general:** Bridge ya tiene una base V1 operativa completa: Operador, Diseñador, Cliente y **ciclo completo del Activo** (vista detallada + propuestas persistentes + evidencias reales + comparación + aprobación + analytics) están implementados y funcionando en producción. Pendiente definir siguiente prioridad entre: Copiloto IA, login cliente público, versionado avanzado, o notificaciones en tiempo real.
+**ID activo:** ARCH-20260510-11  
+**Fecha de actualizacion:** 2026-05-13  
+**Estado general:** Bridge mantiene `ARCH-20260510-11` como corte paraguas de refinamiento operativo. Los slices `ARCH-20260513-01`, `ARCH-20260513-02`, `ARCH-20260513-03`, `ARCH-20260513-04`, `ARCH-20260513-05`, `ARCH-20260513-15` y `ARCH-20260513-16` ya quedaron implementados. La migración de contacto estructurado y la migración de configuración SendGrid ya fueron aplicadas en producción. El siguiente slice técnico recomendado ahora es **ARCH-20260513-19**, enfocado en limpieza técnica antes del refinamiento UX/UI final del piloto. `ARCH-20260513-06` queda absorbido por `ARCH-20260513-15` y no debe ejecutarse por separado.
 
-## MICRO-SPRINT COMPLETADO (Auditoría)
+## MICRO-SPRINT COMPLETADO (MCP + MCT + Caso Demostración)
+
+### IMPLEMENTACIÓN: Servidor MCP Bridge + Módulo de Comunicación + Caso Superman ✓
+
+**Fecha:** 2026-05-10  
+**Proyecto:** Bridge  
+**Estado:** Completado — MCP operativo con 8 tools, MCT implementado, Superman end-to-end creado
+
+### Entregables
+
+#### 1. Servidor MCP Bridge (ARCH-20260510-08 / IMPL-20260510-08)
+- **8 herramientas operativas:**
+  - `bridge_list_assets` — Lista todos los activos del tenant
+  - `bridge_get_asset_context` — Contexto completo del activo (metadatos + brief + spec activa)
+  - `bridge_write_production_spec` — Escribe/actualiza especificación de producción
+  - `bridge_get_brief` — Lee brief consolidado + copia local automática
+  - `bridge_write_quotation` — Crea/actualiza cotización con estructura comercial
+  - `bridge_create_client` — Crea cliente en Bridge
+  - `bridge_create_project` — Crea proyecto asociado a cliente
+  - `bridge_create_asset` — Crea activo asociado a proyecto
+- **Configuración global:** `~/.config/Code/User/mcp.json` funcionando con BRIDGE_URL=https://vectoria-zeta.vercel.app
+- **Endpoints API REST creados:** `/api/v1/clients`, `/api/v1/projects`, `/api/v1/assets` (POST), `/api/v1/projects/[id]/quotation`, `/api/v1/projects/[id]/brief`, `/api/v1/assets/[id]/context`, `/api/v1/assets/[id]/prompts`
+- **Correcciones críticas:** Eliminación de FK `created_by_agent_id` que causaba errores 500
+- **Build:** 346 tests pasando
+- **Checkpoint:** `context/checkpoints/CHECKPOINT_IMPL-20260510-08.md`
+
+#### 2. Módulo de Comunicación Transaccional - MCT (ARCH-20260510-09 / IMPL-20260510-09)
+- **Servicio:** `Bridge/lib/notifications.ts`
+- **3 canales implementados:**
+  1. Email automático al cliente (Resend)
+  2. Google Chat automático al operador (Incoming Webhook)
+  3. WhatsApp Click-to-Send (generación de URL wa.me)
+- **4 plantillas React Email:** `client-created.tsx`, `quotation-active.tsx`, `asset-delivered.tsx`
+- **4 eventos cubiertos:** cliente creado, brief completado, cotización vigente, activo entregado
+- **Estado:** Código implementado, pendiente integración con disparadores reales y configuración de env vars en producción
+- **Checkpoint:** Incluido en `CHECKPOINT_IMPL-20260510-10.md`
+
+#### 3. Caso Superman — Demostración End-to-End
+- **Cliente:** Superman (ID: 92efc927-44aa-43cd-b73d-2871ad4a4b35)
+- **Proyecto:** Propuesta Superman - Lanzamiento Inicial (ID: 60abed85-3e44-4e36-aca4-9b3e9d74928f)
+- **Brief completo:** `Bridge/context/clientes/superman/brief.md` — objetivos, audiencia, tono, alcance, criterios de éxito
+- **5 activos con especificaciones publicadas:**
+  1. Hero de Lanzamiento (Instagram Feed 1:1) — spec v1
+  2. Reel de Credibilidad (Instagram Reel 9:16) — spec v1
+  3. Carousel de Beneficios (Instagram Carousel 1:1) — spec v1
+  4. Portada Facebook (Facebook 16:9) — spec v1
+  5. Stories Diarias Pack 3 (Instagram Story 9:16) — spec v1
+- **Cotización comercial estructurada:** Versión 2 vigente, $42,400 MXN, 2 fases (estrategia + implementación), copia en `Bridge/context/clientes/superman/propuesta.md`
+- **Resultado:** Flujo completo demostrado — cliente → proyecto → brief → cotización → activos con prompts listos para diseñador
+
+### Hallazgos y Correcciones
+
+1. **FK created_by_agent_id:** Campo en `asset_prompt_versions` y `quotation_versions` causaba error 500 al insertar desde MCP (referencia a tabla `service_agents` que requiere UUID válido). Solución: omitir campo en INSERTs (se permite NULL).
+2. **tsconfig.json:** Next.js intentaba compilar código del MCP server. Solución: agregar `"mcp"` al array `exclude`.
+3. **commercial_summary_json:** Faltaba en endpoint de quotation. Solución: agregar helper `buildCommercialSummaryJson` y field en INSERT.
+4. **Degradación silenciosa en MCT:** Si faltan env vars (RESEND_API_KEY, GOOGLE_CHAT_WEBHOOK_URL), el módulo registra warning pero no rompe la ejecución.
+
+## MICRO-SPRINT PREVIO (Auditoría del Activo)
 
 ### AUDITORÍA: Ciclo completo del Activo creativo ✓
 
@@ -66,44 +123,57 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 35. El corte `ARCH-20260506-52 / IMPL-20260506-52` ya cierra `/disenador` con sesiones reales, bloqueos, reanudacion, cierre de jornada util, build y tests verdes, publicacion en `main` y migracion remota `20260506090000_work_sessions_v1.sql` aplicada en Supabase.
 36. El corte `ARCH-20260508-21 / IMPL-20260508-21` ya implementa `/cliente` como PWA ligera con queSigue, estadoDelProyecto, revisiones, resultadosPorCanal y leadsYSeguimiento, con ajustes responsive (IMPL-20260509-01) y optimizacion de densidad publicados en produccion.
 37. El ciclo completo del Activo creativo ya fue implementado en la sesión del 6-may-2026 con los cortes `IMPL-20260506-45` (vista detallada), `IMPL-20260506-46` (propuestas persistentes), `IMPL-20260506-47` (evidencias reales), `IMPL-20260506-49` (miniaturas) e `IMPL-20260506-51` (comparación visual, aprobación cliente, analytics).
+38. **Servidor MCP Bridge operativo** (`ARCH-20260510-08 / IMPL-20260510-08`) con 8 herramientas conectadas a producción: list_assets, get_asset_context, write_production_spec, get_brief, write_quotation, create_client, create_project, create_asset. Configuración global en VS Code funcionando.
+39. **Módulo de Comunicación Transaccional (MCT)** (`ARCH-20260510-09 / IMPL-20260510-09`) implementado con servicio `lib/notifications.ts`, 4 plantillas React Email y 3 canales (SendGrid, Google Chat, WhatsApp wa.me).
+40. **Caso Superman completo** como demostración end-to-end: cliente, proyecto, brief, 5 activos con especificaciones publicadas, cotización comercial estructurada en 2 fases ($42,400 MXN). Flujo completo validado desde MCP.
+41. **Contacto estructurado del cliente** (`ARCH-20260513-01 / IMPL-20260513-01`) implementado con `primary_contact_email` y `primary_contact_whatsapp`, API/MCP actualizados y 356 tests en verde.
+42. **Integración MCT con eventos reales** (`ARCH-20260513-02 / IMPL-20260513-02`) implementada para `client.created` y `quotation.active`, con `emailSent` real, `whatsAppLink` opcional y 362 tests en verde sin regresiones.
+43. **PDF de cotizaciones y propuestas** (`ARCH-20260513-03 / IMPL-20260513-03`) implementado con endpoint `GET /api/v1/projects/[id]/quotation/pdf`, plantilla basada en `@react-pdf/renderer`, CTA en `/cotizaciones`, 370 tests en verde y checkpoint `CHECKPOINT_IMPL-20260513-03_pdf_cotizaciones_v1.md`.
+44. **Migración remota de contacto estructurado aplicada** en producción sobre `public.clients` para `primary_contact_email` y `primary_contact_whatsapp` mediante `supabase db push` sobre el proyecto `vectoria` (`vrboviomvfizqnsvhlew`).
+45. **Migración del MCT a SendGrid** (`ARCH-20260513-04 / IMPL-20260513-04`) implementada con reemplazo de Resend por `@sendgrid/mail`, contratos `client.created`, `quotation.active` y `asset.delivered` preservados, 370 tests en verde y checkpoint `CHECKPOINT_IMPL-20260513-04.md`.
+46. **Configuración segura de SendGrid desde Bridge** (`ARCH-20260513-05 / IMPL-20260513-05`) implementada con ruta `/configuracion`, edición UI de parámetros no secretos del remitente, lectura del estado runtime de SendGrid, fallback a env vars en el MCT y checkpoint `CHECKPOINT_IMPL-20260513-05_configuracion_sendgrid_segura.md`.
+47. **Migración remota de configuración SendGrid aplicada** en producción sobre `tenant_runtime_settings` mediante `supabase db push` con la migración `20260513100000_sendgrid_config_tenant_runtime_v1.sql`.
+48. **Vika como agente operadora de Bridge** (`ARCH-20260513-15 / IMPL-20260513-15`) implementada en el root del workspace con 4 skills técnicas, definición MCP-first y checkpoint `CHECKPOINT_IMPL-20260513-15_vika_agente_v1.md`.
+49. **MCP Vika para sincronización local** (`ARCH-20260513-16 / IMPL-20260513-16`) implementado con soporte `project-folders` en `bridge_get_brief`, nueva tool `bridge_download_asset_files`, ruta `GET /api/v1/assets/[id]/files`, endurecimiento contra traversal y validación completa en `Bridge/mcp` con 33 tests verdes y build limpio.
+50. **Visibilidad operativa ligera Captura/Produccion** (`IMPL-20260513-17`) implementada en `/disenador`, `/activos` y `/activos/[id]` como etiqueta derivada sin cambiar modelo de datos, con build limpio y checkpoint conjunto `CHECKPOINT_IMPL-20260513-16_17_vika_mcp_y_visibilidad_operativa.md`.
 
-### [~] En curso
+### [/] En Progreso
 
-1. Sin corte activo. Auditoría completada: ciclo del Activo ya cerrado.
+1. Corte paraguas: `ARCH-20260510-11` — refinamiento operativo para piloto real.
+
+### [~] Planificado
+
+1. Siguiente slice técnico recomendado: `ARCH-20260513-19` — limpieza técnica para piloto real.
+2. Slices restantes del corte paraguas `ARCH-20260510-11` posteriores a limpieza técnica.
 
 ### [ ] Pendiente
 
-1. No hay pendientes obligatorios dentro de V1.
+1. Configurar env vars de producción de SendGrid.
+2. Ejecutar `ARCH-20260513-19` para limpieza técnica del repo antes del refinamiento UX/UI.
 
 ## Ultimo Corte Cerrado
 
-1. Auditoría `IMPL-20260510-01` confirmó que el ciclo completo del Activo creativo ya estaba cerrado desde 6-may-2026.
-2. `/activos/[id]` opera como ficha detallada completa con propuestas, evidencias, comparación, aprobación y analytics.
-3. El checkpoint de auditoría es `context/checkpoints/CHECKPOINT_IMPL-20260510-01_ficha_activo_auditoria_estado.md`.
+**ARCH-20260513-16 / IMPL-20260513-16 + IMPL-20260513-17**
 
-## Opciones para Siguiente Corte
+1. **Sincronización local del brief endurecida** con layout `project-folders` y escritura en `briefing/brief.md` cuando se solicita por MCP.
+2. **Descarga local de archivos reales del activo** con la tool `bridge_download_asset_files`, preservando evidencias homónimas y contención de rutas.
+3. **Endpoint operativo de archivos por activo** en `/api/v1/assets/[id]/files`, devolviendo todas las evidencias reales del activo.
+4. **Visibilidad ligera para diseñador y operador** con etiquetas `Captura` y `Produccion` en `/disenador`, `/activos` y `/activos/[id]`.
+5. **Validación:** `Bridge/mcp` con 33 tests verdes y build limpio; app `Bridge` con `npm run build` limpio.
+6. **Checkpoint:** `context/checkpoints/CHECKPOINT_IMPL-20260513-16_17_vika_mcp_y_visibilidad_operativa.md`.
 
-Funcionalidad genuinamente nueva pendiente:
+## Siguiente Paso Recomendado
 
-**A. Copiloto IA para Operador y Diseñador** (SPECs 37, 38)  
-- Señal viva determinística + lectura priorizada por IA
-- Dashboards que responden: ¿Qué cambió? ¿Qué necesita atención?  
-- Reduce fricción operativa diaria
+Continuar ejecutando por slices el corte paraguas `ARCH-20260510-11` para dejar Bridge listo para piloto real.
 
-**B. Login Cliente Público**  
-- Cliente puede entrar con su propia sesión (no operador registrando por él)
-- Aprobación pública de propuestas  
-- Notificaciones cuando hay revisiones pendientes
+Prioridad recomendada:
 
-**C. Versionado Avanzado de Propuestas**  
-- Historial completo de ajustes del diseñador
-- Comparación entre versiones
-- Rollback a propuesta anterior
+1. Configurar env vars de producción de SendGrid.
+2. Ejecutar `ARCH-20260513-19`.
+3. Refinamiento UX/UI.
+4. Corrida end-to-end y checkpoint.
 
-**D. Notificaciones en Tiempo Real**  
-- WebSockets o Server-Sent Events
-- Estado del activo actualiza en vivo
-- Alertas cuando propuesta está lista para revisar
+**Estado del V1 técnico:** arquitectura cerrada; pendiente operacionalización final.
 
 ## Artefactos Clave
 
@@ -174,6 +244,22 @@ Funcionalidad genuinamente nueva pendiente:
 64. context/SPECs/SPEC_ARCH-20260506-52_disenador_sesiones_reales_y_cierre_jornada.md
 65. context/checkpoints/CHECKPOINT_IMPL-20260506-52_disenador_sesiones_reales.md
 66. context/SPECs/SPEC_ARCH-20260508-21_cliente_pwa_resultados_y_leads_v1.md
+67. context/checkpoints/CHECKPOINT_IMPL-20260510-01_ficha_activo_auditoria_estado.md
+68. context/SPECs/SPEC_ARCH-20260510-08_mcp_server_bridge_para_agentes_vscode.md
+69. context/checkpoints/CHECKPOINT_IMPL-20260510-08.md
+70. context/SPECs/SPEC_ARCH-20260510-09_modulo_comunicacion_transaccional_mct_v1.md
+71. context/SPECs/SPEC_ARCH-20260510-10_extension_mcp_cotizaciones_y_copias_locales.md
+72. context/SPECs/SPEC_ARCH-20260510-11_refinamiento_operativo_piloto_real_bridge.md
+73. context/SPECs/SPEC_ARCH-20260513-01_contacto_cliente_estructurado_email_whatsapp_v1.md
+74. context/SPECs/SPEC_ARCH-20260513-02_integracion_mct_eventos_reales_v1.md
+75. context/SPECs/SPEC_ARCH-20260513-03_pdf_cotizaciones_y_propuestas_v1.md
+76. context/SPECs/SPEC_ARCH-20260513-04_sendgrid_proveedor_email_mct_v1.md
+77. context/checkpoints/CHECKPOINT_IMPL-20260510-10.md
+76. context/checkpoints/CHECKPOINT_IMPL-20260513-01.md
+77. Bridge/mcp/ — Servidor MCP con 8 tools y cliente HTTP bridge-client.ts
+78. Bridge/lib/notifications.ts — Módulo MCT (Resend, Google Chat, WhatsApp)
+79. Bridge/emails/ — Plantillas React Email (client-created, quotation-active, asset-delivered)
+80. Bridge/context/clientes/superman/ — Caso demostración completo (brief.md, propuesta.md, prompts)
 
 ## Decisiones Ya Tomadas
 
@@ -190,6 +276,10 @@ Funcionalidad genuinamente nueva pendiente:
 11. El agente de briefing madura el brief en 3 etapas obligatorias, usa un catalogo comercial configurable y la aprobacion final siempre pasa por revision humana.
 12. La siguiente capa obligatoria es identidad minima operativa con users, memberships, actor tecnico y actor efectivo.
 13. El tenant no reemplaza al cliente ni al proyecto; briefs, cotizaciones y activos deben vivir dentro de un contenedor client-project.
+14. Los agentes VS Code operan Bridge mediante MCP Server con autenticación por token Bearer y tenant explícito.
+15. La comunicación transaccional usa 3 canales: email automático (Resend), notificación operador (Google Chat), click-to-send cliente (WhatsApp wa.me).
+16. Las cotizaciones deben poder exportarse como PDF para envío formal al cliente.
+17. El modelo del cliente debe incluir email y WhatsApp como campos estructurados; `primary_contact_channel` no basta para automatización.
 
 ## Backlog Estructural Priorizado
 
@@ -230,10 +320,22 @@ Funcionalidad genuinamente nueva pendiente:
 33. Implementar radar priorizado del operador por proyecto.
 34. Implementar modelo de ejecucion del disenador con sesiones y estados.
 35. Implementar workspace del disenador guiado por IA.
+36. Implementar cliente PWA con resultados y leads.
+37. Cerrar arquitectura operativa del servidor MCP Bridge para agentes VS Code.
+38. Implementar servidor MCP Bridge con 8 herramientas operativas.
+39. Cerrar arquitectura del módulo de comunicación transaccional (MCT).
+40. Implementar módulo MCT con 3 canales (Resend, Google Chat, WhatsApp wa.me).
+41. Crear caso demostración end-to-end completo (Superman).
 
 ### [~] Planificado para el siguiente corte
 
-1. Implementar cliente PWA con resultados y leads.
+1. Generar PDFs de cotizaciones con identidad visual.
+2. Crear agente Frank especializado en VS Code con skills dedicados.
+3. Cerrar modelo de contacto del cliente con campos explícitos para email y WhatsApp.
+4. Integrar disparadores reales de MCT en eventos de negocio.
+5. Refinar plantillas de email y PDF con identidad final.
+6. Limpieza técnica de código y archivos no utilizados.
+7. Refinamiento UX/UI en interfaces operador/diseñador/cliente.
 
 ### [ ] Posterior
 
@@ -244,16 +346,101 @@ Funcionalidad genuinamente nueva pendiente:
 
 ## Riesgos Abiertos
 
-1. sobrecargar la V1 con demasiados objetos antes de cerrar uno bien,
-2. no aterrizar cotizaciones y activos sobre el contenedor client-project a tiempo,
-3. mantener placeholders visibles demasiado tiempo en superficies clave,
-4. abrir integraciones de agentes antes de cerrar bien autorizacion y evidencias,
-5. crecer el modelo de datos sin una secuencia clara por objeto de negocio.
+1. No configurar env vars de producción (RESEND_API_KEY, GOOGLE_CHAT_WEBHOOK_URL) rompe MCT silenciosamente
+2. Las cotizaciones sin PDF pueden no ser formales suficiente para clientes corporativos
+3. El agente Frank sin skills dedicados puede generar ruido operativo al explorar
+4. Sin un campo estructurado de email y WhatsApp del cliente, el MCT no puede operar de forma confiable
+5. Código no usado acumula deuda técnica y aumenta bundle size
+6. UX/UI sin refinar puede generar fricción en adopción real del piloto
 
-## Siguiente Paso Recomendado
+## ANÁLISIS DE COMPLETITUD — Bridge V1 vs Arquitectura Planeada
 
-Con Operador, Disenador y la ficha del activo ya fuertes, el siguiente paso recomendado es abrir `/cliente` como una PWA ligera de seguimiento comercial:
+**Fecha de análisis:** 2026-05-10  
+**Evaluador:** INTEGRA - Arquitecto
 
-1. implementar `ARCH-20260508-21` para siguiente paso, revisiones, resultados por canal y leads resumidos,
-2. mantener la experiencia mobile-first, instalable y no abrumadora,
-3. reutilizar briefs, activos, cotizaciones, resultados y mini CRM sin convertir Cliente en backoffice.
+### ✅ COMPLETO — Arquitectura Base (100%)
+
+**Todas las 5 capas arquitectónicas están implementadas:**
+
+| Capa | Estado | Cobertura |
+|------|--------|-----------|
+| **1. Experiencia** | ✅ Completo | Operador (`/operador`), Diseñador (`/disenador`), Cliente (`/cliente` PWA) |
+| **2. Aplicación** | ✅ Completo | 13/13 módulos de dominio operativos |
+| **3. Integración Agentes** | ✅ Completo | MCP Server con 8 tools + API REST |
+| **4. Inteligencia** | ✅ Completo | Claude (briefing), MCP (agentes VS Code) |
+| **5. Datos** | ✅ Completo | Supabase Postgres + Storage + RLS multitenant |
+
+**Los 13 módulos de dominio están operativos:**
+
+1. ✅ Tenancy y acceso
+2. ✅ Clientes y proyectos
+3. ✅ Briefing estructurado
+4. ✅ Cotizaciones
+5. ✅ Catálogo y activos
+6. ✅ Prompts
+7. ✅ Comentarios y decisiones (chat contextual)
+8. ✅ Mini CRM
+9. ✅ Estadísticas
+10. ✅ Trazabilidad
+11. ✅ Conocimiento derivado (`/contexto-agentes`)
+12. ✅ Comunicación Transaccional (MCT) — **código completo**
+13. ✅ Capa Local de Contexto (copias .md VS Code)
+
+**Los 7 flujos arquitectónicos críticos funcionan:**
+
+| Flujo | Estado |
+|-------|--------|
+| A. Brief a estructura | ✅ Operativo |
+| B. Instrucción a activo | ✅ Operativo (via MCP) |
+| C. Producción creativa | ✅ Operativo (diseñador + propuestas + evidencias) |
+| D. Revisión y entrega | ✅ Operativo (aprobación cliente + analytics) |
+| E. Seguimiento comercial | ✅ Operativo (mini CRM + leads) |
+| F. Onboarding y comunicación | ✅ Implementado (MCT listo, faltan disparadores) |
+| G. Copias locales | ✅ Operativo (brief.md, propuesta.md, prompts-produccion.md) |
+
+### ⚠️ REFINAMIENTO PENDIENTE — Operacionalización (5%)
+
+**Lo que falta NO es arquitectónico, es refinamiento operativo:**
+
+| Pendiente | Prioridad | Esfuerzo | Bloqueante Piloto |
+|-----------|-----------|----------|-------------------|
+| **1. PDFs de cotizaciones** | Alta | 2-3 horas | ⚠️ Sí (formalidad) |
+| **2. Agente Frank + skills** | Alta | 3-4 horas | ⚠️ Sí (eficiencia) |
+| **3. Email + WhatsApp estructurados del cliente** | Alta | 1-2 horas | ⚠️ Sí (MCT) |
+| **4. Disparadores MCT reales** | Media | 1-2 horas | No (degrada silencioso) |
+| **5. Plantillas finales** | Media | 2-3 horas | No (estético) |
+| **6. Limpieza código** | Baja | 1-2 horas | No (deuda técnica) |
+| **7. Refinamiento UX/UI** | Media | 3-5 horas | No (usabilidad) |
+
+**Estimación de completitud técnica:** 95%  
+**Estimación de preparación para piloto real:** 85% (falta PDF + agente Frank)
+
+### 🚀 OPCIONES FUTURAS — Post-Piloto (V2)
+
+**Funcionalidad genuinamente nueva que NO está en la arquitectura V1:**
+
+1. **Copiloto IA** (SPECs 37, 38) — Dashboards que detectan qué cambió y necesita atención
+2. **Login cliente público** — Cliente entra con su propia sesión (actualmente vía operador)
+3. **Versionado avanzado** — Historial completo de propuestas, comparación, rollback
+4. **Notificaciones tiempo real** — WebSockets/SSE para actualizaciones en vivo
+5. **WhatsApp Business API** — Envío automático (actualmente click-to-send manual)
+
+### 📊 RESUMEN EJECUTIVO
+
+**Bridge V1 está arquitectónicamente completo.**
+
+- Todas las capas planeadas: ✅ implementadas
+- Todos los módulos de dominio: ✅ operativos
+- Todos los flujos críticos: ✅ funcionando
+- MCP Server: ✅ 8 tools operativos
+- MCT: ✅ código completo (falta config producción)
+- Caso demostración: ✅ Superman end-to-end
+
+**Lo único pendiente es refinamiento operativo** para usar en piloto real:
+
+- **Crítico:** PDFs de cotizaciones + agente Frank
+- **Crítico:** modelo de contacto del cliente con email + WhatsApp reales
+- **Recomendado:** Disparadores MCT + plantillas finales
+- **Opcional:** Limpieza código + UX/UI
+
+**Tiempo estimado para piloto real:** 8-12 horas de refinamiento.

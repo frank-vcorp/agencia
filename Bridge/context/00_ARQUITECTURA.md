@@ -327,7 +327,7 @@ Resuelve:
 3. aviso automatico al cliente cuando la cotizacion esta vigente,
 4. aviso automatico al cliente cuando su activo esta entregado.
 
-Canal V1: email via Resend. Canal V2: WhatsApp como canal secundario.
+Canal V1: email transaccional via proveedor dedicado del MCT. Decision operativa vigente del piloto: SendGrid. WhatsApp se mantiene como canal secundario click-to-send.
 
 Principio rector: Bridge dispara el aviso. No es responsabilidad del operador.
 

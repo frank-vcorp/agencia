@@ -3,10 +3,13 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-41_workspace_disenador_guiado.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-40_modelo_ejecucion_disenador_sesiones_y_estados.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-52_disenador_sesiones_reales_y_cierre_jornada.md
+ * IMPL-20260513-17
+ * Respaldo: context/AGENTE_VIKA_Y_SKILLS_TECNICAS_V1.md
  */
 import Link from "next/link";
 
 import { SessionControlButtons } from "@/components/session-control-buttons";
+import { assetOperationalKindLabel } from "@/lib/assets";
 import {
   type DesignerProposalDraft,
   type CreativeTool,
@@ -70,6 +73,21 @@ function TaskStatusBadge({ status }: { status: DesignerTaskStatus }) {
       className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ring-1 ${TASK_STATUS_COLORS[status]}`}
     >
       {TASK_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+function TaskOperationalBadge({ task }: { task: DesignerTask }) {
+  const colors =
+    task.operationalKind === "captura"
+      ? "bg-white text-slate-700 ring-[color:var(--line)]"
+      : "bg-[color:var(--accent-soft)] text-[color:var(--accent-deep)] ring-[color:rgba(200,93,39,0.18)]";
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ring-1 ${colors}`}
+    >
+      {assetOperationalKindLabel(task.operationalKind)}
     </span>
   );
 }
@@ -145,6 +163,7 @@ function ActiveTaskCard({ task, activeSession }: ActiveTaskCardProps) {
           </h3>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <TaskOperationalBadge task={task} />
           <TaskStatusBadge status={task.status} />
           <span className="font-[family-name:var(--font-heading)] text-2xl font-bold tabular-nums text-[color:var(--accent)]">
             {task.priorityScore}
@@ -234,6 +253,7 @@ function QueueTaskCard({ task }: { task: DesignerTask }) {
         <p className="mt-1 text-[11px] leading-5 text-[color:var(--muted)]">{task.priorityReason}</p>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-2">
+        <TaskOperationalBadge task={task} />
         <TaskStatusBadge status={task.status} />
         <span className="text-[10px] text-[color:var(--muted)]">{toolLabel}</span>
         {/* IMPL-20260506-45: apunta a la ficha detallada del activo */}

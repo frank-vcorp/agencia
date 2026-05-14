@@ -7,7 +7,7 @@
  */
 
 import type { BridgeClient } from "../bridge-client.js";
-import { saveLocalCopy } from "../utils/local-copy.js";
+import { saveLocalCopy, type LocalCopyLayout } from "../utils/local-copy.js";
 
 export const getBriefToolDefinition = {
   name: "bridge_get_brief",
@@ -23,6 +23,15 @@ export const getBriefToolDefinition = {
       clientSlug: {
         type: "string",
         description: "Slug del cliente para nombrar la copia local (ej: techcorp)"
+      },
+      localLayout: {
+        type: "string",
+        enum: ["legacy", "project-folders"],
+        description: "Layout local de destino. legacy mantiene context/clientes/[slug]/brief.md; project-folders usa [localProjectPath]/briefing/brief.md"
+      },
+      localProjectPath: {
+        type: "string",
+        description: "Ruta relativa a workspaceRoot para guardar la copia local cuando localLayout=project-folders"
       }
     },
     required: ["projectId", "clientSlug"]
@@ -37,6 +46,8 @@ export async function handleGetBrief(
   const { projectId, clientSlug } = args as {
     projectId: string;
     clientSlug: string;
+    localLayout?: LocalCopyLayout;
+    localProjectPath?: string;
   };
 
   if (!projectId || typeof projectId !== "string") {
@@ -44,6 +55,20 @@ export async function handleGetBrief(
   }
   if (!clientSlug || typeof clientSlug !== "string") {
     return "Error: clientSlug es requerido y debe ser un string.";
+  }
+
+  const localLayout =
+    args && typeof args === "object" && "localLayout" in (args as Record<string, unknown>)
+      ? ((args as { localLayout?: LocalCopyLayout }).localLayout ?? "legacy")
+      : "legacy";
+
+  const localProjectPath =
+    args && typeof args === "object" && "localProjectPath" in (args as Record<string, unknown>)
+      ? (args as { localProjectPath?: string }).localProjectPath
+      : undefined;
+
+  if (localLayout === "project-folders" && (!localProjectPath || typeof localProjectPath !== "string")) {
+    return "Error: localProjectPath es requerido cuando localLayout=project-folders.";
   }
 
   try {
@@ -88,7 +113,10 @@ export async function handleGetBrief(
     ];
 
     const markdownContent = lines.join("\n");
-    const localPath = saveLocalCopy("brief", clientSlug, markdownContent, workspaceRoot);
+    const localPath = saveLocalCopy("brief", clientSlug, markdownContent, workspaceRoot, {
+      layout: localLayout,
+      localProjectPath
+    });
 
     return [
       `✓ Brief leído correctamente.`,

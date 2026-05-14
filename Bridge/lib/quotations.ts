@@ -1,6 +1,8 @@
 /**
  * IMPL-20260505-23
  * Respaldo: context/COTIZACIONES_VERSIONADAS_V1.md, context/SPECs/SPEC_ARCH-20260505-23_cotizaciones_versionadas_v1.md, context/MODELO_DATOS_MULTITENANT_V1.md, context/CONTRATOS_AGENTES_Y_VSCODE_V1.md
+ * IMPL-20260513-03
+ * Respaldo: context/SPECs/SPEC_ARCH-20260513-03_pdf_cotizaciones_y_propuestas_v1.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 
@@ -282,4 +284,130 @@ export async function setQuotationActiveVersion(
       body: JSON.stringify({ active_version_id: versionId })
     }
   );
+}
+
+// ─── Exportación PDF (IMPL-20260513-03) ────────────────────────────────────────
+
+type ProjectExportRow = {
+  id: string;
+  name: string;
+  client_id: string | null;
+};
+
+type ClientExportRow = {
+  id: string;
+  name: string;
+};
+
+export type QuotationExportData = {
+  quotationId: string;
+  projectId: string;
+  projectName: string;
+  clientName: string;
+  version: QuotationVersion;
+  generatedAt: string;
+};
+
+/**
+ * Resuelve todos los datos necesarios para generar el PDF de la cotización vigente
+ * de un proyecto. Retorna null si no hay cotización o no hay versión activa.
+ */
+export async function getActiveQuotationExportData(
+  projectId: string,
+  tenantSlug = supabaseEnv.defaultTenant
+): Promise<QuotationExportData | null> {
+  if (!isSupabaseConfigured) return null;
+
+  const tenantId = await getTenantId(tenantSlug);
+  if (!tenantId) return null;
+
+  // Cotización del proyecto
+  const qParams = new URLSearchParams({
+    select:
+      "id,tenant_id,client_id,project_id,brief_id,status,active_version_id,created_at,updated_at",
+    project_id: `eq.${projectId}`,
+    tenant_id: `eq.${tenantId}`,
+    order: "created_at.desc",
+    limit: "1"
+  });
+  const quotationRows = await postgrest<QuotationRow[]>(
+    `quotations?${qParams.toString()}`,
+    { method: "GET" }
+  ).catch(() => [] as QuotationRow[]);
+
+  const quotationRow = quotationRows[0];
+  if (!quotationRow?.active_version_id) return null;
+
+  // Versión activa
+  const vParams = new URLSearchParams({
+    select:
+      "id,tenant_id,quotation_id,version_number,title,body_markdown,commercial_summary_json,admin_status,internal_note,created_by_user_id,created_by_agent_id,created_at",
+    id: `eq.${quotationRow.active_version_id}`,
+    limit: "1"
+  });
+  const versionRows = await postgrest<QuotationVersionRow[]>(
+    `quotation_versions?${vParams.toString()}`,
+    { method: "GET" }
+  ).catch(() => [] as QuotationVersionRow[]);
+
+  const versionRow = versionRows[0];
+  if (!versionRow) return null;
+
+  // Nombre del proyecto
+  const projectParams = new URLSearchParams({
+    select: "id,name,client_id",
+    id: `eq.${projectId}`,
+    tenant_id: `eq.${tenantId}`,
+    limit: "1"
+  });
+  const projectRows = await postgrest<ProjectExportRow[]>(
+    `projects?${projectParams.toString()}`,
+    { method: "GET" }
+  ).catch(() => [] as ProjectExportRow[]);
+
+  const projectRow = projectRows[0];
+
+  // Nombre del cliente
+  let clientName = "Cliente";
+  if (projectRow?.client_id) {
+    const clientParams = new URLSearchParams({
+      select: "id,name",
+      id: `eq.${projectRow.client_id}`,
+      tenant_id: `eq.${tenantId}`,
+      limit: "1"
+    });
+    const clientRows = await postgrest<ClientExportRow[]>(
+      `clients?${clientParams.toString()}`,
+      { method: "GET" }
+    ).catch(() => [] as ClientExportRow[]);
+    clientName = clientRows[0]?.name ?? "Cliente";
+  }
+
+  return {
+    quotationId: quotationRow.id,
+    projectId,
+    projectName: projectRow?.name ?? "Proyecto",
+    clientName,
+    version: normalizeVersionRow(versionRow),
+    generatedAt: new Date().toISOString()
+  };
+}
+
+/**
+ * Genera un nombre de archivo estable para el PDF de cotización.
+ * Formato: cotizacion-[client]-[project]-v[version].pdf
+ */
+export function buildPdfFilename(
+  clientName: string,
+  projectName: string,
+  versionNumber: number
+): string {
+  const slug = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+  return `cotizacion-${slug(clientName)}-${slug(projectName)}-v${versionNumber}.pdf`;
 }

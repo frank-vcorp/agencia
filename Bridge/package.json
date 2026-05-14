@@ -13,10 +13,11 @@
     "@google/generative-ai": "^0.24.1",
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.8",
+    "@react-pdf/renderer": "^4.5.1",
+    "@sendgrid/mail": "^8.1.6",
     "next": "15.5.15",
     "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "resend": "^6.12.3"
+    "react-dom": "19.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.18",

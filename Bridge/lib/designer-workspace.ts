@@ -3,7 +3,13 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-40_modelo_ejecucion_disenador_sesiones_y_estados.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-41_workspace_disenador_guiado.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-52_disenador_sesiones_reales_y_cierre_jornada.md
+ * IMPL-20260513-17
+ * Respaldo: context/AGENTE_VIKA_Y_SKILLS_TECNICAS_V1.md
  */
+import {
+  resolveAssetOperationalKind,
+  type AssetOperationalKind
+} from "./assets";
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 
 // ─── Tipos del contrato ───────────────────────────────────────────────────────
@@ -31,6 +37,7 @@ export type DesignerAction = "start" | "block" | "resume" | "finish" | "ready_fo
 export type DesignerTask = {
   assetId: string;
   assetTitle: string;
+  operationalKind: AssetOperationalKind;
   projectId: string;
   projectName: string;
   clientName: string;
@@ -600,6 +607,7 @@ export async function getDesignerWorkspace(
     return {
       assetId: asset.id,
       assetTitle: asset.title,
+      operationalKind: resolveAssetOperationalKind(asset.title),
       projectId: asset.project_id,
       projectName: project?.name ?? "Proyecto desconocido",
       clientName,

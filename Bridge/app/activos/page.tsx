@@ -6,6 +6,8 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-33_continuidad_conversacional_entidades_restantes_v1.md
  * IMPL-20260506-45
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-45_vista_detallada_activo_creativo_y_propuestas.md
+ * IMPL-20260513-17
+ * Respaldo: context/AGENTE_VIKA_Y_SKILLS_TECNICAS_V1.md
  */
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
@@ -16,6 +18,7 @@ import {
   PIECE_TYPE_CODES,
   PLACEMENT_CODES,
   applicationLabel,
+  assetOperationalKindLabel,
   assetStatusLabel,
   createAsset,
   formatLabel,
@@ -23,6 +26,7 @@ import {
   getContextIdsForDefaultTenant,
   pieceTypeLabel,
   placementLabel,
+  resolveAssetOperationalKind,
   type AssetStatus
 } from "@/lib/assets";
 import {
@@ -160,6 +164,11 @@ export default async function ActivosPage() {
             <div className="mt-5 space-y-3">
               {workspaces.map(({ asset, activePrompt }) => {
                 const assetChat = chatsByAssetId[asset.id] ?? { thread: null, messages: [] };
+                const operationalKind = resolveAssetOperationalKind(asset.title);
+                const operationalKindClass =
+                  operationalKind === "captura"
+                    ? "bg-white/80 text-[color:var(--muted)] ring-[color:var(--line)]"
+                    : "bg-[color:var(--accent-soft)] text-[color:var(--accent-deep)] ring-[color:rgba(200,93,39,0.18)]";
 
                 return (
                 <article
@@ -176,11 +185,18 @@ export default async function ActivosPage() {
                         Project {asset.projectId ? "ligado" : "pendiente"} · Cotizacion {asset.quotationId ? "ligada" : "sin referencia"}
                       </p>
                     </div>
-                    <span
-                      className={`shrink-0 rounded-[16px] px-3 py-1 text-[11px] uppercase tracking-[0.18em] ring-1 ${statusBadgeClass(asset.status)}`}
-                    >
-                      {assetStatusLabel(asset.status)}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span
+                        className={`rounded-[16px] px-3 py-1 text-[11px] uppercase tracking-[0.18em] ring-1 ${operationalKindClass}`}
+                      >
+                        {assetOperationalKindLabel(operationalKind)}
+                      </span>
+                      <span
+                        className={`rounded-[16px] px-3 py-1 text-[11px] uppercase tracking-[0.18em] ring-1 ${statusBadgeClass(asset.status)}`}
+                      >
+                        {assetStatusLabel(asset.status)}
+                      </span>
+                    </div>
                   </div>
 
                   {/* ── Acceso a la ficha detallada — IMPL-20260506-45 ─── */}

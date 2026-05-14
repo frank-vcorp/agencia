@@ -2,6 +2,8 @@
  * IMPL-20260505-24
  * Respaldo: context/ACTIVOS_OPERABLES_V1.md, context/CATALOGO_ACTIVOS_V1.md,
  *           context/SPECs/SPEC_ARCH-20260505-24_activos_vinculados_a_cotizacion_y_project_v1.md
+ * IMPL-20260513-18
+ * Respaldo: context/AGENTE_VIKA_Y_SKILLS_TECNICAS_V1.md
  */
 import { describe, expect, it, beforeEach, afterEach, vi, type MockInstance } from "vitest";
 
@@ -12,6 +14,7 @@ import {
   PLACEMENT_CODES,
   applicationLabel,
   applicationLabels,
+  assetOperationalKindLabel,
   assetStatusLabel,
   assetStatusLabels,
   formatLabel,
@@ -21,6 +24,9 @@ import {
   pieceTypeLabels,
   placementLabel,
   placementLabels,
+  isValidEmail,
+  resolveAssetOperationalKind,
+  sanitizeWhatsapp,
   type AssetPromptVersion,
   type AssetStatus
 } from "./assets";
@@ -139,7 +145,6 @@ describe("createOrUpdateAssetPrompt", () => {
   let fetchMock: MockInstance;
 
   beforeEach(() => {
-    // @ts-expect-error - reemplazar fetch global en tests
     fetchMock = vi.spyOn(globalThis, "fetch");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://fake.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "fake-anon-key");
@@ -222,5 +227,88 @@ describe("createOrUpdateAssetPrompt", () => {
       typeof url === "string" && url.includes("id=eq.ver-1")
     );
     expect(patchCall).toBeDefined();
+  });
+});
+
+// ─── IMPL-20260513-01: helpers de contacto estructurado ──────────────────────
+
+describe("isValidEmail", () => {
+  it("acepta email con formato valido", () => {
+    expect(isValidEmail("ana@cliente.com")).toBe(true);
+    expect(isValidEmail("contacto+tag@dominio.mx")).toBe(true);
+  });
+
+  it("rechaza email sin @", () => {
+    expect(isValidEmail("sinArroba.com")).toBe(false);
+  });
+
+  it("rechaza email sin dominio", () => {
+    expect(isValidEmail("usuario@")).toBe(false);
+  });
+
+  it("rechaza email con espacios internos", () => {
+    expect(isValidEmail("usuario @dominio.com")).toBe(false);
+  });
+
+  it("acepta email con espacios externos (trim)", () => {
+    expect(isValidEmail("  ana@cliente.com  ")).toBe(true);
+  });
+
+  it("rechaza TLD de un solo caracter (IMPL-20260513-02)", () => {
+    expect(isValidEmail("user@domain.c")).toBe(false);
+  });
+});
+
+describe("sanitizeWhatsapp", () => {
+  it("elimina espacios y guiones manteniendo digitos", () => {
+    expect(sanitizeWhatsapp("55 1234 5678")).toBe("5512345678");
+  });
+
+  it("mantiene el + inicial si esta presente", () => {
+    expect(sanitizeWhatsapp("+52 55 1234 5678")).toBe("+525512345678");
+  });
+
+  it("elimina parentesis y guiones", () => {
+    expect(sanitizeWhatsapp("+52 (55) 1234-5678")).toBe("+525512345678");
+  });
+
+  it("no agrega + si no estaba", () => {
+    expect(sanitizeWhatsapp("5215512345678")).toBe("5215512345678");
+  });
+
+  it("elimina puntos", () => {
+    expect(sanitizeWhatsapp("+1.800.555.0000")).toBe("+18005550000");
+  });
+});
+
+describe("resolveAssetOperationalKind", () => {
+  it("clasifica como captura cuando el titulo inicia con marcador fuerte", () => {
+    expect(resolveAssetOperationalKind("[Captura] Fachada principal del local")).toBe("captura");
+  });
+
+  it("clasifica como captura con prefijo textual simple", () => {
+    expect(resolveAssetOperationalKind("Captura: producto sobre fondo neutro")).toBe("captura");
+  });
+
+  it("clasifica como captura aunque el titulo tenga acentos y mayusculas mixtas", () => {
+    expect(resolveAssetOperationalKind("Activo de Captura - Fotografía del área médica")).toBe("captura");
+  });
+
+  it("clasifica como produccion cuando no encuentra marcadores de captura", () => {
+    expect(resolveAssetOperationalKind("Reel de captacion para Instagram")).toBe("produccion");
+  });
+
+  it("no confunde palabras de marketing con un activo de captura real", () => {
+    expect(resolveAssetOperationalKind("Campana de captura de leads para WhatsApp")).toBe("produccion");
+  });
+});
+
+describe("assetOperationalKindLabel", () => {
+  it("mapea captura a su etiqueta visible", () => {
+    expect(assetOperationalKindLabel("captura")).toBe("Captura");
+  });
+
+  it("mapea produccion a su etiqueta visible", () => {
+    expect(assetOperationalKindLabel("produccion")).toBe("Produccion");
   });
 });

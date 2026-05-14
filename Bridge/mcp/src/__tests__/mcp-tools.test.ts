@@ -11,6 +11,7 @@ import { handleGetAssetContext } from "../tools/get-asset-context.js";
 import { handleWriteProductionSpec } from "../tools/write-production-spec.js";
 import { handleGetBrief } from "../tools/get-brief.js";
 import { handleWriteQuotation } from "../tools/write-quotation.js";
+import { handleDownloadAssetFiles } from "../tools/download-asset-files.js";
 import { saveLocalCopy } from "../utils/local-copy.js";
 
 // Mock del módulo fs para todos los tests que usan saveLocalCopy
@@ -316,6 +317,32 @@ describe("saveLocalCopy", () => {
     expect(content).toContain("Fuente de verdad: Bridge/Supabase");
     expect(content).toContain("# Spec");
   });
+
+  it("guarda brief en briefing/brief.md cuando layout=project-folders", async () => {
+    const { existsSync, writeFileSync } = await import("fs");
+    vi.mocked(existsSync).mockReturnValue(true);
+
+    const result = saveLocalCopy("brief", "techcorp", "# Brief", "/workspace", {
+      layout: "project-folders",
+      localProjectPath: "clientes/techcorp/proyecto-lanzamiento"
+    });
+
+    expect(writeFileSync).toHaveBeenCalledWith(
+      expect.stringContaining("clientes/techcorp/proyecto-lanzamiento/briefing/brief.md"),
+      expect.stringContaining("# Brief"),
+      "utf-8"
+    );
+    expect(result).toContain("briefing/brief.md");
+  });
+
+  it("rechaza localProjectPath fuera de workspaceRoot en project-folders", () => {
+    expect(() =>
+      saveLocalCopy("brief", "techcorp", "# Brief", "/workspace", {
+        layout: "project-folders",
+        localProjectPath: "../../etc"
+      })
+    ).toThrow("localProjectPath debe permanecer dentro de workspaceRoot");
+  });
 });
 
 // ─── bridge_get_brief ─────────────────────────────────────────────────────────
@@ -373,6 +400,35 @@ describe("bridge_get_brief", () => {
     expect(result).toContain("Copia guardada en");
   });
 
+  it("guarda brief en project-folders cuando se solicita el layout nuevo", async () => {
+    fetchMock.mockReturnValueOnce(
+      makeResponse({
+        ok: true,
+        project: { id: "proj-1", name: "Campaña Mayo 2026" },
+        brief: {
+          status: "completed",
+          summary: "Software contable para PyMEs",
+          objectives: ["Aumentar ventas"],
+          targetAudience: "PyMEs en LATAM",
+          tone: "Profesional",
+          references: [],
+          constraints: [],
+          rawContent: "# Brief completo..."
+        }
+      })
+    );
+
+    const client = new BridgeClient(CONFIG);
+    const result = await handleGetBrief(client, {
+      projectId: "proj-1",
+      clientSlug: "techcorp",
+      localLayout: "project-folders",
+      localProjectPath: "clientes/techcorp/proyecto-lanzamiento"
+    }, "/workspace");
+
+    expect(result).toContain("briefing/brief.md");
+  });
+
   it("retorna error cuando el proyecto no existe", async () => {
     fetchMock.mockReturnValueOnce(new Response(null, { status: 404 }));
 
@@ -398,6 +454,17 @@ describe("bridge_get_brief", () => {
     const result = await handleGetBrief(client, { projectId: "proj-1" }, "/workspace");
     expect(result).toContain("Error");
     expect(result).toContain("clientSlug");
+  });
+
+  it("valida que localProjectPath exista cuando localLayout=project-folders", async () => {
+    const client = new BridgeClient(CONFIG);
+    const result = await handleGetBrief(client, {
+      projectId: "proj-1",
+      clientSlug: "techcorp",
+      localLayout: "project-folders"
+    }, "/workspace");
+    expect(result).toContain("Error");
+    expect(result).toContain("localProjectPath");
   });
 });
 
@@ -499,5 +566,235 @@ describe("bridge_write_quotation", () => {
     }, "/workspace");
 
     expect(result).toContain("Error");
+  });
+});
+
+describe("bridge_download_asset_files", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function makeResponse(data: unknown, status = 200) {
+    return Promise.resolve(
+      new Response(JSON.stringify(data), {
+        status,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+  }
+
+  it("descarga archivos del activo al workspace", async () => {
+    fetchMock
+      .mockReturnValueOnce(
+        makeResponse({
+          ok: true,
+          asset: { id: "asset-1", title: "Reel Captación" },
+          files: [
+            {
+              evidenceId: "ev-1",
+              proposalId: "prop-1",
+              fileName: "toma-fachada.mp4",
+              mimeType: "video/mp4",
+              storagePath: "tenant/asset/file.mp4",
+              signedUrl: "https://signed.example.com/file.mp4",
+              uploadedAt: "2026-05-13T00:00:00Z"
+            }
+          ]
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(Uint8Array.from([1, 2, 3]), { status: 200 })
+      );
+
+    const client = new BridgeClient(CONFIG);
+    const result = await handleDownloadAssetFiles(client, {
+      assetId: "asset-1",
+      assetSlug: "reel-captacion",
+      localLayout: "project-folders",
+      localProjectPath: "clientes/techcorp/proyecto-lanzamiento"
+    }, "/workspace");
+
+    const { writeFileSync } = await import("fs");
+    expect(writeFileSync).toHaveBeenCalledWith(
+      expect.stringContaining("clientes/techcorp/proyecto-lanzamiento/activos/reel-captacion/ev-1__toma-fachada.mp4"),
+      expect.any(Buffer)
+    );
+    expect(result).toContain("Descargados: 1");
+  });
+
+  it("retorna mensaje honesto cuando no hay archivos", async () => {
+    fetchMock.mockReturnValueOnce(
+      makeResponse({
+        ok: true,
+        asset: { id: "asset-1", title: "Reel Captación" },
+        files: []
+      })
+    );
+
+    const client = new BridgeClient(CONFIG);
+    const result = await handleDownloadAssetFiles(client, {
+      assetId: "asset-1",
+      assetSlug: "reel-captacion"
+    }, "/workspace");
+
+    expect(result).toContain("No hay archivos reales descargables");
+  });
+
+  it("valida localProjectPath cuando localLayout=project-folders", async () => {
+    const client = new BridgeClient(CONFIG);
+    const result = await handleDownloadAssetFiles(client, {
+      assetId: "asset-1",
+      assetSlug: "reel-captacion",
+      localLayout: "project-folders"
+    }, "/workspace");
+
+    expect(result).toContain("localProjectPath");
+  });
+
+  it("rechaza localProjectPath fuera de workspaceRoot", async () => {
+    const client = new BridgeClient(CONFIG);
+    const result = await handleDownloadAssetFiles(client, {
+      assetId: "asset-1",
+      assetSlug: "reel-captacion",
+      localLayout: "project-folders",
+      localProjectPath: "../../etc"
+    }, "/workspace");
+
+    expect(result).toContain("workspaceRoot");
+  });
+
+  it("sanitiza fileName para evitar traversal", async () => {
+    fetchMock
+      .mockReturnValueOnce(
+        makeResponse({
+          ok: true,
+          asset: { id: "asset-1", title: "Reel Captación" },
+          files: [
+            {
+              evidenceId: "ev-1",
+              proposalId: "prop-1",
+              fileName: "../../malicioso.mp4",
+              mimeType: "video/mp4",
+              storagePath: "tenant/asset/file.mp4",
+              signedUrl: "https://signed.example.com/file.mp4",
+              uploadedAt: "2026-05-13T00:00:00Z"
+            }
+          ]
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(Uint8Array.from([1, 2, 3]), { status: 200 })
+      );
+
+    const client = new BridgeClient(CONFIG);
+    await handleDownloadAssetFiles(client, {
+      assetId: "asset-1",
+      assetSlug: "reel-captacion",
+      localLayout: "project-folders",
+      localProjectPath: "clientes/techcorp/proyecto-lanzamiento"
+    }, "/workspace");
+
+    const { writeFileSync } = await import("fs");
+    expect(writeFileSync).toHaveBeenCalledWith(
+      expect.stringContaining("reel-captacion/ev-1__malicioso.mp4"),
+      expect.any(Buffer)
+    );
+  });
+
+  it("sanitiza assetSlug para evitar traversal", async () => {
+    const { writeFileSync } = await import("fs");
+    vi.mocked(writeFileSync).mockClear();
+
+    fetchMock
+      .mockReturnValueOnce(
+        makeResponse({
+          ok: true,
+          asset: { id: "asset-1", title: "Reel Captación" },
+          files: [
+            {
+              evidenceId: "ev-1",
+              proposalId: "prop-1",
+              fileName: "toma-fachada.mp4",
+              mimeType: "video/mp4",
+              storagePath: "tenant/asset/file.mp4",
+              signedUrl: "https://signed.example.com/file.mp4",
+              uploadedAt: "2026-05-13T00:00:00Z"
+            }
+          ]
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(Uint8Array.from([1, 2, 3]), { status: 200 })
+      );
+
+    const client = new BridgeClient(CONFIG);
+    await handleDownloadAssetFiles(client, {
+      assetId: "asset-1",
+      assetSlug: "../../../../etc",
+      localLayout: "legacy"
+    }, "/workspace");
+
+    expect(writeFileSync).toHaveBeenCalledWith(
+      expect.stringContaining("context/activos/..-..-..-..-etc/ev-1__toma-fachada.mp4"),
+      expect.any(Buffer)
+    );
+  });
+
+  it("preserva evidencias homónimas sin sobrescribirlas", async () => {
+    fetchMock
+      .mockReturnValueOnce(
+        makeResponse({
+          ok: true,
+          asset: { id: "asset-1", title: "Reel Captación" },
+          files: [
+            {
+              evidenceId: "ev-1",
+              proposalId: "prop-1",
+              fileName: "pieza.png",
+              mimeType: "image/png",
+              storagePath: "tenant/asset/pieza-1.png",
+              signedUrl: "https://signed.example.com/pieza-1.png",
+              uploadedAt: "2026-05-13T00:00:00Z"
+            },
+            {
+              evidenceId: "ev-2",
+              proposalId: "prop-2",
+              fileName: "pieza.png",
+              mimeType: "image/png",
+              storagePath: "tenant/asset/pieza-2.png",
+              signedUrl: "https://signed.example.com/pieza-2.png",
+              uploadedAt: "2026-05-13T00:10:00Z"
+            }
+          ]
+        })
+      )
+      .mockResolvedValueOnce(new Response(Uint8Array.from([1]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(Uint8Array.from([2]), { status: 200 }));
+
+    const { writeFileSync } = await import("fs");
+    vi.mocked(writeFileSync).mockClear();
+
+    const client = new BridgeClient(CONFIG);
+    await handleDownloadAssetFiles(client, {
+      assetId: "asset-1",
+      assetSlug: "reel-captacion",
+      localLayout: "legacy"
+    }, "/workspace");
+
+    expect(writeFileSync).toHaveBeenCalledWith(
+      expect.stringContaining("context/activos/reel-captacion/ev-1__pieza.png"),
+      expect.any(Buffer)
+    );
+    expect(writeFileSync).toHaveBeenCalledWith(
+      expect.stringContaining("context/activos/reel-captacion/ev-2__pieza.png"),
+      expect.any(Buffer)
+    );
   });
 });

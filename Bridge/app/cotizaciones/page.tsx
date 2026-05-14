@@ -146,6 +146,29 @@ export default async function CotizacionesPage() {
             </div>
           </div>
 
+          {/* CTA descarga PDF — IMPL-20260513-03 */}
+          {activeVersion ? (
+            <div className="mt-4">
+              <a
+                href={`/api/v1/projects/${quotation.projectId}/quotation/pdf`}
+                className="inline-flex items-center gap-2 rounded-full bg-[color:var(--accent)] px-5 py-2.5 text-xs font-semibold text-white shadow-sm ring-1 ring-[color:var(--accent)] hover:opacity-90 transition-opacity"
+                download
+              >
+                <svg
+                  aria-hidden="true"
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 4v11" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Descargar PDF
+              </a>
+            </div>
+          ) : null}
+
           {activeVersion ? (
             <div className="mt-6 rounded-[24px] bg-white/80 px-5 py-5 ring-1 ring-[color:var(--line)]">
               <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">

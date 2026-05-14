@@ -2,6 +2,8 @@
  * IMPL-20260505-24
  * Respaldo: context/ACTIVOS_OPERABLES_V1.md, context/CATALOGO_ACTIVOS_V1.md,
  *           context/SPECs/SPEC_ARCH-20260505-24_activos_vinculados_a_cotizacion_y_project_v1.md
+ * IMPL-20260513-17
+ * Respaldo: context/AGENTE_VIKA_Y_SKILLS_TECNICAS_V1.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 
@@ -62,6 +64,7 @@ export type ApplicationCode = (typeof APPLICATION_CODES)[number];
 export type PieceTypeCode = (typeof PIECE_TYPE_CODES)[number];
 export type PlacementCode = (typeof PLACEMENT_CODES)[number];
 export type FormatCode = (typeof FORMAT_CODES)[number];
+export type AssetOperationalKind = "captura" | "produccion";
 
 export const applicationLabels: Record<ApplicationCode, string> = {
   whatsapp: "WhatsApp",
@@ -220,6 +223,31 @@ export function placementLabel(code: string): string {
 
 export function formatLabel(code: string): string {
   return formatLabels[code as FormatCode] ?? code;
+}
+
+function normalizeOperationalText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+export function resolveAssetOperationalKind(title: string): AssetOperationalKind {
+  const normalizedTitle = normalizeOperationalText(title);
+  const capturePatterns = [
+    /^\[captura\]/,
+    /^captura\s*[:\-]/,
+    /^activo de captura\b/,
+    /^insumo de captura\b/
+  ];
+
+  return capturePatterns.some((pattern) => pattern.test(normalizedTitle))
+    ? "captura"
+    : "produccion";
+}
+
+export function assetOperationalKindLabel(kind: AssetOperationalKind): string {
+  return kind === "captura" ? "Captura" : "Produccion";
 }
 
 export function nextPromptVersionNumber(versions: AssetPromptVersion[]): number {
@@ -635,11 +663,35 @@ async function postgrestInsert<T>(table: string, body: unknown): Promise<T> {
   return (await res.json()) as T;
 }
 
+// ─── Helpers de validación de contacto (IMPL-20260513-01) ───────────────────
+
+/**
+ * Valida que el string tenga forma de email con un patrón pragmático.
+ * No intenta RFC 5322 completo — basta para un corte operativo.
+ */
+export function isValidEmail(value: string): boolean {
+  // TLD mínimo 2 chars — más honesto que 1 char (IMPL-20260513-02 / observación GEM)
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim());
+}
+
+/**
+ * Limpia un número de WhatsApp: elimina todo lo que no sea dígito ni el + inicial.
+ * Ejemplo: "+52 (55) 1234-5678" → "+5215512345678"
+ */
+export function sanitizeWhatsapp(value: string): string {
+  const trimmed = value.trim();
+  const prefix = trimmed.startsWith("+") ? "+" : "";
+  const digits = trimmed.replace(/\D/g, "");
+  return `${prefix}${digits}`;
+}
+
 export type CreateClientInput = {
   name: string;
   legalName?: string;
   status?: "active" | "prospect" | "inactive";
   primaryContactName?: string;
+  primaryContactEmail?: string;
+  primaryContactWhatsapp?: string;
   primaryContactChannel?: string;
   notes?: string;
 };
@@ -678,6 +730,9 @@ export async function createClient(
     legal_name: data.legalName ?? null,
     status: data.status ?? "active",
     primary_contact_name: data.primaryContactName ?? null,
+    primary_contact_email: data.primaryContactEmail?.trim() ?? null,
+    primary_contact_whatsapp:
+      data.primaryContactWhatsapp ? sanitizeWhatsapp(data.primaryContactWhatsapp) : null,
     primary_contact_channel: data.primaryContactChannel ?? null,
     notes: data.notes ?? null
   });

@@ -14,6 +14,9 @@
 import { getAssetChat, type EntityChat } from "./chat";
 import { suggestCreativeTool, type CreativeTool } from "./designer-workspace";
 import { assetStatusLabel, type Asset, type AssetPromptVersion, type AssetStatus } from "./assets";
+
+// Re-exportar AssetPromptVersion: se usa en firmas exportadas de este módulo (IMPL-20260513-19)
+export type { AssetPromptVersion };
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 
 // ─── Tipos del contrato (SPEC-45 + SPEC-46) ──────────────────────────────────
@@ -781,6 +784,37 @@ async function fetchEvidencesForProposals(
       })
     );
     return evidences;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Lista todas las evidencias reales asociadas a un activo.
+ * No colapsa por propuesta: devuelve cada archivo persistido en asset_proposal_evidences.
+ * IMPL-20260513-16
+ */
+export async function listAssetEvidences(assetId: string): Promise<ProposalEvidence[]> {
+  if (!isSupabaseConfigured) return [];
+  const params = new URLSearchParams({
+    select: "id,tenant_id,asset_id,proposal_id,file_name,mime_type,storage_path,file_size_bytes,uploaded_at",
+    asset_id: `eq.${assetId}`,
+    order: "uploaded_at.desc"
+  });
+
+  try {
+    const rows = await postgrest<EvidenceRow[]>(
+      `asset_proposal_evidences?${params.toString()}`,
+      { method: "GET" }
+    );
+
+    return await Promise.all(
+      rows.map(async (row) => {
+        const base = normalizeEvidenceRow(row);
+        const signedUrl = await generateSignedUrl(row.storage_path);
+        return { ...base, signedUrl };
+      })
+    );
   } catch {
     return [];
   }

@@ -1,27 +1,45 @@
 /**
- * IMPL-20260510-09
- * Módulo de Comunicación Transaccional (MCT) V1
- * Respaldo: context/SPECs/SPEC_ARCH-20260510-09_modulo_comunicacion_transaccional_mct_v1.md
+ * IMPL-20260513-04 | IMPL-20260513-05
+ * Módulo de Comunicación Transaccional (MCT) V1 — proveedor email: SendGrid
+ * Respaldo: context/SPECs/SPEC_ARCH-20260513-04_sendgrid_proveedor_email_mct_v1.md
+ * IMPL-20260513-05: context/SPECs/SPEC_ARCH-20260513-05_configuracion_sendgrid_segura_v1.md
+ * Migrado desde: IMPL-20260510-09 (Resend)
  *
  * Canales:
- *  - Email automático al cliente (Resend)
+ *  - Email automático al cliente (SendGrid)
  *  - Google Chat automático al operador (Incoming Webhook)
  *  - WhatsApp Click-to-Send (generación de URL wa.me)
  */
 
-import { Resend } from "resend";
+import sgMail from "@sendgrid/mail";
 import { render } from "@react-email/render";
 
 import { ClientCreatedEmail } from "../emails/client-created";
 import { QuotationActiveEmail } from "../emails/quotation-active";
 import { AssetDeliveredEmail } from "../emails/asset-delivered";
+import { getTenantSendgridConfig } from "./tenant-runtime";
+import { supabaseEnv } from "./supabase";
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
+// ─── Constantes de fallback (cuando no hay config en tenant) ──────────────────
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const DEFAULT_AGENCY_NAME = process.env.BRIDGE_AGENCY_NAME ?? "Vectoria";
+const DEFAULT_FROM_EMAIL  = process.env.BRIDGE_FROM_EMAIL  ?? "hola@vectoria.mx";
 
-const AGENCY_NAME = process.env.BRIDGE_AGENCY_NAME ?? "Vectoria";
-const FROM_EMAIL = process.env.BRIDGE_FROM_EMAIL ?? "hola@vectoria.mx";
+/**
+ * Resuelve agencyName y fromEmail preferiendo la configuración del tenant
+ * cuando exista, con fallback a env vars.
+ */
+async function resolveSenderConfig(): Promise<{ agencyName: string; fromEmail: string }> {
+  try {
+    const cfg = await getTenantSendgridConfig(supabaseEnv.defaultTenant);
+    return {
+      agencyName: cfg?.sendgridAgencyName ?? DEFAULT_AGENCY_NAME,
+      fromEmail:  cfg?.sendgridFromEmail  ?? DEFAULT_FROM_EMAIL
+    };
+  } catch {
+    return { agencyName: DEFAULT_AGENCY_NAME, fromEmail: DEFAULT_FROM_EMAIL };
+  }
+}
 
 // ─── Tipos de dominio ─────────────────────────────────────────────────────────
 
@@ -72,7 +90,7 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-// ─── Canal 1: Email automático al cliente (Resend) ────────────────────────────
+// ─── Canal 1: Email automático al cliente (SendGrid) ───────────────────────────
 
 /**
  * Envía un email transaccional al cliente según el evento.
@@ -83,10 +101,12 @@ export async function sendTransactionalEmail<E extends MCTEmailEvent>(
   event: E,
   data: MCTEmailEventDataMap[E]
 ): Promise<MCTEmailResult> {
-  if (!process.env.RESEND_API_KEY) {
-    console.warn("[MCT] RESEND_API_KEY no configurada, email omitido.", { event });
-    return { success: false, error: "RESEND_API_KEY not set" };
+  if (!process.env.SENDGRID_API_KEY) {
+    console.warn("[MCT] SENDGRID_API_KEY no configurada, email omitido.", { event });
+    return { success: false, error: "SENDGRID_API_KEY not set" };
   }
+
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
   const to = (data as { to: string }).to;
 
@@ -99,22 +119,19 @@ export async function sendTransactionalEmail<E extends MCTEmailEvent>(
   }
 
   try {
-    const { subject, html } = await buildEmailPayload(event, data);
+    const sender = await resolveSenderConfig();
+    const { subject, html } = await buildEmailPayload(event, data, sender);
 
-    const result = await resend.emails.send({
-      from: `${AGENCY_NAME} <${FROM_EMAIL}>`,
+    const [response] = await sgMail.send({
+      from: `${sender.agencyName} <${sender.fromEmail}>`,
       to,
       subject,
       html
     });
 
-    if (result.error) {
-      console.error("[MCT] Error al enviar email.", { event, to: "[email]", error: result.error });
-      return { success: false, error: result.error.message };
-    }
-
-    console.info("[MCT] Email enviado.", { event, to: "[email]", messageId: result.data?.id });
-    return { success: true, messageId: result.data?.id };
+    const messageId = response.headers["x-message-id"] as string | undefined;
+    console.info("[MCT] Email enviado.", { event, to: "[email]", messageId });
+    return { success: true, messageId };
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown_error";
     console.error("[MCT] Excepción al enviar email.", { event, error: message });
@@ -126,22 +143,24 @@ export async function sendTransactionalEmail<E extends MCTEmailEvent>(
 
 async function buildEmailPayload(
   event: MCTEmailEvent,
-  data: MCTEmailEventDataMap[MCTEmailEvent]
+  data: MCTEmailEventDataMap[MCTEmailEvent],
+  sender: { agencyName: string; fromEmail: string }
 ): Promise<{ subject: string; html: string }> {
+  const { agencyName } = sender;
   switch (event) {
     case "client.created": {
       const d = data as ClientCreatedData;
-      const subject = `Tu espacio en ${AGENCY_NAME} ya está listo`;
+      const subject = `Tu espacio en ${agencyName} ya está listo`;
       const html = await render(
-        ClientCreatedEmail({ ...d, agencyName: AGENCY_NAME })
+        ClientCreatedEmail({ ...d, agencyName })
       );
       return { subject, html };
     }
     case "quotation.active": {
       const d = data as QuotationActiveData;
-      const subject = `Tu propuesta de ${AGENCY_NAME} ya está disponible`;
+      const subject = `Tu propuesta de ${agencyName} ya está disponible`;
       const html = await render(
-        QuotationActiveEmail({ ...d, agencyName: AGENCY_NAME })
+        QuotationActiveEmail({ ...d, agencyName })
       );
       return { subject, html };
     }
@@ -149,7 +168,7 @@ async function buildEmailPayload(
       const d = data as AssetDeliveredData;
       const subject = `Tu entrega está lista — ${d.assetName}`;
       const html = await render(
-        AssetDeliveredEmail({ ...d, agencyName: AGENCY_NAME })
+        AssetDeliveredEmail({ ...d, agencyName })
       );
       return { subject, html };
     }

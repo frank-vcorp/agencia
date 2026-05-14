@@ -61,6 +61,10 @@ import {
   createAssetToolDefinition,
   handleCreateAsset
 } from "./tools/create-asset.js";
+import {
+  downloadAssetFilesToolDefinition,
+  handleDownloadAssetFiles
+} from "./tools/download-asset-files.js";
 
 async function main() {
   const config = loadConfig();
@@ -81,7 +85,8 @@ async function main() {
       writeQuotationToolDefinition,
       createClientToolDefinition,
       createProjectToolDefinition,
-      createAssetToolDefinition
+      createAssetToolDefinition,
+      downloadAssetFilesToolDefinition
     ]
   }));
 
@@ -122,6 +127,10 @@ async function main() {
 
       case "bridge_create_asset":
         text = await handleCreateAsset(client, args ?? {});
+        break;
+
+      case "bridge_download_asset_files":
+        text = await handleDownloadAssetFiles(client, args ?? {}, config.workspaceRoot);
         break;
 
       default:
