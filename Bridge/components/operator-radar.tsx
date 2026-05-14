@@ -45,22 +45,6 @@ function formatIdleLabel(hours: number): string {
   return remainder > 0 ? `${days}d ${remainder}h sin movimiento` : `${days}d sin movimiento`;
 }
 
-function formatGeneratedAt(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat("es-MX", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: "America/Mexico_City"
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
-}
-
 // ─── Tarjeta individual de proyecto ──────────────────────────────────────────
 
 function RadarProjectCard({ item }: { item: PortfolioItem }) {
@@ -182,29 +166,16 @@ export function OperatorRadarView({ radar }: { radar: OperatorRadar }) {
     <div className="space-y-5">
       {/* Header del radar */}
       <section className="panel rounded-[30px] px-6 py-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="inline-flex rounded-full bg-[color:var(--accent-soft)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--accent-deep)]">
-              Operador
-            </div>
-            <h2 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-bold tracking-tight">
-              Radar priorizado por proyecto
-            </h2>
-            <p className="mt-2 max-w-2xl text-base leading-7 text-[color:var(--muted)]">
-              Proyectos ordenados por conveniencia operativa. Cada fila explica por que sube en
-              prioridad, que esta bloqueando y donde actuar primero.
-            </p>
-          </div>
-          <div className="rounded-[24px] bg-slate-900 px-4 py-4 text-white">
-            <div className="text-[11px] uppercase tracking-[0.22em] text-white/60">Generado</div>
-            <div className="mt-2 font-[family-name:var(--font-heading)] text-lg font-bold">
-              {formatGeneratedAt(radar.generatedAt)}
-            </div>
-            <p className="mt-1 text-sm text-white/60">
-              {radar.portfolioItems.length} proyecto{radar.portfolioItems.length !== 1 ? "s" : ""} evaluado
-              {radar.portfolioItems.length !== 1 ? "s" : ""}
-            </p>
-          </div>
+        <div>
+          <h2 className="font-[family-name:var(--font-heading)] text-3xl font-bold tracking-tight">
+            Proyectos por prioridad operativa
+          </h2>
+          <p className="mt-2 max-w-2xl text-base leading-7 text-[color:var(--muted)]">
+            Orden actual de atencion para mover clientes, propuestas y entregables sin perder el siguiente paso comercial.
+          </p>
+          <p className="mt-3 text-sm text-[color:var(--muted)]">
+            {radar.portfolioItems.length} proyecto{radar.portfolioItems.length !== 1 ? "s" : ""} en seguimiento.
+          </p>
         </div>
       </section>
 

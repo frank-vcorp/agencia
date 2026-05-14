@@ -92,56 +92,6 @@ function TaskOperationalBadge({ task }: { task: DesignerTask }) {
   );
 }
 
-// ─── Bloque de herramienta sugerida (estacion creativa) ──────────────────────
-
-function CreativeStationBlock({ task }: { task: DesignerTask }) {
-  const tool = task.suggestedTool;
-  const ALL_TOOLS: CreativeTool[] = ["firefly", "adobe_express", "photoshop"];
-
-  return (
-    <div className="panel rounded-[28px] px-5 py-5 ring-1 ring-[color:var(--line)]">
-      <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
-        Estacion creativa — flujo Bridge → Adobe → Bridge
-      </p>
-      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-lg font-bold tracking-tight">
-        Herramienta sugerida: {TOOL_LABELS[tool]}
-      </h3>
-      <p className="mt-1 text-sm leading-6 text-[color:var(--muted)]">{TOOL_DESC[tool]}</p>
-
-      {/* Flujo visual de 3 pasos */}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {ALL_TOOLS.map((t, i) => (
-          <div key={t} className="flex items-center gap-2">
-            <span
-              className={`rounded-[14px] px-3 py-1.5 text-[11px] font-semibold ${
-                t === tool
-                  ? "bg-slate-900 text-white"
-                  : "bg-white/70 text-[color:var(--muted)] ring-1 ring-[color:var(--line)]"
-              }`}
-            >
-              {i + 1}. {TOOL_LABELS[t]}
-            </span>
-            {i < ALL_TOOLS.length - 1 && (
-              <span className="text-[color:var(--muted)]">→</span>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Nota de regreso de propuestas */}
-      <div className="mt-4 rounded-[14px] bg-[color:var(--accent-soft)] px-4 py-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--accent-deep)]">
-          Regreso a Bridge
-        </p>
-        <p className="mt-1 text-sm leading-6 text-[color:var(--accent-deep)]">
-          Cuando termines de producir, regresa las propuestas al activo en Bridge para revision del
-          operador. El prompt origen queda registrado como referencia.
-        </p>
-      </div>
-    </div>
-  );
-}
-
 // ─── Tarjeta de tarea activa (pendiente principal) ────────────────────────────
 
 interface ActiveTaskCardProps {
@@ -475,15 +425,11 @@ export function DesignerWorkspaceView({
       <section className="panel rounded-[30px] px-6 py-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="inline-flex rounded-full bg-[color:var(--accent-soft)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--accent-deep)]">
-              Disenador
-            </div>
-            <h2 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-bold tracking-tight">
-              Workspace de produccion
+            <h2 className="font-[family-name:var(--font-heading)] text-3xl font-bold tracking-tight">
+              Cola de produccion
             </h2>
             <p className="mt-2 max-w-2xl text-base leading-7 text-[color:var(--muted)]">
-              Cola guiada de activos. Bridge entrega el prompt y el contexto, tu saltas a la estacion
-              Adobe para producir, y regresas las propuestas aqui para revision.
+              Activos listos para producir, revisar y devolver al flujo comercial sin pasos internos innecesarios.
             </p>
           </div>
           <div className="rounded-[24px] bg-slate-900 px-4 py-4 text-white">
@@ -524,13 +470,6 @@ export function DesignerWorkspaceView({
               </section>
             ) : null}
 
-            {/* 4. Estacion creativa — se muestra si hay tarea activa o sugerida */}
-            {(workspace.activeTask ?? workspace.nextSuggestedTask) && (
-              <CreativeStationBlock
-                task={(workspace.activeTask ?? workspace.nextSuggestedTask)!}
-              />
-            )}
-
             {/* 6. Propuestas del activo */}
             <ProposalDraftsPanel
               proposals={workspace.proposalDrafts}
@@ -555,31 +494,6 @@ export function DesignerWorkspaceView({
                   ))}
                 </div>
               </section>
-            )}
-
-            {/* Vacios V1 documentados */}
-            {workspace.gaps.length > 0 ? (
-              <details className="panel shrink-0 rounded-[22px] px-5 py-4 ring-1 ring-[color:var(--line)]">
-                <summary className="cursor-pointer text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted)]">
-                  Vacios V1 documentados ({workspace.gaps.length})
-                </summary>
-                <ul className="mt-3 space-y-1.5">
-                  {workspace.gaps.map((gap, i) => (
-                    <li key={i} className="text-[11px] leading-5 text-[color:var(--muted)]">
-                      • {gap}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            ) : (
-              <div className="panel shrink-0 rounded-[22px] px-5 py-4 ring-1 ring-emerald-200 bg-emerald-50">
-                <p className="text-[10px] uppercase tracking-[0.22em] text-emerald-700">
-                  Workspace cerrado
-                </p>
-                <p className="mt-1 text-sm leading-6 text-emerald-800">
-                  `/disenador` ya tiene sesiones reales, propuestas visibles y jornada util sin vacios honestos activos.
-                </p>
-              </div>
             )}
 
             {/* Chat panel — ocupa el espacio restante */}
