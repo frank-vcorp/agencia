@@ -31,6 +31,8 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const isConfiguration = pathname.startsWith("/configuracion");
+  const currentNavItem = [...shellMeta.roles, ...shellMeta.modules].find((item) => isCurrent(pathname, item.href));
+  const compactTitle = currentNavItem?.label ?? "Bridge";
 
   // Ruta /cliente → PWA ligera; no exponer la cabina general de Bridge
   if (pathname.startsWith("/cliente")) {
@@ -127,65 +129,34 @@ export function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col gap-5">
-        {isConfiguration ? (
-          <header className="lg:hidden">
-            <div className="-mx-1 flex gap-2 overflow-x-auto pb-1">
-              {mobileLinks.map((item) => {
-                const active = isCurrent(pathname, item.href);
-
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
-                      active
-                        ? "bg-slate-900 text-white"
-                        : "bg-white/80 text-[color:var(--muted)] ring-1 ring-[color:var(--line)]"
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
-          </header>
-        ) : (
-          <header className="panel flex flex-col gap-4 rounded-[28px] px-5 py-4 md:flex-row md:items-center md:justify-between md:px-6">
+        <header className={`panel rounded-[20px] px-4 py-3 lg:hidden ${isConfiguration ? "" : ""}`}>
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">
-                <span>Bridge V1</span>
-                <span className="h-1 w-1 rounded-full bg-[color:var(--accent)]" />
-                <span>Piloto operativo</span>
-              </div>
-              <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight md:text-[2rem]">
-                Plataforma compartida para operador, disenador y cliente
-              </h1>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-[color:var(--muted)]">
-                Ordena briefings, cotizaciones, activos y contexto derivado sin depender de chats dispersos.
-              </p>
+              <div className="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Superficie activa</div>
+              <h1 className="mt-1 font-[family-name:var(--font-heading)] text-lg font-bold tracking-tight">{compactTitle}</h1>
             </div>
+          </div>
 
-            <div className="-mx-1 flex gap-2 overflow-x-auto pb-1 lg:hidden">
-              {mobileLinks.map((item) => {
-                const active = isCurrent(pathname, item.href);
+          <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto pb-1">
+            {mobileLinks.map((item) => {
+              const active = isCurrent(pathname, item.href);
 
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
-                      active
-                        ? "bg-slate-900 text-white"
-                        : "bg-white/80 text-[color:var(--muted)] ring-1 ring-[color:var(--line)]"
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
-          </header>
-        )}
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+                    active
+                      ? "bg-slate-900 text-white"
+                      : "bg-white/80 text-[color:var(--muted)] ring-1 ring-[color:var(--line)]"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </header>
 
         <main className="min-w-0">{children}</main>
       </div>
