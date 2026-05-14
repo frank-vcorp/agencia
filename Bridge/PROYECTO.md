@@ -338,6 +338,7 @@ Prioridad recomendada:
 6. Limpieza técnica de código y archivos no utilizados.
 7. Refinamiento UX/UI en interfaces operador/diseñador/cliente.
 8. Redefinir `/disenador` como estacion unica de ejecucion creativa con contexto persistente y asistente lateral puntual.
+9. Cerrar foco intra-workspace del diseñador para cambiar de activo sin salir de `/disenador`.
 
 ### [ ] Posterior
 

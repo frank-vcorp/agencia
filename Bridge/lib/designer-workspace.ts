@@ -1,8 +1,9 @@
 /**
- * IMPL-20260506-44 | IMPL-20260506-52
+ * IMPL-20260506-44 | IMPL-20260506-52 | IMPL-20260514-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-40_modelo_ejecucion_disenador_sesiones_y_estados.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-41_workspace_disenador_guiado.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-52_disenador_sesiones_reales_y_cierre_jornada.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260514-01_foco_intra_workspace_disenador_v1.md
  * IMPL-20260513-17
  * Respaldo: context/AGENTE_VIKA_Y_SKILLS_TECNICAS_V1.md
  */
@@ -113,11 +114,23 @@ export type DailyStatsToday = {
   date: string;
 };
 
+/**
+ * Opciones de entrada para getDesignerWorkspace. IMPL-20260514-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260514-01_foco_intra_workspace_disenador_v1.md
+ */
+export type GetDesignerWorkspaceOptions = {
+  tenantSlug?: string;
+  /** Si viene de ?focus=<id>, forzar ese activo como enfocado si pertenece a taskQueue. */
+  focusedAssetId?: string | null;
+};
+
 export type DesignerWorkspace = {
   tenantSlug: string;
   generatedAt: string;
   /** Activo en foco: tarea activa o, si no hay, la siguiente sugerida. IMPL-20260513-20 */
   focusedAsset: DesignerTask | null;
+  /** Origen del foco: 'auto' = derivacion automatica, 'query' = explicito por ?focus=. IMPL-20260514-01 */
+  focusedAssetSource: "auto" | "query";
   /** Tarea en curso (status = in_progress). */
   activeTask: DesignerTask | null;
   /** Siguiente tarea sugerida (status = ready_to_start con mayor score). */
@@ -579,11 +592,12 @@ async function fetchProposalDraftsForAsset(assetId: string): Promise<DesignerPro
 
 /**
  * Obtiene el workspace del disenador con sesiones reales y jornada diaria.
- * IMPL-20260506-44 | IMPL-20260506-52
+ * Soporta foco explicito via focusedAssetId (query param ?focus=). IMPL-20260506-44 | IMPL-20260506-52 | IMPL-20260514-01
  */
 export async function getDesignerWorkspace(
-  tenantSlug = supabaseEnv.defaultTenant
+  options: GetDesignerWorkspaceOptions = {}
 ): Promise<DesignerWorkspace> {
+  const tenantSlug = options.tenantSlug ?? supabaseEnv.defaultTenant;
   const generatedAt = new Date().toISOString();
 
   // Inicio del dia actual en UTC para filtrar jornada
@@ -603,6 +617,7 @@ export async function getDesignerWorkspace(
     tenantSlug,
     generatedAt,
     focusedAsset: null,
+    focusedAssetSource: "auto",
     activeTask: null,
     nextSuggestedTask: null,
     taskQueue: [],
@@ -733,7 +748,29 @@ export async function getDesignerWorkspace(
     taskQueue.find((t) => t.status === "ready_for_review" && t !== activeTask) ??
     null;
 
-  const focusedAsset = activeTask ?? nextSuggestedTask ?? null;
+  const autoFocusedAsset = activeTask ?? nextSuggestedTask ?? null;
+
+  // Resolver foco explicito: si viene ?focus=<id> y el activo esta en la cola, usarlo.
+  // Si no existe en la cola o no se proporciono, caer al foco automatico. IMPL-20260514-01
+  const requestedFocusId = options.focusedAssetId ?? null;
+  let focusedAsset: DesignerTask | null;
+  let focusedAssetSource: "auto" | "query";
+
+  if (requestedFocusId) {
+    const explicitTask = taskQueue.find((t) => t.assetId === requestedFocusId) ?? null;
+    if (explicitTask) {
+      focusedAsset = explicitTask;
+      focusedAssetSource = "query";
+    } else {
+      // ID no existe en la cola: silenciosamente caer al foco automatico
+      focusedAsset = autoFocusedAsset;
+      focusedAssetSource = "auto";
+    }
+  } else {
+    focusedAsset = autoFocusedAsset;
+    focusedAssetSource = "auto";
+  }
+
   const focusAssetId = focusedAsset?.assetId ?? null;
 
   // Fetch en paralelo: propuestas y resumen del brief del activo enfocado
@@ -750,6 +787,7 @@ export async function getDesignerWorkspace(
     tenantSlug,
     generatedAt,
     focusedAsset,
+    focusedAssetSource,
     activeTask,
     nextSuggestedTask,
     taskQueue,

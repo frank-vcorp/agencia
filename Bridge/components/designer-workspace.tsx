@@ -1,9 +1,10 @@
 /**
- * IMPL-20260506-44 | IMPL-20260506-52 | IMPL-20260513-20
+ * IMPL-20260506-44 | IMPL-20260506-52 | IMPL-20260513-20 | IMPL-20260514-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-41_workspace_disenador_guiado.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-40_modelo_ejecucion_disenador_sesiones_y_estados.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260506-52_disenador_sesiones_reales_y_cierre_jornada.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260513-20_workspace_disenador_estacion_unica_v2.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260514-01_foco_intra_workspace_disenador_v1.md
  * IMPL-20260513-17 | ARCH-20260513-26
  * Respaldo: context/AGENTE_VIKA_Y_SKILLS_TECNICAS_V1.md
  */
@@ -100,7 +101,7 @@ function LeftRailTaskItem({
     : "ring-[color:var(--line)] bg-white/60 hover:bg-white/90";
 
   return (
-    <Link href={`/activos/${task.assetId}`}>
+    <Link href={`/disenador?focus=${task.assetId}`}>
       <article
         className={`rounded-[18px] px-3 py-3 ring-1 transition ${focusedRing}`}
       >
@@ -132,7 +133,7 @@ function LeftRail({ workspace }: { workspace: DesignerWorkspace }) {
     dailyStats.inProgressCount + dailyStats.readyToStartCount + dailyStats.blockedCount;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 overflow-y-auto max-h-[calc(100vh-2rem)]">
       {/* Encabezado de jornada */}
       <div className="panel rounded-[22px] px-4 py-3 ring-1 ring-[color:var(--line)]">
         <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">
