@@ -202,8 +202,8 @@ export function scoreDesignerTask(
 ): number {
   let score = 0;
   if (task.status === "in_progress") score += 50;
-  else if (task.status === "ready_for_review") score += 30;
-  else if (task.status === "ready_to_start") score += 20;
+  else if (task.status === "ready_to_start") score += 30;
+  else if (task.status === "ready_for_review") score += 20;
   // Prompt activo = listo para saltar a estacion creativa
   if (task.promptText) score += 15;
   return score;
