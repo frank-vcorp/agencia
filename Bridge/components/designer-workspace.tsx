@@ -191,22 +191,37 @@ function ActiveTaskCard({ task, activeSession }: ActiveTaskCardProps) {
 // ─── Tarjeta compacta de cola ─────────────────────────────────────────────────
 
 function QueueTaskCard({ task }: { task: DesignerTask }) {
-  const toolLabel = TOOL_LABELS[task.suggestedTool];
+  const statusLabel = TASK_STATUS_LABELS[task.status];
 
   return (
-    <article className="panel flex flex-wrap items-start justify-between gap-3 rounded-[22px] px-4 py-4 ring-1 ring-[color:var(--line)]">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">
-          {task.clientName} / {task.projectName}
-        </p>
-        <p className="mt-0.5 truncate text-sm font-semibold">{task.assetTitle}</p>
-        <p className="mt-1 text-[11px] leading-5 text-[color:var(--muted)]">{task.priorityReason}</p>
+    <article className="panel rounded-[20px] px-4 py-3 ring-1 ring-[color:var(--line)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">
+            {task.projectName}
+          </p>
+          <p className="mt-1 truncate text-sm font-semibold leading-5">{task.assetTitle}</p>
+          <p className="mt-1 truncate text-[11px] text-[color:var(--muted)]">{task.clientName}</p>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="font-[family-name:var(--font-heading)] text-lg font-bold tabular-nums text-[color:var(--accent)]">
+            {task.priorityScore}
+          </div>
+          <div className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--muted)]">score</div>
+        </div>
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-2">
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <TaskOperationalBadge task={task} />
         <TaskStatusBadge status={task.status} />
-        <span className="text-[10px] text-[color:var(--muted)]">{toolLabel}</span>
-        {/* IMPL-20260506-45: apunta a la ficha detallada del activo */}
+      </div>
+
+      <p className="mt-3 truncate text-[11px] leading-5 text-[color:var(--muted)]">{task.suggestedAction}</p>
+
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-[color:var(--line)] pt-3">
+        <span className="truncate text-[10px] uppercase tracking-[0.16em] text-[color:var(--muted)]">
+          {statusLabel}
+        </span>
         <Link
           href={`/activos/${task.assetId}`}
           className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent-deep)] transition hover:underline"
