@@ -1,10 +1,11 @@
 /**
- * IMPL-20260505-25
+ * IMPL-20260505-25 | ARCH-20260513-20
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-25_cabina_operador_accionable_resumenes_reales_v1.md
+ * Ajuste: recorte del dashboard para evitar navegación redundante frente al shell global.
  */
 import Link from "next/link";
 
-import { modulePages, rolePages } from "@/lib/bridge-data";
+import { modulePages } from "@/lib/bridge-data";
 import { getOperativeSummary } from "@/lib/dashboard";
 import { getSupabaseHealth } from "@/lib/supabase-health";
 
@@ -142,26 +143,7 @@ export async function OverviewDashboard() {
         </aside>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[1fr_1fr]">
-        <div className="panel rounded-[30px] px-6 py-6">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">Superficies por rol</p>
-              <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight">Cada actor ve el mismo sistema con distinta prioridad</h3>
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-3">
-            {rolePages.map((role) => (
-              <Link key={role.href} href={role.href} className="panel-strong rounded-[24px] px-4 py-4 transition hover:-translate-y-0.5">
-                <div className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">{role.shortLabel}</div>
-                <div className="mt-2 font-[family-name:var(--font-heading)] text-xl font-bold">{role.label}</div>
-                <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">{role.description}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-
+      <section>
         <div className="panel rounded-[30px] px-6 py-6">
           <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">Estado operativo del proyecto</p>
           <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight">Resumen accionable del piloto</h3>

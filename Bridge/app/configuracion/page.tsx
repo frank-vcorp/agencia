@@ -1,9 +1,10 @@
 /**
- * IMPL-20260513-05
+ * IMPL-20260513-05 | ARCH-20260513-20
  * Respaldo: context/SPECs/SPEC_ARCH-20260513-05_configuracion_sendgrid_segura_v1.md
  *
  * Superficie interna de configuración — parámetros no secretos de SendGrid.
  * SENDGRID_API_KEY NO se almacena aquí; vive en secretos de plataforma.
+ * Ajuste: recorte visual para concentrar la UI en estado y acción.
  */
 import { revalidatePath } from "next/cache";
 
@@ -69,8 +70,7 @@ export default async function ConfiguracionPage() {
           Canal de email — SendGrid
         </h1>
         <p className="mt-1 max-w-2xl text-sm leading-6 text-[color:var(--muted)]">
-          Aquí puedes revisar el estado del canal y ajustar parámetros del remitente sin tocar código.
-          La API key vive fuera de Bridge, en secretos de plataforma.
+          Revisa el estado del canal y ajusta solo los parámetros que sí afectan el envío.
         </p>
       </div>
 
@@ -117,17 +117,6 @@ export default async function ConfiguracionPage() {
           </div>
         </div>
 
-        {/* Aviso de seguridad */}
-        <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200">
-          <p className="text-xs font-semibold text-slate-600">
-            🔒 Separación de responsabilidades
-          </p>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            <strong>SENDGRID_API_KEY</strong> es un secreto de plataforma. Bridge nunca la almacena en base de datos.
-            Los parámetros del remitente (abajo) son valores operativos, no secretos — sí se persisten en
-            configuración del tenant.
-          </p>
-        </div>
       </div>
 
       {/* Formulario de configuración editable */}
@@ -135,19 +124,12 @@ export default async function ConfiguracionPage() {
         <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-[color:var(--muted)]">
           Parámetros del remitente
         </p>
-        <p className="mb-5 text-xs text-[color:var(--muted)]">
-          Estos valores se guardan en configuración del tenant. Tienen prioridad sobre las variables de entorno.
-        </p>
-
         <form action={guardarConfigSendgrid} className="space-y-5">
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
               <label htmlFor="sendgridFromEmail" className="block text-xs font-semibold text-slate-700">
                 Email remitente
               </label>
-              <p className="mt-0.5 text-[11px] text-[color:var(--muted)]">
-                Fallback: {process.env.BRIDGE_FROM_EMAIL ?? "hola@vectoria.mx"} (env)
-              </p>
               <input
                 type="email"
                 id="sendgridFromEmail"
@@ -162,9 +144,6 @@ export default async function ConfiguracionPage() {
               <label htmlFor="sendgridAgencyName" className="block text-xs font-semibold text-slate-700">
                 Nombre de la agencia
               </label>
-              <p className="mt-0.5 text-[11px] text-[color:var(--muted)]">
-                Fallback: {process.env.BRIDGE_AGENCY_NAME ?? "Vectoria"} (env)
-              </p>
               <input
                 type="text"
                 id="sendgridAgencyName"
@@ -178,11 +157,8 @@ export default async function ConfiguracionPage() {
 
           <div className="sm:w-1/2">
             <label htmlFor="sendgridReplyToEmail" className="block text-xs font-semibold text-slate-700">
-              Reply-to (opcional)
+              Reply-to
             </label>
-            <p className="mt-0.5 text-[11px] text-[color:var(--muted)]">
-              Si se configura, los clientes responden a este email en lugar del remitente.
-            </p>
             <input
               type="email"
               id="sendgridReplyToEmail"
@@ -201,22 +177,10 @@ export default async function ConfiguracionPage() {
               Guardar configuración
             </button>
             <p className="text-xs text-[color:var(--muted)]">
-              Los cambios aplican al siguiente envío de email.
+              La API key sigue viviendo en secretos de plataforma.
             </p>
           </div>
         </form>
-      </div>
-
-      {/* Info de tenant */}
-      <div className="panel rounded-[28px] px-6 py-4">
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-[color:var(--muted)]">
-            Tenant activo: <span className="font-semibold text-slate-700">{supabaseEnv.defaultTenant}</span>
-          </p>
-          <p className="text-xs text-[color:var(--muted)]">
-            Fuente de config: <span className="font-semibold text-slate-700">tenant_runtime_settings</span>
-          </p>
-        </div>
       </div>
     </div>
   );

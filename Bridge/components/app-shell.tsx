@@ -1,7 +1,9 @@
 /**
- * FIX-20260505-01 | IMPL-20260508-23
+ * FIX-20260505-01 | IMPL-20260508-23 | ARCH-20260513-20
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-26_crm_ligero_operativo_y_seguimiento_minimo_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260513-05_configuracion_sendgrid_segura_v1.md
  * Ajuste: /cliente omite sidebar/header del shell general (PWA ligera).
+ * Ajuste: /configuracion usa shell mas compacto para evitar ruido visual redundante.
  */
 "use client";
 
@@ -11,7 +13,6 @@ import { usePathname } from "next/navigation";
 
 import { shellMeta } from "@/lib/bridge-data";
 import type { ModuleMetrics } from "@/lib/dashboard";
-import { isSupabaseConfigured, supabaseEnv } from "@/lib/supabase";
 
 function isCurrent(pathname: string, href: string) {
   if (href === "/") {
@@ -29,6 +30,7 @@ export function AppShell({
   moduleMetrics?: ModuleMetrics;
 }) {
   const pathname = usePathname();
+  const isConfiguration = pathname.startsWith("/configuracion");
 
   // Ruta /cliente → PWA ligera; no exponer la cabina general de Bridge
   if (pathname.startsWith("/cliente")) {
@@ -52,10 +54,7 @@ export function AppShell({
           <div className="rounded-2xl bg-white/90 p-2 shadow-sm ring-1 ring-[color:var(--line)]">
             <Image src="/logo-vectoria.png" alt="Vectoria" width={120} height={38} className="h-auto w-[120px]" priority />
           </div>
-          <div>
-            <p className="font-[family-name:var(--font-heading)] text-xl font-bold tracking-tight">Bridge</p>
-            <p className="text-xs text-[color:var(--muted)]">Cabina multirrol para el piloto P0</p>
-          </div>
+          <p className="font-[family-name:var(--font-heading)] text-xl font-bold tracking-tight">Bridge</p>
         </div>
 
         <div className="mt-6 space-y-6">
@@ -81,7 +80,6 @@ export function AppShell({
                         {item.shortLabel}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs leading-5 text-[color:var(--muted)]">{item.description}</p>
                   </Link>
                 );
               })}
@@ -111,7 +109,7 @@ export function AppShell({
           </nav>
         </div>
 
-        <div className="mt-auto space-y-3">
+        <div className="mt-auto">
           <Link
             href="/configuracion"
             className={`flex items-center justify-between rounded-2xl px-4 py-3 text-xs font-semibold transition ring-1 ${
@@ -125,72 +123,69 @@ export function AppShell({
               SendGrid
             </span>
           </Link>
-
-          <div className="rounded-[26px] bg-slate-900 px-4 py-4 text-white">
-          <p className="text-[11px] uppercase tracking-[0.22em] text-white/65">Infra lista</p>
-          <p className="mt-2 font-[family-name:var(--font-heading)] text-lg font-bold">Next + Tailwind</p>
-          <p className="mt-2 text-sm leading-6 text-white/72">Supabase queda desacoplado hasta cargar variables reales. El shell ya expone el estado del tenant por entorno.</p>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-            <div className="rounded-2xl bg-white/10 px-3 py-2">
-              <div className="text-white/55">Tenant</div>
-              <div className="mt-1 font-semibold">{supabaseEnv.defaultTenant}</div>
-            </div>
-            <div className="rounded-2xl bg-white/10 px-3 py-2">
-              <div className="text-white/55">Supabase</div>
-              <div className="mt-1 font-semibold">{isSupabaseConfigured ? "listo" : "pendiente"}</div>
-            </div>
-          </div>
-        </div>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col gap-5">
-        <header className="panel flex flex-col gap-4 rounded-[28px] px-5 py-4 md:flex-row md:items-center md:justify-between md:px-6">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">
-              <span>Bridge V1</span>
-              <span className="h-1 w-1 rounded-full bg-[color:var(--accent)]" />
-              <span>Piloto operativo</span>
-            </div>
-            <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight md:text-[2rem]">
-              Plataforma compartida para operador, disenador y cliente
-            </h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-[color:var(--muted)]">
-              Ordena briefings, cotizaciones, activos y contexto derivado sin depender de chats dispersos.
-            </p>
-          </div>
+        {isConfiguration ? (
+          <header className="lg:hidden">
+            <div className="-mx-1 flex gap-2 overflow-x-auto pb-1">
+              {mobileLinks.map((item) => {
+                const active = isCurrent(pathname, item.href);
 
-          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-            <div className="rounded-2xl bg-white/75 px-4 py-3 ring-1 ring-[color:var(--line)]">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Tenant activo</div>
-              <div className="mt-1 font-semibold">{supabaseEnv.defaultTenant}</div>
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+                      active
+                        ? "bg-slate-900 text-white"
+                        : "bg-white/80 text-[color:var(--muted)] ring-1 ring-[color:var(--line)]"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
             </div>
-            <div className="rounded-2xl bg-[color:var(--accent-soft)] px-4 py-3 text-[color:var(--accent-deep)] ring-1 ring-[color:rgba(200,93,39,0.18)]">
-              <div className="text-[11px] uppercase tracking-[0.22em]">Siguiente capa</div>
-              <div className="mt-1 font-semibold">Contratos remotos + tenancy</div>
+          </header>
+        ) : (
+          <header className="panel flex flex-col gap-4 rounded-[28px] px-5 py-4 md:flex-row md:items-center md:justify-between md:px-6">
+            <div>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">
+                <span>Bridge V1</span>
+                <span className="h-1 w-1 rounded-full bg-[color:var(--accent)]" />
+                <span>Piloto operativo</span>
+              </div>
+              <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight md:text-[2rem]">
+                Plataforma compartida para operador, disenador y cliente
+              </h1>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-[color:var(--muted)]">
+                Ordena briefings, cotizaciones, activos y contexto derivado sin depender de chats dispersos.
+              </p>
             </div>
-          </div>
 
-          <div className="-mx-1 flex gap-2 overflow-x-auto pb-1 lg:hidden">
-            {mobileLinks.map((item) => {
-              const active = isCurrent(pathname, item.href);
+            <div className="-mx-1 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+              {mobileLinks.map((item) => {
+                const active = isCurrent(pathname, item.href);
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
-                    active
-                      ? "bg-slate-900 text-white"
-                      : "bg-white/80 text-[color:var(--muted)] ring-1 ring-[color:var(--line)]"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        </header>
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+                      active
+                        ? "bg-slate-900 text-white"
+                        : "bg-white/80 text-[color:var(--muted)] ring-1 ring-[color:var(--line)]"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </header>
+        )}
 
         <main className="min-w-0">{children}</main>
       </div>
