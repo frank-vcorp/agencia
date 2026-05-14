@@ -116,6 +116,8 @@ export type DailyStatsToday = {
 export type DesignerWorkspace = {
   tenantSlug: string;
   generatedAt: string;
+  /** Activo en foco: tarea activa o, si no hay, la siguiente sugerida. IMPL-20260513-20 */
+  focusedAsset: DesignerTask | null;
   /** Tarea en curso (status = in_progress). */
   activeTask: DesignerTask | null;
   /** Siguiente tarea sugerida (status = ready_to_start con mayor score). */
@@ -129,6 +131,8 @@ export type DesignerWorkspace = {
   dailyStatsToday: DailyStatsToday;
   /** Propuestas reales del activo enfocado (tarea activa o siguiente sugerida). */
   proposalDrafts: DesignerProposalDraft[];
+  /** Contexto operativo resumido del proyecto para el rail derecho. IMPL-20260513-20 */
+  projectContext: ProjectContext | null;
   /** Vacios honestos documentados. */
   gaps: string[];
   isEmpty: boolean;
@@ -302,8 +306,33 @@ const V1_GAPS: string[] = [];
 
 // ─── Tipos internos de filas DB ───────────────────────────────────────────────
 
+// ─── Tipo de contexto general del proyecto (SPEC ARCH-20260513-20) ─────────────
+
+/**
+ * Contexto operativo resumido del proyecto para el rail derecho del workspace.
+ * Derivado del project.objective, client.name y brief vinculado al activo enfocado.
+ * IMPL-20260513-20
+ * Respaldo: context/SPECs/SPEC_ARCH-20260513-20_workspace_disenador_estacion_unica_v2.md
+ */
+export type ProjectContext = {
+  clientName: string | null;
+  projectName: string | null;
+  /** Resumen del negocio del cliente — de brief_versions.structured_summary_json.businessContext. */
+  businessSummary: string | null;
+  /** Objetivo del proyecto — de projects.objective. */
+  projectObjective: string | null;
+  /** Oferta o mensaje principal — de brief_versions.structured_summary_json.mainOffer. */
+  offerSummary: string | null;
+  /** Tono o direccion general — de brief_versions.structured_summary_json.tone. */
+  toneSummary: string | null;
+  /** Criterios que no deben romperse — de brief_versions.structured_summary_json.restrictions. */
+  nonNegotiables: string[];
+};
+
+// ─── Tipos internos de filas DB ───────────────────────────────────────────────
+
 type TenantRow = { id: string; slug: string };
-type ProjectRow = { id: string; client_id: string; name: string };
+type ProjectRow = { id: string; client_id: string; name: string; objective: string | null };
 type ClientRow = { id: string; name: string };
 
 type AssetRow = {
@@ -392,10 +421,68 @@ async function fetchActivePrompts(tenantId: string): Promise<PromptVersionRow[]>
 
 async function fetchProjects(tenantId: string): Promise<ProjectRow[]> {
   const params = new URLSearchParams({
-    select: "id,client_id,name",
+    select: "id,client_id,name,objective",
     tenant_id: `eq.${tenantId}`
   });
   return postgrest<ProjectRow[]>(`projects?${params.toString()}`);
+}
+
+/** Fila interna de brief_versions con el resumen estructurado. */
+type BriefVersionRow = {
+  brief_id: string;
+  structured_summary_json: Record<string, unknown>;
+};
+
+/**
+ * Obtiene el resumen estructurado del brief para un activo via su briefId.
+ * Solo trae la version con estado aprobado o en revision — la mas reciente.
+ * IMPL-20260513-20
+ */
+async function fetchBriefSummary(briefId: string): Promise<BriefVersionRow | null> {
+  const params = new URLSearchParams({
+    select: "brief_id,structured_summary_json",
+    brief_id: `eq.${briefId}`,
+    status: "in.(approved_locked,pending_operator_review,operator_review_in_progress,stage_3_commercial_fit)",
+    order: "version_number.desc",
+    limit: "1"
+  });
+  const rows = await postgrest<BriefVersionRow[]>(`brief_versions?${params.toString()}`);
+  return rows[0] ?? null;
+}
+
+/**
+ * Construye el ProjectContext a partir de los datos ya disponibles y el brief resumen.
+ * IMPL-20260513-20
+ */
+function buildProjectContext(
+  focusedTask: DesignerTask | null,
+  projectMap: Map<string, ProjectRow>,
+  briefVersion: BriefVersionRow | null
+): ProjectContext | null {
+  if (!focusedTask) return null;
+  const project = projectMap.get(focusedTask.projectId);
+  const summary = briefVersion?.structured_summary_json ?? {};
+
+  const restrictionsRaw = typeof summary.restrictions === "string" ? summary.restrictions : "";
+  const nonNegotiables = restrictionsRaw
+    ? restrictionsRaw
+        .split(/\n|;/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+
+  return {
+    clientName: focusedTask.clientName,
+    projectName: focusedTask.projectName,
+    projectObjective: project?.objective ?? null,
+    businessSummary:
+      typeof summary.businessContext === "string" ? summary.businessContext || null : null,
+    offerSummary:
+      typeof summary.mainOffer === "string" ? summary.mainOffer || null : null,
+    toneSummary:
+      typeof summary.tone === "string" ? summary.tone || null : null,
+    nonNegotiables
+  };
 }
 
 async function fetchClients(tenantId: string): Promise<ClientRow[]> {
@@ -515,6 +602,7 @@ export async function getDesignerWorkspace(
   const base: DesignerWorkspace = {
     tenantSlug,
     generatedAt,
+    focusedAsset: null,
     activeTask: null,
     nextSuggestedTask: null,
     taskQueue: [],
@@ -522,6 +610,7 @@ export async function getDesignerWorkspace(
     activeSession: null,
     dailyStatsToday: emptyDailyStatsToday,
     proposalDrafts: [],
+    projectContext: null,
     gaps: V1_GAPS,
     isEmpty: true
   };
@@ -545,7 +634,8 @@ export async function getDesignerWorkspace(
     return {
       ...base,
       activeSession: buildActiveSession(activeSessionRow),
-      dailyStatsToday: deriveDailyStatsFromSessions(todaySessions, todayDateStr)
+      dailyStatsToday: deriveDailyStatsFromSessions(todaySessions, todayDateStr),
+      projectContext: null
     };
   }
 
@@ -643,14 +733,23 @@ export async function getDesignerWorkspace(
     taskQueue.find((t) => t.status === "ready_for_review" && t !== activeTask) ??
     null;
 
-  const focusAssetId = activeTask?.assetId ?? nextSuggestedTask?.assetId ?? null;
-  const proposalDrafts = focusAssetId
-    ? await fetchProposalDraftsForAsset(focusAssetId)
-    : [];
+  const focusedAsset = activeTask ?? nextSuggestedTask ?? null;
+  const focusAssetId = focusedAsset?.assetId ?? null;
+
+  // Fetch en paralelo: propuestas y resumen del brief del activo enfocado
+  const [proposalDrafts, briefVersion] = await Promise.all([
+    focusAssetId ? fetchProposalDraftsForAsset(focusAssetId) : Promise.resolve([]),
+    focusedAsset?.briefId
+      ? fetchBriefSummary(focusedAsset.briefId)
+      : Promise.resolve(null)
+  ]);
+
+  const projectContext = buildProjectContext(focusedAsset, projectMap, briefVersion);
 
   return {
     tenantSlug,
     generatedAt,
+    focusedAsset,
     activeTask,
     nextSuggestedTask,
     taskQueue,
@@ -658,6 +757,7 @@ export async function getDesignerWorkspace(
     activeSession: buildActiveSession(activeSessionRow),
     dailyStatsToday: deriveDailyStatsFromSessions(todaySessions, todayDateStr),
     proposalDrafts,
+    projectContext,
     gaps: V1_GAPS,
     isEmpty: taskQueue.length === 0
   };

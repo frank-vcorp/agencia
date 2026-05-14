@@ -260,6 +260,7 @@ Prioridad recomendada:
 78. Bridge/lib/notifications.ts — Módulo MCT (Resend, Google Chat, WhatsApp)
 79. Bridge/emails/ — Plantillas React Email (client-created, quotation-active, asset-delivered)
 80. Bridge/context/clientes/superman/ — Caso demostración completo (brief.md, propuesta.md, prompts)
+81. context/SPECs/SPEC_ARCH-20260513-20_workspace_disenador_estacion_unica_v2.md
 
 ## Decisiones Ya Tomadas
 
@@ -336,6 +337,7 @@ Prioridad recomendada:
 5. Refinar plantillas de email y PDF con identidad final.
 6. Limpieza técnica de código y archivos no utilizados.
 7. Refinamiento UX/UI en interfaces operador/diseñador/cliente.
+8. Redefinir `/disenador` como estacion unica de ejecucion creativa con contexto persistente y asistente lateral puntual.
 
 ### [ ] Posterior
 
