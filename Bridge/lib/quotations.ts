@@ -273,6 +273,32 @@ export async function createQuotationDraftVersion(
   return normalizeVersionRow(row);
 }
 
+/**
+ * Crea una nueva cotización para un proyecto.
+ * Lanza Error('project_not_found') si el proyecto no existe en el tenant.
+ */
+export async function createQuotationForProject(
+  tenantId: string,
+  projectId: string,
+  clientId: string,
+  briefId?: string | null
+): Promise<{ id: string; status: string }> {
+  const rows = await postgrest<{ id: string; status: string }[]>("quotations", {
+    method: "POST",
+    body: JSON.stringify({
+      tenant_id: tenantId,
+      project_id: projectId,
+      client_id: clientId,
+      brief_id: briefId ?? null,
+      status: "draft"
+    })
+  });
+
+  const row = rows[0];
+  if (!row) throw new Error("quotations:create_failed");
+  return row;
+}
+
 export async function setQuotationActiveVersion(
   quotationId: string,
   versionId: string

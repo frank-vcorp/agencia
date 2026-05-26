@@ -1,14 +1,16 @@
 /**
  * IMPL-20260510-14
  * Respaldo: context/SPECs/SPEC_ARCH-20260510-14_mcp_crear_cliente_proyecto_activo.md
+ * IMPL-20260526-04
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
  *
- * GET  /api/v1/projects — Stub mínimo
+ * GET  /api/v1/projects — Lista proyectos del tenant
  * POST /api/v1/projects — Crea un nuevo proyecto en el tenant activo
  * Auth: Bearer <BRIDGE_MCP_SECRET>
  */
 import { NextRequest, NextResponse } from "next/server";
 
-import { getTenantIdBySlug, createProject } from "@/lib/assets";
+import { getTenantIdBySlug, createProject, getProjectsByTenant } from "@/lib/assets";
 import { verifyAgentToken, getTenantSlug } from "@/lib/agent-auth";
 
 export const dynamic = "force-dynamic";
@@ -23,11 +25,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "tenant_not_found" }, { status: 404 });
   }
 
-  return NextResponse.json({
-    ok: true,
-    message: "Usa POST /api/v1/projects para crear un proyecto.",
-    tenantId
-  });
+  try {
+    const projects = await getProjectsByTenant(tenantId);
+    return NextResponse.json({ ok: true, projects }, { status: 200 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {

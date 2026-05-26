@@ -143,8 +143,9 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 
 ### [~] Planificado
 
-1. Siguiente slice técnico recomendado: `ARCH-20260513-19` — limpieza técnica para piloto real.
-2. Slices restantes del corte paraguas `ARCH-20260510-11` posteriores a limpieza técnica.
+1. `ARCH-20260526-04` — completar el contrato MCP entidad-centrico con list/get/create/update/delete segun alcance aprobado para `clients`, `projects`, `briefs`, `quotations` y `assets`.
+2. Siguiente slice técnico recomendado del paraguas previo: `ARCH-20260513-19` — limpieza técnica para piloto real.
+3. Slices restantes del corte paraguas `ARCH-20260510-11` posteriores a limpieza técnica.
 
 ### [ ] Pendiente
 
@@ -168,10 +169,11 @@ Continuar ejecutando por slices el corte paraguas `ARCH-20260510-11` para dejar 
 
 Prioridad recomendada:
 
-1. Configurar env vars de producción de SendGrid.
-2. Ejecutar `ARCH-20260513-19`.
-3. Refinamiento UX/UI.
-4. Corrida end-to-end y checkpoint.
+1. Ejecutar `ARCH-20260526-04` para cerrar el CRUD logico por entidad en MCP.
+2. Configurar env vars de producción de SendGrid.
+3. Ejecutar `ARCH-20260513-19`.
+4. Refinamiento UX/UI.
+5. Corrida end-to-end y checkpoint.
 
 **Estado del V1 técnico:** arquitectura cerrada; pendiente operacionalización final.
 
