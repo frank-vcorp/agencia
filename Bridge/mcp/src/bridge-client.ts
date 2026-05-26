@@ -171,6 +171,47 @@ export type AssetCreateResult = {
   message: string;
 };
 
+// ─── Tipos para eliminación de entidades (IMPL-20260526-01) ───────────────────
+
+export type EntityDeleteMode = "preview" | "execute";
+
+export type EntityDeletePreviewResult = {
+  ok: true;
+  mode: "preview";
+  entityType: string;
+  entityId: string;
+  entityLabel: string;
+  impact: {
+    direct: number;
+    cascaded: number;
+    detached: number;
+  };
+  confirmationText: string;
+};
+
+export type EntityDeleteExecuteResult = {
+  ok: true;
+  mode: "execute";
+  deletedEntityId: string;
+  deletedEntityType: string;
+  deletedEntityLabel: string;
+  impactSummary: {
+    direct: number;
+    cascaded: number;
+    detached: number;
+  };
+  eventId: string;
+  message: string;
+};
+
+export type EntityDeleteInput = {
+  mode: EntityDeleteMode;
+  requestedByLabel: string;
+  approvedByLabel: string;
+  reason: string;
+  confirmationText?: string;
+};
+
 export class BridgeClient {
   private readonly baseUrl: string;
   private readonly secret: string;
@@ -322,5 +363,61 @@ export class BridgeClient {
     });
 
     return (await res.json()) as AssetCreateResult | BridgeErrorResult;
+  }
+
+  // ─── Métodos de eliminación (IMPL-20260526-01) ───────────────────────────────
+
+  async deleteProject(
+    projectId: string,
+    input: EntityDeleteInput
+  ): Promise<EntityDeletePreviewResult | EntityDeleteExecuteResult | BridgeErrorResult> {
+    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}/delete`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(input)
+    });
+
+    return (await res.json()) as EntityDeletePreviewResult | EntityDeleteExecuteResult | BridgeErrorResult;
+  }
+
+  async deleteAsset(
+    assetId: string,
+    input: EntityDeleteInput
+  ): Promise<EntityDeletePreviewResult | EntityDeleteExecuteResult | BridgeErrorResult> {
+    const res = await fetch(`${this.baseUrl}/api/v1/assets/${assetId}/delete`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(input)
+    });
+
+    return (await res.json()) as EntityDeletePreviewResult | EntityDeleteExecuteResult | BridgeErrorResult;
+  }
+
+  async deleteQuotation(
+    projectId: string,
+    quotationId: string,
+    input: EntityDeleteInput
+  ): Promise<EntityDeletePreviewResult | EntityDeleteExecuteResult | BridgeErrorResult> {
+    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}/quotation/${quotationId}/delete`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(input)
+    });
+
+    return (await res.json()) as EntityDeletePreviewResult | EntityDeleteExecuteResult | BridgeErrorResult;
+  }
+
+  async deleteBrief(
+    projectId: string,
+    briefId: string,
+    input: EntityDeleteInput
+  ): Promise<EntityDeletePreviewResult | EntityDeleteExecuteResult | BridgeErrorResult> {
+    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}/brief/${briefId}/delete`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(input)
+    });
+
+    return (await res.json()) as EntityDeletePreviewResult | EntityDeleteExecuteResult | BridgeErrorResult;
   }
 }

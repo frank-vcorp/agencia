@@ -65,6 +65,22 @@ import {
   downloadAssetFilesToolDefinition,
   handleDownloadAssetFiles
 } from "./tools/download-asset-files.js";
+import {
+  deleteProjectToolDefinition,
+  handleDeleteProject
+} from "./tools/delete-project.js";
+import {
+  deleteAssetToolDefinition,
+  handleDeleteAsset
+} from "./tools/delete-asset.js";
+import {
+  deleteQuotationToolDefinition,
+  handleDeleteQuotation
+} from "./tools/delete-quotation.js";
+import {
+  deleteBriefToolDefinition,
+  handleDeleteBrief
+} from "./tools/delete-brief.js";
 
 async function main() {
   const config = loadConfig();
@@ -86,7 +102,11 @@ async function main() {
       createClientToolDefinition,
       createProjectToolDefinition,
       createAssetToolDefinition,
-      downloadAssetFilesToolDefinition
+      downloadAssetFilesToolDefinition,
+      deleteProjectToolDefinition,
+      deleteAssetToolDefinition,
+      deleteQuotationToolDefinition,
+      deleteBriefToolDefinition
     ]
   }));
 
@@ -131,6 +151,22 @@ async function main() {
 
       case "bridge_download_asset_files":
         text = await handleDownloadAssetFiles(client, args ?? {}, config.workspaceRoot);
+        break;
+
+      case "bridge_delete_project":
+        text = await handleDeleteProject(client, args ?? {});
+        break;
+
+      case "bridge_delete_asset":
+        text = await handleDeleteAsset(client, args ?? {});
+        break;
+
+      case "bridge_delete_quotation":
+        text = await handleDeleteQuotation(client, args ?? {});
+        break;
+
+      case "bridge_delete_brief":
+        text = await handleDeleteBrief(client, args ?? {});
         break;
 
       default:
