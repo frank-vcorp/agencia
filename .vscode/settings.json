@@ -11,5 +11,6 @@
         "statusBar.debuggingForeground": "#F9FBF9",
         "statusBar.noFolderBackground": "#1F321F",
         "statusBar.noFolderForeground": "#F9FBF9"
-    }
+    },
+    "github.copilot.chat.agentDebugLog.fileLogging.enabled": true
 }

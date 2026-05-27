@@ -139,20 +139,19 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 
 ### [/] En Progreso
 
-1. Corte paraguas: `ARCH-20260510-11` — refinamiento operativo para piloto real.
-2. `ARCH-20260526-06` — unificacion de resolucion de tenant en dominio (`assets`, `briefing`, `quotations`) como primer micro-slice de cierre tecnico.
+1. Corte paraguas: `ARCH-20260510-11` — fase de cierre operativo final para piloto real.
+2. Secuencia tecnica `ARCH-20260526-06`, `ARCH-20260526-07`, `ARCH-20260526-08` y `ARCH-20260526-09` cerrada tecnicamente (QA APROBADO en `CHECKPOINT_VAL-20260526-01_qa_cierre_tecnico_arch_20260526_06_09.md`).
+3. SendGrid en produccion verificado operativo por INFRA.
 
 ### [~] Planificado
 
-1. `ARCH-20260526-07` — normalizacion de contexto auth+tenant en rutas CRUD por ID.
-2. `ARCH-20260526-08` — hardening de parsing de argumentos en tools MCP CRUD.
-3. `ARCH-20260526-09` — cobertura minima de regresion para MCP CRUD entidad.
-4. Slices restantes del corte paraguas `ARCH-20260510-11` posteriores a la secuencia tecnica 20260526-06..09.
+1. Cierre operativo final del corte `ARCH-20260510-11`: corrida e2e final de punta a punta y trazabilidad Jira del cierre tecnico `20260526-06..09`.
+2. Slices posteriores del corte paraguas `ARCH-20260510-11`, una vez liberado el bloqueador operativo.
 
 ### [ ] Pendiente
 
-1. Configurar env vars de producción de SendGrid.
-2. Ejecutar refinamiento UX/UI final del piloto al cerrar la secuencia tecnica `ARCH-20260526-06..09`.
+1. Bloqueador unico operativo: completar e2e final y registrar issue Jira vinculado al cierre (`estado actual: SIN-ISSUE`), con evidencia de QA e INFRA.
+2. Ejecutar refinamiento UX/UI final del piloto al cerrar el bloqueador operativo de e2e/Jira.
 
 ## Ultimo Corte Cerrado
 
@@ -171,13 +170,11 @@ Continuar ejecutando por slices el corte paraguas `ARCH-20260510-11` para dejar 
 
 Prioridad recomendada:
 
-1. Configurar env vars de producción de SendGrid.
-2. Ejecutar `ARCH-20260526-06`.
-3. Ejecutar `ARCH-20260526-07`.
-4. Ejecutar `ARCH-20260526-08`.
-5. Ejecutar `ARCH-20260526-09`.
-6. Refinamiento UX/UI.
-7. Corrida end-to-end y checkpoint.
+1. Correr e2e final end-to-end en entorno objetivo de cierre.
+2. Crear o vincular issue Jira del cierre tecnico `20260526-06..09` y adjuntar checkpoint QA + dictamen INFRA.
+3. Solicitar transicion/comentario Jira con `Jira - Especialista` y reflejar resultado en PROYECTO.md.
+4. Emitir checkpoint final de cierre operativo y marcar el corte como completado.
+5. Ejecutar refinamiento UX/UI final.
 
 **Estado del V1 técnico:** arquitectura cerrada; pendiente operacionalización final.
 
