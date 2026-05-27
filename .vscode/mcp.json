@@ -1,0 +1,16 @@
+{
+	"servers": {
+		"Bridge": {
+			"type": "stdio",
+			"command": "node",
+			"args": ["/home/frank/proyectos/agencia/Bridge/mcp/dist/index.js"],
+			"env": {
+				"BRIDGE_URL": "https://vectoria-zeta.vercel.app",
+				"BRIDGE_MCP_SECRET": "cdbd21efaa5cde9fcfce0637b50c2c6e50f729667343fa1b07781088c27250f3",
+				"BRIDGE_TENANT_SLUG": "vectoria",
+				"BRIDGE_WORKSPACE_ROOT": "/home/frank/proyectos/agencia/Bridge"
+			}
+		}
+	},
+	"inputs": []
+}

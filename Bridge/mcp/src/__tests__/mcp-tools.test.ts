@@ -1,5 +1,7 @@
 /**
- * IMPL-20260510-08 | IMPL-20260510-10
+ * IMPL-20260527-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260527-02_timeout_fail_fast_mcp_bridge.md
+ *
  * Tests del MCP server: bridge_list_assets, bridge_write_production_spec,
  * bridge_get_brief, bridge_write_quotation y saveLocalCopy.
  */
@@ -37,6 +39,7 @@ describe("bridge_list_assets", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -95,6 +98,34 @@ describe("bridge_list_assets", () => {
 
     expect(result).toContain("Error");
     expect(result).toContain("401");
+  });
+
+  it("retorna error operativo si Bridge excede el timeout", async () => {
+    vi.useFakeTimers();
+    fetchMock.mockImplementationOnce((_url: string, init?: RequestInit) => {
+      const signal = init?.signal as AbortSignal;
+
+      return new Promise<Response>((_resolve, reject) => {
+        signal.addEventListener(
+          "abort",
+          () => {
+            const abortError = new Error("The operation was aborted.");
+            abortError.name = "AbortError";
+            reject(abortError);
+          },
+          { once: true }
+        );
+      });
+    });
+
+    const client = new BridgeClient(CONFIG);
+    const resultPromise = handleListAssets(client);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(resultPromise).resolves.toContain(
+      "Error al obtener activos: bridge_timeout_error:Bridge no respondio en 10000ms"
+    );
   });
 });
 

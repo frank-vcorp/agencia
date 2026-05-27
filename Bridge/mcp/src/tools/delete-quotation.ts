@@ -10,24 +10,21 @@
 import type { BridgeClient } from "../bridge-client.js";
 
 export const deleteQuotationToolDefinition = {
-  type: "function" as const,
-  function: {
-    name: "bridge_delete_quotation",
-    description:
-      "Elimina una cotización de Bridge con sus versiones. Soporta modo preview y execute.",
-    parameters: {
-      type: "object" as const,
-      properties: {
-        projectId: { type: "string", description: "ID del proyecto contenedor" },
-        quotationId: { type: "string", description: "ID de la cotización a eliminar" },
-        mode: { type: "string", enum: ["preview", "execute"], description: "Modo de operación" },
-        requestedByLabel: { type: "string", description: "Nombre del agente que solicitó la eliminación" },
-        approvedByLabel: { type: "string", description: "Nombre del humano que aprobó la eliminación" },
-        reason: { type: "string", description: "Razón operativa: dato_erroneo, no_contratado, reset_pruebas, duplicado, otro" },
-        confirmationText: { type: "string", description: "Texto de confirmación obligatorio en modo execute" }
-      },
-      required: ["projectId", "quotationId", "mode", "requestedByLabel", "approvedByLabel", "reason"]
-    }
+  name: "bridge_delete_quotation",
+  description:
+    "Elimina una cotización de Bridge con sus versiones. Soporta modo preview y execute.",
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      projectId: { type: "string", description: "ID del proyecto contenedor" },
+      quotationId: { type: "string", description: "ID de la cotización a eliminar" },
+      mode: { type: "string", enum: ["preview", "execute"], description: "Modo de operación" },
+      requestedByLabel: { type: "string", description: "Nombre del agente que solicitó la eliminación" },
+      approvedByLabel: { type: "string", description: "Nombre del humano que aprobó la eliminación" },
+      reason: { type: "string", description: "Razón operativa: dato_erroneo, no_contratado, reset_pruebas, duplicado, otro" },
+      confirmationText: { type: "string", description: "Texto de confirmación obligatorio en modo execute" }
+    },
+    required: ["projectId", "quotationId", "mode", "requestedByLabel", "approvedByLabel", "reason"]
   }
 };
 

@@ -10,23 +10,20 @@
 import type { BridgeClient } from "../bridge-client.js";
 
 export const deleteProjectToolDefinition = {
-  type: "function" as const,
-  function: {
-    name: "bridge_delete_project",
-    description:
-      "Elimina un proyecto de Bridge con sus dependencias. Soporta modo preview para ver impacto y modo execute para borrar. Requiere confirmación explícita.",
-    parameters: {
-      type: "object" as const,
-      properties: {
-        projectId: { type: "string", description: "ID del proyecto a eliminar" },
-        mode: { type: "string", enum: ["preview", "execute"], description: "Modo de operación" },
-        requestedByLabel: { type: "string", description: "Nombre del agente que solicitó la eliminación" },
-        approvedByLabel: { type: "string", description: "Nombre del humano que aprobó la eliminación" },
-        reason: { type: "string", description: "Razón operativa: dato_erroneo, no_contratado, reset_pruebas, duplicado, otro" },
-        confirmationText: { type: "string", description: "Texto de confirmación obligatorio en modo execute" }
-      },
-      required: ["projectId", "mode", "requestedByLabel", "approvedByLabel", "reason"]
-    }
+  name: "bridge_delete_project",
+  description:
+    "Elimina un proyecto de Bridge con sus dependencias. Soporta modo preview para ver impacto y modo execute para borrar. Requiere confirmación explícita.",
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      projectId: { type: "string", description: "ID del proyecto a eliminar" },
+      mode: { type: "string", enum: ["preview", "execute"], description: "Modo de operación" },
+      requestedByLabel: { type: "string", description: "Nombre del agente que solicitó la eliminación" },
+      approvedByLabel: { type: "string", description: "Nombre del humano que aprobó la eliminación" },
+      reason: { type: "string", description: "Razón operativa: dato_erroneo, no_contratado, reset_pruebas, duplicado, otro" },
+      confirmationText: { type: "string", description: "Texto de confirmación obligatorio en modo execute" }
+    },
+    required: ["projectId", "mode", "requestedByLabel", "approvedByLabel", "reason"]
   }
 };
 

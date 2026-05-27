@@ -1,6 +1,6 @@
 /**
- * IMPL-20260510-08
- * Respaldo: context/SPECs/SPEC_ARCH-20260510-08_mcp_server_bridge_para_agentes_vscode.md
+ * IMPL-20260527-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260527-02_timeout_fail_fast_mcp_bridge.md
  *
  * Cliente HTTP que consume las rutas /api/v1/ de Bridge.
  * Inyecta el token de autenticación y el tenant slug en cada request.
@@ -321,6 +321,8 @@ export type EntityDeleteInput = {
   confirmationText?: string;
 };
 
+const BRIDGE_HTTP_TIMEOUT_MS = 10_000;
+
 export class BridgeClient {
   private readonly baseUrl: string;
   private readonly secret: string;
@@ -340,10 +342,30 @@ export class BridgeClient {
     };
   }
 
+  private async request(path: string, init: RequestInit): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), BRIDGE_HTTP_TIMEOUT_MS);
+
+    try {
+      return await fetch(`${this.baseUrl}${path}`, {
+        ...init,
+        headers: this.headers(),
+        signal: controller.signal
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error(`bridge_timeout_error:Bridge no respondio en ${BRIDGE_HTTP_TIMEOUT_MS}ms`);
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
   async listAssets(): Promise<{ assets: AssetListItem[]; total: number }> {
-    const res = await fetch(`${this.baseUrl}/api/v1/assets`, {
+    const res = await this.request("/api/v1/assets", {
       method: "GET",
-      headers: this.headers()
     });
 
     if (!res.ok) {
@@ -356,9 +378,8 @@ export class BridgeClient {
   }
 
   async getAssetContext(assetId: string): Promise<AssetContext> {
-    const res = await fetch(`${this.baseUrl}/api/v1/assets/${assetId}/context`, {
+    const res = await this.request(`/api/v1/assets/${assetId}/context`, {
       method: "GET",
-      headers: this.headers()
     });
 
     if (res.status === 404) {
@@ -378,9 +399,8 @@ export class BridgeClient {
     specContent: string,
     versionNote?: string
   ): Promise<PromptWriteResult | BridgeErrorResult> {
-    const res = await fetch(`${this.baseUrl}/api/v1/assets/${assetId}/prompts`, {
+    const res = await this.request(`/api/v1/assets/${assetId}/prompts`, {
       method: "POST",
-      headers: this.headers(),
       body: JSON.stringify({ specContent, versionNote })
     });
 
@@ -388,9 +408,8 @@ export class BridgeClient {
   }
 
   async getBrief(projectId: string): Promise<BriefData> {
-    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}/brief`, {
+    const res = await this.request(`/api/v1/projects/${projectId}/brief`, {
       method: "GET",
-      headers: this.headers()
     });
 
     if (res.status === 404) {
@@ -406,9 +425,8 @@ export class BridgeClient {
   }
 
   async getAssetFiles(assetId: string): Promise<AssetFilesData> {
-    const res = await fetch(`${this.baseUrl}/api/v1/assets/${assetId}/files`, {
+    const res = await this.request(`/api/v1/assets/${assetId}/files`, {
       method: "GET",
-      headers: this.headers()
     });
 
     if (res.status === 404) {
@@ -427,9 +445,8 @@ export class BridgeClient {
     projectId: string,
     input: QuotationWriteInput
   ): Promise<QuotationWriteResult | BridgeErrorResult> {
-    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}/quotation`, {
+    const res = await this.request(`/api/v1/projects/${projectId}/quotation`, {
       method: "POST",
-      headers: this.headers(),
       body: JSON.stringify(input)
     });
 
@@ -441,9 +458,8 @@ export class BridgeClient {
   async createClient(
     input: ClientCreateInput
   ): Promise<ClientCreateResult | BridgeErrorResult> {
-    const res = await fetch(`${this.baseUrl}/api/v1/clients`, {
+    const res = await this.request("/api/v1/clients", {
       method: "POST",
-      headers: this.headers(),
       body: JSON.stringify(input)
     });
 
@@ -453,9 +469,8 @@ export class BridgeClient {
   async createProject(
     input: ProjectCreateInput
   ): Promise<ProjectCreateResult | BridgeErrorResult> {
-    const res = await fetch(`${this.baseUrl}/api/v1/projects`, {
+    const res = await this.request("/api/v1/projects", {
       method: "POST",
-      headers: this.headers(),
       body: JSON.stringify(input)
     });
 
@@ -465,9 +480,8 @@ export class BridgeClient {
   async createAsset(
     input: AssetCreateInput
   ): Promise<AssetCreateResult | BridgeErrorResult> {
-    const res = await fetch(`${this.baseUrl}/api/v1/assets`, {
+    const res = await this.request("/api/v1/assets", {
       method: "POST",
-      headers: this.headers(),
       body: JSON.stringify(input)
     });
 
@@ -475,9 +489,8 @@ export class BridgeClient {
   }
 
   async listProjects(): Promise<{ projects: ProjectListItem[] }> {
-    const res = await fetch(`${this.baseUrl}/api/v1/projects`, {
+    const res = await this.request("/api/v1/projects", {
       method: "GET",
-      headers: this.headers()
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -487,9 +500,8 @@ export class BridgeClient {
   }
 
   async getProject(projectId: string): Promise<ProjectDetail> {
-    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}`, {
+    const res = await this.request(`/api/v1/projects/${projectId}`, {
       method: "GET",
-      headers: this.headers()
     });
     if (res.status === 404) throw new Error("project_not_found");
     if (!res.ok) {
@@ -501,9 +513,8 @@ export class BridgeClient {
   }
 
   async updateProject(projectId: string, input: ProjectUpdateInput): Promise<ProjectDetail> {
-    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}`, {
+    const res = await this.request(`/api/v1/projects/${projectId}`, {
       method: "PATCH",
-      headers: this.headers(),
       body: JSON.stringify(input)
     });
     if (res.status === 404) throw new Error("project_not_found");
@@ -516,9 +527,8 @@ export class BridgeClient {
   }
 
   async listClients(): Promise<{ clients: ClientListItem[] }> {
-    const res = await fetch(`${this.baseUrl}/api/v1/clients`, {
+    const res = await this.request("/api/v1/clients", {
       method: "GET",
-      headers: this.headers()
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -528,9 +538,8 @@ export class BridgeClient {
   }
 
   async getClient(clientId: string): Promise<ClientListItem> {
-    const res = await fetch(`${this.baseUrl}/api/v1/clients/${clientId}`, {
+    const res = await this.request(`/api/v1/clients/${clientId}`, {
       method: "GET",
-      headers: this.headers()
     });
     if (res.status === 404) throw new Error("client_not_found");
     if (!res.ok) {
@@ -542,9 +551,8 @@ export class BridgeClient {
   }
 
   async updateClient(clientId: string, input: ClientUpdateInput): Promise<ClientListItem> {
-    const res = await fetch(`${this.baseUrl}/api/v1/clients/${clientId}`, {
+    const res = await this.request(`/api/v1/clients/${clientId}`, {
       method: "PATCH",
-      headers: this.headers(),
       body: JSON.stringify(input)
     });
     if (res.status === 404) throw new Error("client_not_found");
@@ -557,9 +565,8 @@ export class BridgeClient {
   }
 
   async listBriefs(): Promise<{ briefs: BriefListItem[] }> {
-    const res = await fetch(`${this.baseUrl}/api/v1/briefs`, {
+    const res = await this.request("/api/v1/briefs", {
       method: "GET",
-      headers: this.headers()
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -569,9 +576,8 @@ export class BridgeClient {
   }
 
   async updateBrief(briefId: string, input: BriefUpdateInput): Promise<BriefListItem> {
-    const res = await fetch(`${this.baseUrl}/api/v1/briefs/${briefId}`, {
+    const res = await this.request(`/api/v1/briefs/${briefId}`, {
       method: "PATCH",
-      headers: this.headers(),
       body: JSON.stringify(input)
     });
     if (res.status === 404) throw new Error("brief_not_found");
@@ -584,9 +590,8 @@ export class BridgeClient {
   }
 
   async listQuotations(): Promise<{ quotations: QuotationListItem[] }> {
-    const res = await fetch(`${this.baseUrl}/api/v1/quotations`, {
+    const res = await this.request("/api/v1/quotations", {
       method: "GET",
-      headers: this.headers()
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -596,9 +601,8 @@ export class BridgeClient {
   }
 
   async getQuotation(quotationId: string): Promise<QuotationListItem> {
-    const res = await fetch(`${this.baseUrl}/api/v1/quotations/${quotationId}`, {
+    const res = await this.request(`/api/v1/quotations/${quotationId}`, {
       method: "GET",
-      headers: this.headers()
     });
     if (res.status === 404) throw new Error("quotation_not_found");
     if (!res.ok) {
@@ -613,9 +617,8 @@ export class BridgeClient {
     quotationId: string,
     input: QuotationUpdateInput
   ): Promise<QuotationListItem> {
-    const res = await fetch(`${this.baseUrl}/api/v1/quotations/${quotationId}`, {
+    const res = await this.request(`/api/v1/quotations/${quotationId}`, {
       method: "PATCH",
-      headers: this.headers(),
       body: JSON.stringify(input)
     });
     if (res.status === 404) throw new Error("quotation_not_found");
@@ -628,9 +631,8 @@ export class BridgeClient {
   }
 
   async updateAsset(assetId: string, input: AssetUpdateInput): Promise<AssetDetail> {
-    const res = await fetch(`${this.baseUrl}/api/v1/assets/${assetId}`, {
+    const res = await this.request(`/api/v1/assets/${assetId}`, {
       method: "PATCH",
-      headers: this.headers(),
       body: JSON.stringify(input)
     });
     if (res.status === 404) throw new Error("asset_not_found");
@@ -648,9 +650,8 @@ export class BridgeClient {
     projectId: string,
     input: EntityDeleteInput
   ): Promise<EntityDeletePreviewResult | EntityDeleteExecuteResult | BridgeErrorResult> {
-    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}/delete`, {
+    const res = await this.request(`/api/v1/projects/${projectId}/delete`, {
       method: "POST",
-      headers: this.headers(),
       body: JSON.stringify(input)
     });
 
@@ -661,9 +662,8 @@ export class BridgeClient {
     assetId: string,
     input: EntityDeleteInput
   ): Promise<EntityDeletePreviewResult | EntityDeleteExecuteResult | BridgeErrorResult> {
-    const res = await fetch(`${this.baseUrl}/api/v1/assets/${assetId}/delete`, {
+    const res = await this.request(`/api/v1/assets/${assetId}/delete`, {
       method: "POST",
-      headers: this.headers(),
       body: JSON.stringify(input)
     });
 
@@ -675,9 +675,8 @@ export class BridgeClient {
     quotationId: string,
     input: EntityDeleteInput
   ): Promise<EntityDeletePreviewResult | EntityDeleteExecuteResult | BridgeErrorResult> {
-    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}/quotation/${quotationId}/delete`, {
+    const res = await this.request(`/api/v1/projects/${projectId}/quotation/${quotationId}/delete`, {
       method: "POST",
-      headers: this.headers(),
       body: JSON.stringify(input)
     });
 
@@ -689,9 +688,8 @@ export class BridgeClient {
     briefId: string,
     input: EntityDeleteInput
   ): Promise<EntityDeletePreviewResult | EntityDeleteExecuteResult | BridgeErrorResult> {
-    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}/brief/${briefId}/delete`, {
+    const res = await this.request(`/api/v1/projects/${projectId}/brief/${briefId}/delete`, {
       method: "POST",
-      headers: this.headers(),
       body: JSON.stringify(input)
     });
 

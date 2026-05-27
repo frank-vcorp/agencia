@@ -10,23 +10,20 @@
 import type { BridgeClient } from "../bridge-client.js";
 
 export const deleteAssetToolDefinition = {
-  type: "function" as const,
-  function: {
-    name: "bridge_delete_asset",
-    description:
-      "Elimina un activo de Bridge con sus dependencias (prompts, propuestas, evidencias, aprobaciones, sesiones). Soporta modo preview y execute.",
-    parameters: {
-      type: "object" as const,
-      properties: {
-        assetId: { type: "string", description: "ID del activo a eliminar" },
-        mode: { type: "string", enum: ["preview", "execute"], description: "Modo de operación" },
-        requestedByLabel: { type: "string", description: "Nombre del agente que solicitó la eliminación" },
-        approvedByLabel: { type: "string", description: "Nombre del humano que aprobó la eliminación" },
-        reason: { type: "string", description: "Razón operativa: dato_erroneo, no_contratado, reset_pruebas, duplicado, otro" },
-        confirmationText: { type: "string", description: "Texto de confirmación obligatorio en modo execute" }
-      },
-      required: ["assetId", "mode", "requestedByLabel", "approvedByLabel", "reason"]
-    }
+  name: "bridge_delete_asset",
+  description:
+    "Elimina un activo de Bridge con sus dependencias (prompts, propuestas, evidencias, aprobaciones, sesiones). Soporta modo preview y execute.",
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      assetId: { type: "string", description: "ID del activo a eliminar" },
+      mode: { type: "string", enum: ["preview", "execute"], description: "Modo de operación" },
+      requestedByLabel: { type: "string", description: "Nombre del agente que solicitó la eliminación" },
+      approvedByLabel: { type: "string", description: "Nombre del humano que aprobó la eliminación" },
+      reason: { type: "string", description: "Razón operativa: dato_erroneo, no_contratado, reset_pruebas, duplicado, otro" },
+      confirmationText: { type: "string", description: "Texto de confirmación obligatorio en modo execute" }
+    },
+    required: ["assetId", "mode", "requestedByLabel", "approvedByLabel", "reason"]
   }
 };
 

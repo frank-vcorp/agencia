@@ -25,7 +25,9 @@
   - `bridge_create_client` — Crea cliente en Bridge
   - `bridge_create_project` — Crea proyecto asociado a cliente
   - `bridge_create_asset` — Crea activo asociado a proyecto
-- **Configuración global:** `~/.config/Code/User/mcp.json` funcionando con BRIDGE_URL=https://vectoria-zeta.vercel.app
+- **Configuración MCP operativa actual (IMPL-20260527-01 / respaldo: `context/SPECs/SPEC_ARCH-20260527-01_unificacion_config_mcp_workspace_bridge.md`):** al abrir el workspace padre `agencia`, la fuente de verdad es `agencia/.vscode/mcp.json`, apuntando a `Bridge/mcp/dist/index.js` con `BRIDGE_WORKSPACE_ROOT=/home/frank/proyectos/agencia/Bridge`.
+- **Configuración global:** `~/.config/Code/User/mcp.json` queda como respaldo histórico, no como fuente operativa principal para el workspace `agencia`.
+- **Configuración anidada en Bridge:** `Bridge/.vscode/mcp.json` se conserva como referencia para abrir solo la subcarpeta `Bridge`, pero no gobierna la sesión cuando el workspace activo es `agencia`.
 - **Endpoints API REST creados:** `/api/v1/clients`, `/api/v1/projects`, `/api/v1/assets` (POST), `/api/v1/projects/[id]/quotation`, `/api/v1/projects/[id]/brief`, `/api/v1/assets/[id]/context`, `/api/v1/assets/[id]/prompts`
 - **Correcciones críticas:** Eliminación de FK `created_by_agent_id` que causaba errores 500
 - **Build:** 346 tests pasando
@@ -142,6 +144,7 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 1. Corte paraguas: `ARCH-20260510-11` — fase de cierre operativo final para piloto real.
 2. Secuencia tecnica `ARCH-20260526-06`, `ARCH-20260526-07`, `ARCH-20260526-08` y `ARCH-20260526-09` cerrada tecnicamente (QA APROBADO en `CHECKPOINT_VAL-20260526-01_qa_cierre_tecnico_arch_20260526_06_09.md`).
 3. SendGrid en produccion verificado operativo por INFRA.
+4. Configuracion MCP del workspace raiz `agencia` alineada para validacion manual en VS Code tras recarga de ventana; comprobar visibilidad de `bridge_list_projects`, `bridge_get_project` y `bridge_list_clients`.
 
 ### [~] Planificado
 

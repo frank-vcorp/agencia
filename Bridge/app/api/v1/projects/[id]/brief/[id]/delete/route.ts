@@ -1,9 +1,9 @@
 /**
- * IMPL-20260526-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260526-03_eliminacion_operativa_entidades_v1.md
+ * IMPL-20260527-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260527-03_normalizacion_slug_dinamico_projects_delete.md
  *
- * DELETE /api/v1/projects/[projectId]/quotation/[id]/delete
- * Preview y execute de eliminación de cotización.
+ * DELETE /api/v1/projects/[id]/brief/[id]/delete
+ * Preview y execute de eliminacion de brief.
  *
  * Auth: Bearer <BRIDGE_MCP_SECRET>
  * Tenant: X-Bridge-Tenant
@@ -13,16 +13,39 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { verifyAgentToken, getTenantSlug } from "@/lib/agent-auth";
 import { getTenantIdBySlug } from "@/lib/assets";
-import { previewDeleteQuotation, executeDeleteQuotation } from "@/lib/entity-delete";
+import { previewDeleteBrief, executeDeleteBrief } from "@/lib/entity-delete";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ projectId: string; id: string }> }
-): Promise<NextResponse> {
+function getProjectAndBriefIds(pathname: string): { projectId: string; briefId: string } | null {
+  const segments = pathname.split("/").filter(Boolean);
+  const projectsIndex = segments.indexOf("projects");
+  const briefIndex = segments.indexOf("brief");
+
+  if (projectsIndex === -1 || briefIndex === -1) {
+    return null;
+  }
+
+  const projectId = segments[projectsIndex + 1];
+  const briefId = segments[briefIndex + 1];
+
+  if (!projectId || !briefId) {
+    return null;
+  }
+
+  return { projectId, briefId };
+}
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
   const authError = verifyAgentToken(req);
   if (authError) return authError;
+
+  const ids = getProjectAndBriefIds(req.nextUrl.pathname);
+  if (!ids) {
+    return NextResponse.json({ ok: false, error: "invalid_route_params" }, { status: 400 });
+  }
+
+  const { projectId, briefId } = ids;
 
   const slug = getTenantSlug(req);
   const tenantId = await getTenantIdBySlug(slug);
@@ -30,20 +53,16 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "tenant_not_found" }, { status: 404 });
   }
 
-  const { projectId, id: quotationId } = await params;
-
-  // Verificar que la cotización pertenece al proyecto
-  const quotationParams = new URLSearchParams({
-    select: "id,project_id",
-    id: `eq.${quotationId}`,
-    project_id: `eq.${projectId}`,
+  const briefParams = new URLSearchParams({
+    select: "id,project_id,tenant_id",
+    id: `eq.${briefId}`,
     tenant_id: `eq.${tenantId}`,
     limit: "1"
   });
 
   try {
-    const quotations = await fetch(
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/quotations?${quotationParams.toString()}`,
+    const briefs = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/briefs?${briefParams.toString()}`,
       {
         method: "GET",
         headers: {
@@ -55,13 +74,17 @@ export async function POST(
       }
     );
 
-    if (!quotations.ok) {
-      return NextResponse.json({ ok: false, error: "quotation_not_found" }, { status: 404 });
+    if (!briefs.ok) {
+      return NextResponse.json({ ok: false, error: "brief_not_found" }, { status: 404 });
     }
 
-    const data = (await quotations.json()) as Array<{ id: string; project_id: string }>;
+    const data = (await briefs.json()) as Array<{ id: string; project_id: string | null; tenant_id: string }>;
     if (data.length === 0) {
-      return NextResponse.json({ ok: false, error: "quotation_not_found" }, { status: 404 });
+      return NextResponse.json({ ok: false, error: "brief_not_found" }, { status: 404 });
+    }
+
+    if (projectId && data[0].project_id !== projectId) {
+      return NextResponse.json({ ok: false, error: "brief_not_associated_to_project" }, { status: 400 });
     }
   } catch {
     return NextResponse.json({ ok: false, error: "supabase_error" }, { status: 500 });
@@ -74,7 +97,6 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
 
-  // Validar campos obligatorios
   if (!body.mode || (body.mode !== "preview" && body.mode !== "execute")) {
     return NextResponse.json({ ok: false, error: "mode_required" }, { status: 400 });
   }
@@ -96,9 +118,8 @@ export async function POST(
   const approvedByLabel = body.approvedByLabel as string;
   const reason = body.reason as string;
 
-  // Preview
   if (mode === "preview") {
-    const result = await previewDeleteQuotation(tenantId, quotationId);
+    const result = await previewDeleteBrief(tenantId, briefId);
 
     if (!result.ok) {
       return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
@@ -115,22 +136,18 @@ export async function POST(
     });
   }
 
-  // Execute
   if (mode === "execute") {
     if (!body.confirmationText || typeof body.confirmationText !== "string") {
       return NextResponse.json({ ok: false, error: "confirmationText_required" }, { status: 400 });
     }
 
     const confirmationText = body.confirmationText as string;
-
-    // Primero hacer preview para obtener el texto de confirmación canónico
-    const previewResult = await previewDeleteQuotation(tenantId, quotationId);
+    const previewResult = await previewDeleteBrief(tenantId, briefId);
 
     if (!previewResult.ok) {
       return NextResponse.json({ ok: false, error: previewResult.error }, { status: 400 });
     }
 
-    // Validar confirmación
     if (confirmationText !== previewResult.confirmationText) {
       return NextResponse.json(
         { ok: false, error: "confirmation_mismatch" },
@@ -138,9 +155,9 @@ export async function POST(
       );
     }
 
-    const result = await executeDeleteQuotation(
+    const result = await executeDeleteBrief(
       tenantId,
-      quotationId,
+      briefId,
       requestedByLabel,
       approvedByLabel,
       reason,
