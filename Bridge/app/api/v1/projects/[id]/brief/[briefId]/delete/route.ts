@@ -2,8 +2,8 @@
  * IMPL-20260527-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260527-03_normalizacion_slug_dinamico_projects_delete.md
  *
- * DELETE /api/v1/projects/[id]/quotation/[id]/delete
- * Preview y execute de eliminacion de cotizacion.
+ * DELETE /api/v1/projects/[id]/brief/[briefId]/delete
+ * Preview y execute de eliminacion de brief.
  *
  * Auth: Bearer <BRIDGE_MCP_SECRET>
  * Tenant: X-Bridge-Tenant
@@ -13,39 +13,20 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { verifyAgentToken, getTenantSlug } from "@/lib/agent-auth";
 import { getTenantIdBySlug } from "@/lib/assets";
-import { previewDeleteQuotation, executeDeleteQuotation } from "@/lib/entity-delete";
+import { previewDeleteBrief, executeDeleteBrief } from "@/lib/entity-delete";
 
 export const dynamic = "force-dynamic";
 
-function getProjectAndQuotationIds(pathname: string): { projectId: string; quotationId: string } | null {
-  const segments = pathname.split("/").filter(Boolean);
-  const projectsIndex = segments.indexOf("projects");
-  const quotationIndex = segments.indexOf("quotation");
+type Params = { id: string; briefId: string };
 
-  if (projectsIndex === -1 || quotationIndex === -1) {
-    return null;
-  }
-
-  const projectId = segments[projectsIndex + 1];
-  const quotationId = segments[quotationIndex + 1];
-
-  if (!projectId || !quotationId) {
-    return null;
-  }
-
-  return { projectId, quotationId };
-}
-
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<Params> }
+): Promise<NextResponse> {
   const authError = verifyAgentToken(req);
   if (authError) return authError;
 
-  const ids = getProjectAndQuotationIds(req.nextUrl.pathname);
-  if (!ids) {
-    return NextResponse.json({ ok: false, error: "invalid_route_params" }, { status: 400 });
-  }
-
-  const { projectId, quotationId } = ids;
+  const { id: projectId, briefId } = await params;
 
   const slug = getTenantSlug(req);
   const tenantId = await getTenantIdBySlug(slug);
@@ -53,17 +34,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "tenant_not_found" }, { status: 404 });
   }
 
-  const quotationParams = new URLSearchParams({
-    select: "id,project_id",
-    id: `eq.${quotationId}`,
-    project_id: `eq.${projectId}`,
+  const briefParams = new URLSearchParams({
+    select: "id,project_id,tenant_id",
+    id: `eq.${briefId}`,
     tenant_id: `eq.${tenantId}`,
     limit: "1"
   });
 
   try {
-    const quotations = await fetch(
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/quotations?${quotationParams.toString()}`,
+    const briefs = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/briefs?${briefParams.toString()}`,
       {
         method: "GET",
         headers: {
@@ -75,13 +55,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     );
 
-    if (!quotations.ok) {
-      return NextResponse.json({ ok: false, error: "quotation_not_found" }, { status: 404 });
+    if (!briefs.ok) {
+      return NextResponse.json({ ok: false, error: "brief_not_found" }, { status: 404 });
     }
 
-    const data = (await quotations.json()) as Array<{ id: string; project_id: string }>;
+    const data = (await briefs.json()) as Array<{ id: string; project_id: string | null; tenant_id: string }>;
     if (data.length === 0) {
-      return NextResponse.json({ ok: false, error: "quotation_not_found" }, { status: 404 });
+      return NextResponse.json({ ok: false, error: "brief_not_found" }, { status: 404 });
+    }
+
+    if (projectId && data[0].project_id !== projectId) {
+      return NextResponse.json({ ok: false, error: "brief_not_associated_to_project" }, { status: 400 });
     }
   } catch {
     return NextResponse.json({ ok: false, error: "supabase_error" }, { status: 500 });
@@ -116,7 +100,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const reason = body.reason as string;
 
   if (mode === "preview") {
-    const result = await previewDeleteQuotation(tenantId, quotationId);
+    const result = await previewDeleteBrief(tenantId, briefId);
 
     if (!result.ok) {
       return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
@@ -139,7 +123,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const confirmationText = body.confirmationText as string;
-    const previewResult = await previewDeleteQuotation(tenantId, quotationId);
+    const previewResult = await previewDeleteBrief(tenantId, briefId);
 
     if (!previewResult.ok) {
       return NextResponse.json({ ok: false, error: previewResult.error }, { status: 400 });
@@ -152,9 +136,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const result = await executeDeleteQuotation(
+    const result = await executeDeleteBrief(
       tenantId,
-      quotationId,
+      briefId,
       requestedByLabel,
       approvedByLabel,
       reason,
