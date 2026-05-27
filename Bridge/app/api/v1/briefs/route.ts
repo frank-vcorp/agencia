@@ -58,11 +58,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const brief = await createBriefForDefaultTenant(tenantId, {
-      clientId,
-      projectId,
-      sourceChannel
-    });
+    const brief = await createBriefForDefaultTenant(slug);
 
     return NextResponse.json(
       {

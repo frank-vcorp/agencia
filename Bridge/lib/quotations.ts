@@ -437,3 +437,51 @@ export function buildPdfFilename(
       .replace(/^-|-$/g, "");
   return `cotizacion-${slug(clientName)}-${slug(projectName)}-v${versionNumber}.pdf`;
 }
+
+/**
+ * IMPL-20260526-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ */
+export async function getTenantIdBySlug(slug: string): Promise<string | null> {
+  return getTenantId(slug);
+}
+
+/**
+ * IMPL-20260526-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ */
+export async function getQuotationsByTenant(tenantId: string): Promise<
+  Array<{
+    id: string;
+    tenant_id: string;
+    client_id: string;
+    project_id: string;
+    brief_id: string | null;
+    status: string;
+    active_version_id: string | null;
+    created_at: string;
+    updated_at: string;
+  }>
+> {
+  const params = new URLSearchParams({
+    select: "id,tenant_id,client_id,project_id,brief_id,status,active_version_id,created_at,updated_at",
+    tenant_id: `eq.${tenantId}`,
+    order: "created_at.desc"
+  });
+
+  return postgrest<
+    Array<{
+      id: string;
+      tenant_id: string;
+      client_id: string;
+      project_id: string;
+      brief_id: string | null;
+      status: string;
+      active_version_id: string | null;
+      created_at: string;
+      updated_at: string;
+    }>
+  >(`quotations?${params.toString()}`, {
+    method: "GET"
+  });
+}

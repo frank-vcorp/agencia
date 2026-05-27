@@ -1213,3 +1213,54 @@ export async function createDerivedBriefVersion(context: MutationContext): Promi
 
   return serializeVersion(current);
 }
+
+/**
+ * IMPL-20260526-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ */
+export async function getTenantIdBySlug(slug: string): Promise<string | null> {
+  const tenant = await getTenantRecord(slug);
+  return tenant?.id ?? null;
+}
+
+/**
+ * IMPL-20260526-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ */
+export async function getBriefsByTenant(tenantId: string): Promise<
+  Array<{
+    id: string;
+    tenant_id: string;
+    client_id: string | null;
+    project_id: string | null;
+    status: string;
+    source_channel: string;
+    current_version_number: number;
+    active_version_id: string | null;
+    created_at: string;
+    updated_at: string;
+  }>
+> {
+  const params = new URLSearchParams({
+    select: "id,tenant_id,client_id,project_id,status,source_channel,current_version_number,active_version_id,created_at,updated_at",
+    tenant_id: `eq.${tenantId}`,
+    order: "updated_at.desc"
+  });
+
+  return postgrest<
+    Array<{
+      id: string;
+      tenant_id: string;
+      client_id: string | null;
+      project_id: string | null;
+      status: string;
+      source_channel: string;
+      current_version_number: number;
+      active_version_id: string | null;
+      created_at: string;
+      updated_at: string;
+    }>
+  >(`briefs?${params.toString()}`, {
+    method: "GET"
+  });
+}

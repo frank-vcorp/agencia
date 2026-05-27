@@ -140,6 +140,7 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 ### [/] En Progreso
 
 1. Corte paraguas: `ARCH-20260510-11` — refinamiento operativo para piloto real.
+2. `IMPL-20260526-01` — estabilizacion tecnica del slice `ARCH-20260526-04` (deduplicacion en `lib/assets.ts`, restauracion de exports en `lib/briefing.ts` y `lib/quotations.ts`, build limpio).
 
 ### [~] Planificado
 
