@@ -5,6 +5,7 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260513-03_pdf_cotizaciones_y_propuestas_v1.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
+import { resolveTenantIdBySlug } from "./tenant";
 
 export type QuotationStatus = "draft" | "sent" | "approved" | "invoiced" | "paid";
 
@@ -81,11 +82,6 @@ type QuotationVersionRow = {
   created_by_user_id: string | null;
   created_by_agent_id: string | null;
   created_at: string;
-};
-
-type TenantRow = {
-  id: string;
-  slug: string;
 };
 
 export const quotationStatusLabels: Record<QuotationStatus, string> = {
@@ -179,15 +175,12 @@ async function postgrest<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+/**
+ * IMPL-20260526-03
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-06_unificacion_resolucion_tenant_dominio_bridge_v1.md
+ */
 async function getTenantId(slug = supabaseEnv.defaultTenant): Promise<string | null> {
-  const params = new URLSearchParams({
-    select: "id,slug",
-    slug: `eq.${slug}`,
-    limit: "1"
-  });
-  const rows = await postgrest<TenantRow[]>(`tenants?${params.toString()}`, { method: "GET" });
-
-  return rows[0]?.id ?? null;
+  return resolveTenantIdBySlug(slug);
 }
 
 async function getLatestQuotationRow(tenantId: string): Promise<QuotationRow | null> {

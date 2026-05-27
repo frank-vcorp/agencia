@@ -1,11 +1,12 @@
 /**
- * IMPL-20260526-02
+ * IMPL-20260526-02 | IMPL-20260526-04
  * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-07_normalizacion_contexto_auth_tenant_rutas_crud_id_v1.md
  */
 import { NextRequest, NextResponse } from "next/server";
 
-import { getTenantIdBySlug, getBriefById, updateBriefById } from "@/lib/briefing";
-import { verifyAgentToken, getTenantSlug } from "@/lib/agent-auth";
+import { getBriefById, updateBriefById } from "@/lib/briefing";
+import { resolveApiV1RequestContext } from "@/lib/api-v1-context";
 
 export const dynamic = "force-dynamic";
 
@@ -15,19 +16,16 @@ export async function GET(
   req: NextRequest,
   context: { params: Promise<Params> }
 ): Promise<NextResponse> {
-  const authError = verifyAgentToken(req);
-  if (authError) return authError;
-
-  const slug = getTenantSlug(req);
-  const tenantId = await getTenantIdBySlug(slug);
-  if (!tenantId) {
+  const { context: requestContext, error } = await resolveApiV1RequestContext(req);
+  if (error) return error;
+  if (!requestContext) {
     return NextResponse.json({ ok: false, error: "tenant_not_found" }, { status: 404 });
   }
 
   const { id } = await context.params;
 
   try {
-    const brief = await getBriefById(tenantId, id);
+    const brief = await getBriefById(requestContext.tenantId, id);
     if (!brief) {
       return NextResponse.json({ ok: false, error: "brief_not_found" }, { status: 404 });
     }
@@ -43,12 +41,9 @@ export async function PATCH(
   req: NextRequest,
   context: { params: Promise<Params> }
 ): Promise<NextResponse> {
-  const authError = verifyAgentToken(req);
-  if (authError) return authError;
-
-  const slug = getTenantSlug(req);
-  const tenantId = await getTenantIdBySlug(slug);
-  if (!tenantId) {
+  const { context: requestContext, error } = await resolveApiV1RequestContext(req);
+  if (error) return error;
+  if (!requestContext) {
     return NextResponse.json({ ok: false, error: "tenant_not_found" }, { status: 404 });
   }
 
@@ -72,7 +67,7 @@ export async function PATCH(
   }
 
   try {
-    const brief = await updateBriefById(tenantId, id, patch);
+    const brief = await updateBriefById(requestContext.tenantId, id, patch);
     if (!brief) {
       return NextResponse.json({ ok: false, error: "brief_not_found" }, { status: 404 });
     }

@@ -1,8 +1,51 @@
 /**
- * IMPL-20260526-02
+ * IMPL-20260526-02 | IMPL-20260526-05
  * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-08_hardening_parsing_args_tools_mcp_crud_v1.md
  */
 import type { BridgeClient } from "../bridge-client.js";
+
+type UpdateClientArgs = {
+  clientId: string | null;
+  name?: string;
+  legalName?: string;
+  status?: string;
+  primaryContactName?: string;
+  primaryContactEmail?: string;
+  primaryContactWhatsapp?: string;
+  primaryContactChannel?: string;
+  notes?: string;
+};
+
+function parseUpdateClientArgs(args: unknown): UpdateClientArgs {
+  if (!args || typeof args !== "object") {
+    return { clientId: null };
+  }
+
+  return {
+    clientId: "clientId" in args && typeof args.clientId === "string" ? args.clientId : null,
+    name: "name" in args && typeof args.name === "string" ? args.name : undefined,
+    legalName: "legalName" in args && typeof args.legalName === "string" ? args.legalName : undefined,
+    status: "status" in args && typeof args.status === "string" ? args.status : undefined,
+    primaryContactName:
+      "primaryContactName" in args && typeof args.primaryContactName === "string"
+        ? args.primaryContactName
+        : undefined,
+    primaryContactEmail:
+      "primaryContactEmail" in args && typeof args.primaryContactEmail === "string"
+        ? args.primaryContactEmail
+        : undefined,
+    primaryContactWhatsapp:
+      "primaryContactWhatsapp" in args && typeof args.primaryContactWhatsapp === "string"
+        ? args.primaryContactWhatsapp
+        : undefined,
+    primaryContactChannel:
+      "primaryContactChannel" in args && typeof args.primaryContactChannel === "string"
+        ? args.primaryContactChannel
+        : undefined,
+    notes: "notes" in args && typeof args.notes === "string" ? args.notes : undefined
+  };
+}
 
 export const updateClientToolDefinition = {
   name: "bridge_update_client",
@@ -35,19 +78,9 @@ export async function handleUpdateClient(client: BridgeClient, args: unknown): P
     primaryContactWhatsapp,
     primaryContactChannel,
     notes
-  } = args as {
-    clientId: string;
-    name?: string;
-    legalName?: string;
-    status?: string;
-    primaryContactName?: string;
-    primaryContactEmail?: string;
-    primaryContactWhatsapp?: string;
-    primaryContactChannel?: string;
-    notes?: string;
-  };
+  } = parseUpdateClientArgs(args);
 
-  if (!clientId || typeof clientId !== "string") return "Error: clientId es requerido.";
+  if (!clientId) return "Error: clientId es requerido.";
 
   const patch: Record<string, unknown> = {};
   if (typeof name === "string") patch.name = name;

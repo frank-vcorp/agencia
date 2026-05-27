@@ -1,8 +1,33 @@
 /**
- * IMPL-20260526-02
+ * IMPL-20260526-02 | IMPL-20260526-05
  * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-08_hardening_parsing_args_tools_mcp_crud_v1.md
  */
 import type { BridgeClient } from "../bridge-client.js";
+
+type UpdateProjectArgs = {
+  projectId: string | null;
+  name?: string;
+  objective?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
+function parseUpdateProjectArgs(args: unknown): UpdateProjectArgs {
+  if (!args || typeof args !== "object") {
+    return { projectId: null };
+  }
+
+  return {
+    projectId: "projectId" in args && typeof args.projectId === "string" ? args.projectId : null,
+    name: "name" in args && typeof args.name === "string" ? args.name : undefined,
+    objective: "objective" in args && typeof args.objective === "string" ? args.objective : undefined,
+    status: "status" in args && typeof args.status === "string" ? args.status : undefined,
+    startDate: "startDate" in args && typeof args.startDate === "string" ? args.startDate : undefined,
+    endDate: "endDate" in args && typeof args.endDate === "string" ? args.endDate : undefined
+  };
+}
 
 export const updateProjectToolDefinition = {
   name: "bridge_update_project",
@@ -22,16 +47,9 @@ export const updateProjectToolDefinition = {
 };
 
 export async function handleUpdateProject(client: BridgeClient, args: unknown): Promise<string> {
-  const { projectId, name, objective, status, startDate, endDate } = args as {
-    projectId: string;
-    name?: string;
-    objective?: string;
-    status?: string;
-    startDate?: string;
-    endDate?: string;
-  };
+  const { projectId, name, objective, status, startDate, endDate } = parseUpdateProjectArgs(args);
 
-  if (!projectId || typeof projectId !== "string") return "Error: projectId es requerido.";
+  if (!projectId) return "Error: projectId es requerido.";
 
   const patch: Record<string, unknown> = {};
   if (typeof name === "string") patch.name = name;

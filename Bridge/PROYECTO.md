@@ -140,17 +140,19 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 ### [/] En Progreso
 
 1. Corte paraguas: `ARCH-20260510-11` — refinamiento operativo para piloto real.
-2. `IMPL-20260526-01` — estabilizacion tecnica del slice `ARCH-20260526-04` (deduplicacion en `lib/assets.ts`, restauracion de exports en `lib/briefing.ts` y `lib/quotations.ts`, build limpio).
+2. `ARCH-20260526-06` — unificacion de resolucion de tenant en dominio (`assets`, `briefing`, `quotations`) como primer micro-slice de cierre tecnico.
 
 ### [~] Planificado
 
-1. Siguiente slice técnico recomendado del paraguas previo: `ARCH-20260513-19` — limpieza técnica para piloto real.
-2. Slices restantes del corte paraguas `ARCH-20260510-11` posteriores a limpieza técnica.
+1. `ARCH-20260526-07` — normalizacion de contexto auth+tenant en rutas CRUD por ID.
+2. `ARCH-20260526-08` — hardening de parsing de argumentos en tools MCP CRUD.
+3. `ARCH-20260526-09` — cobertura minima de regresion para MCP CRUD entidad.
+4. Slices restantes del corte paraguas `ARCH-20260510-11` posteriores a la secuencia tecnica 20260526-06..09.
 
 ### [ ] Pendiente
 
 1. Configurar env vars de producción de SendGrid.
-2. Ejecutar `ARCH-20260513-19` para limpieza técnica del repo antes del refinamiento UX/UI.
+2. Ejecutar refinamiento UX/UI final del piloto al cerrar la secuencia tecnica `ARCH-20260526-06..09`.
 
 ## Ultimo Corte Cerrado
 
@@ -170,9 +172,12 @@ Continuar ejecutando por slices el corte paraguas `ARCH-20260510-11` para dejar 
 Prioridad recomendada:
 
 1. Configurar env vars de producción de SendGrid.
-2. Ejecutar `ARCH-20260513-19`.
-3. Refinamiento UX/UI.
-4. Corrida end-to-end y checkpoint.
+2. Ejecutar `ARCH-20260526-06`.
+3. Ejecutar `ARCH-20260526-07`.
+4. Ejecutar `ARCH-20260526-08`.
+5. Ejecutar `ARCH-20260526-09`.
+6. Refinamiento UX/UI.
+7. Corrida end-to-end y checkpoint.
 
 **Estado del V1 técnico:** arquitectura cerrada; pendiente operacionalización final.
 

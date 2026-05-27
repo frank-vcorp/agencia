@@ -6,6 +6,7 @@
  * Respaldo: context/AGENTE_VIKA_Y_SKILLS_TECNICAS_V1.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
+import { resolveTenantIdBySlug } from "./tenant";
 
 // ─── Catálogo de opciones guiadas (V1) ───────────────────────────────────────
 
@@ -192,8 +193,6 @@ type PromptVersionRow = {
   created_at: string;
 };
 
-type TenantRow = { id: string; slug: string };
-
 // ─── Etiquetas de estado ──────────────────────────────────────────────────────
 
 export const assetStatusLabels: Record<AssetStatus, string> = {
@@ -322,10 +321,12 @@ async function postgrest<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+/**
+ * IMPL-20260526-03
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-06_unificacion_resolucion_tenant_dominio_bridge_v1.md
+ */
 async function getTenantId(slug = supabaseEnv.defaultTenant): Promise<string | null> {
-  const params = new URLSearchParams({ select: "id,slug", slug: `eq.${slug}`, limit: "1" });
-  const rows = await postgrest<TenantRow[]>(`tenants?${params.toString()}`, { method: "GET" });
-  return rows[0]?.id ?? null;
+  return resolveTenantIdBySlug(slug);
 }
 
 // ─── Funciones públicas ───────────────────────────────────────────────────────

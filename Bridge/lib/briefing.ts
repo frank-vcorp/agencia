@@ -4,6 +4,7 @@
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 import { getTenantIdentityContextByTenantId, resolveActorTrace } from "./identity";
+import { resolveTenantIdBySlug } from "./tenant";
 
 export const briefingStages = ["discovery", "precision", "commercial_fit"] as const;
 
@@ -1215,12 +1216,11 @@ export async function createDerivedBriefVersion(context: MutationContext): Promi
 }
 
 /**
- * IMPL-20260526-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ * IMPL-20260526-03
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-06_unificacion_resolucion_tenant_dominio_bridge_v1.md
  */
 export async function getTenantIdBySlug(slug: string): Promise<string | null> {
-  const tenant = await getTenantRecord(slug);
-  return tenant?.id ?? null;
+  return resolveTenantIdBySlug(slug);
 }
 
 /**
