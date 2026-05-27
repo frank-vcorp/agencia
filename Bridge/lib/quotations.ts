@@ -485,3 +485,51 @@ export async function getQuotationsByTenant(tenantId: string): Promise<
     method: "GET"
   });
 }
+
+/**
+ * IMPL-20260526-02
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ */
+export async function getQuotationById(
+  tenantId: string,
+  quotationId: string
+): Promise<Quotation | null> {
+  const params = new URLSearchParams({
+    select: "id,tenant_id,client_id,project_id,brief_id,status,active_version_id,created_at,updated_at",
+    tenant_id: `eq.${tenantId}`,
+    id: `eq.${quotationId}`,
+    limit: "1"
+  });
+
+  const rows = await postgrest<QuotationRow[]>(`quotations?${params.toString()}`, {
+    method: "GET"
+  });
+
+  return rows[0] ? normalizeQuotationRow(rows[0]) : null;
+}
+
+/**
+ * IMPL-20260526-02
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ */
+export async function updateQuotationById(
+  tenantId: string,
+  quotationId: string,
+  patch: Partial<{
+    status: QuotationStatus;
+    active_version_id: string | null;
+    brief_id: string | null;
+  }>
+): Promise<Quotation | null> {
+  const params = new URLSearchParams({
+    tenant_id: `eq.${tenantId}`,
+    id: `eq.${quotationId}`
+  });
+
+  const rows = await postgrest<QuotationRow[]>(`quotations?${params.toString()}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch)
+  });
+
+  return rows[0] ? normalizeQuotationRow(rows[0]) : null;
+}

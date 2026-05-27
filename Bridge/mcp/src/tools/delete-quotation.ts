@@ -35,13 +35,13 @@ export async function handleDeleteQuotation(
   client: BridgeClient,
   args: Record<string, unknown>
 ): Promise<string> {
-  const projectId = args.projectId;
-  const quotationId = args.quotationId;
-  const mode = args.mode;
-  const requestedByLabel = args.requestedByLabel;
-  const approvedByLabel = args.approvedByLabel;
-  const reason = args.reason;
-  const confirmationText = args.confirmationText;
+  const projectId = typeof args.projectId === "string" ? args.projectId : undefined;
+  const quotationId = typeof args.quotationId === "string" ? args.quotationId : undefined;
+  const mode = args.mode === "preview" || args.mode === "execute" ? args.mode : undefined;
+  const requestedByLabel = typeof args.requestedByLabel === "string" ? args.requestedByLabel : undefined;
+  const approvedByLabel = typeof args.approvedByLabel === "string" ? args.approvedByLabel : undefined;
+  const reason = typeof args.reason === "string" ? args.reason : undefined;
+  const confirmationText = typeof args.confirmationText === "string" ? args.confirmationText : undefined;
 
   if (!projectId || typeof projectId !== "string") {
     return "Error: projectId es requerido y debe ser un string.";
@@ -73,7 +73,7 @@ export async function handleDeleteQuotation(
 
   try {
     const result = await client.deleteQuotation(projectId, quotationId, {
-      mode: mode as "preview" | "execute",
+      mode,
       requestedByLabel,
       approvedByLabel,
       reason,

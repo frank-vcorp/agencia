@@ -6,15 +6,8 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260510-14_mcp_crear_cliente_proyecto_activo.md
  *
  * Entry point del MCP server de Bridge.
- * Expone 8 herramientas vía stdio para agentes VS Code (GitHub Copilot):
- *   - bridge_list_assets
- *   - bridge_get_asset_context
- *   - bridge_write_production_spec
- *   - bridge_get_brief
- *   - bridge_write_quotation
- *   - bridge_create_client
- *   - bridge_create_project
- *   - bridge_create_asset
+ * Expone herramientas MCP para operaciones operativas sobre assets,
+ * briefs, cotizaciones, clientes y proyectos.
  *
  * Uso: node dist/index.js
  * Configurar en .vscode/mcp.json con BRIDGE_URL, BRIDGE_MCP_SECRET, BRIDGE_TENANT_SLUG, BRIDGE_WORKSPACE_ROOT.
@@ -81,6 +74,54 @@ import {
   deleteBriefToolDefinition,
   handleDeleteBrief
 } from "./tools/delete-brief.js";
+import {
+  listProjectsToolDefinition,
+  handleListProjects
+} from "./tools/list-projects.js";
+import {
+  getProjectToolDefinition,
+  handleGetProject
+} from "./tools/get-project.js";
+import {
+  updateProjectToolDefinition,
+  handleUpdateProject
+} from "./tools/update-project.js";
+import {
+  listClientsToolDefinition,
+  handleListClients
+} from "./tools/list-clients.js";
+import {
+  getClientToolDefinition,
+  handleGetClient
+} from "./tools/get-client.js";
+import {
+  updateClientToolDefinition,
+  handleUpdateClient
+} from "./tools/update-client.js";
+import {
+  listBriefsToolDefinition,
+  handleListBriefs
+} from "./tools/list-briefs.js";
+import {
+  updateBriefToolDefinition,
+  handleUpdateBrief
+} from "./tools/update-brief.js";
+import {
+  listQuotationsToolDefinition,
+  handleListQuotations
+} from "./tools/list-quotations.js";
+import {
+  getQuotationToolDefinition,
+  handleGetQuotation
+} from "./tools/get-quotation.js";
+import {
+  updateQuotationStatusToolDefinition,
+  handleUpdateQuotationStatus
+} from "./tools/update-quotation-status.js";
+import {
+  updateAssetToolDefinition,
+  handleUpdateAsset
+} from "./tools/update-asset.js";
 
 async function main() {
   const config = loadConfig();
@@ -103,6 +144,18 @@ async function main() {
       createProjectToolDefinition,
       createAssetToolDefinition,
       downloadAssetFilesToolDefinition,
+      listProjectsToolDefinition,
+      getProjectToolDefinition,
+      updateProjectToolDefinition,
+      listClientsToolDefinition,
+      getClientToolDefinition,
+      updateClientToolDefinition,
+      listBriefsToolDefinition,
+      updateBriefToolDefinition,
+      listQuotationsToolDefinition,
+      getQuotationToolDefinition,
+      updateQuotationStatusToolDefinition,
+      updateAssetToolDefinition,
       deleteProjectToolDefinition,
       deleteAssetToolDefinition,
       deleteQuotationToolDefinition,
@@ -151,6 +204,54 @@ async function main() {
 
       case "bridge_download_asset_files":
         text = await handleDownloadAssetFiles(client, args ?? {}, config.workspaceRoot);
+        break;
+
+      case "bridge_list_projects":
+        text = await handleListProjects(client);
+        break;
+
+      case "bridge_get_project":
+        text = await handleGetProject(client, args ?? {});
+        break;
+
+      case "bridge_update_project":
+        text = await handleUpdateProject(client, args ?? {});
+        break;
+
+      case "bridge_list_clients":
+        text = await handleListClients(client);
+        break;
+
+      case "bridge_get_client":
+        text = await handleGetClient(client, args ?? {});
+        break;
+
+      case "bridge_update_client":
+        text = await handleUpdateClient(client, args ?? {});
+        break;
+
+      case "bridge_list_briefs":
+        text = await handleListBriefs(client);
+        break;
+
+      case "bridge_update_brief":
+        text = await handleUpdateBrief(client, args ?? {});
+        break;
+
+      case "bridge_list_quotations":
+        text = await handleListQuotations(client);
+        break;
+
+      case "bridge_get_quotation":
+        text = await handleGetQuotation(client, args ?? {});
+        break;
+
+      case "bridge_update_quotation_status":
+        text = await handleUpdateQuotationStatus(client, args ?? {});
+        break;
+
+      case "bridge_update_asset":
+        text = await handleUpdateAsset(client, args ?? {});
         break;
 
       case "bridge_delete_project":

@@ -949,3 +949,220 @@ export async function createAssetForProject(
   if (!row) throw new Error("assets:create_failed");
   return normalizeAssetRow(row);
 }
+
+/**
+ * IMPL-20260526-02
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ */
+export async function getClientById(
+  tenantId: string,
+  clientId: string
+): Promise<{
+  id: string;
+  name: string;
+  legal_name: string | null;
+  status: string;
+  primary_contact_name: string | null;
+  primary_contact_email: string | null;
+  primary_contact_whatsapp: string | null;
+  primary_contact_channel: string | null;
+  notes: string | null;
+} | null> {
+  const params = new URLSearchParams({
+    select: "id,name,legal_name,status,primary_contact_name,primary_contact_email,primary_contact_whatsapp,primary_contact_channel,notes",
+    tenant_id: `eq.${tenantId}`,
+    id: `eq.${clientId}`,
+    limit: "1"
+  });
+
+  const rows = await postgrest<
+    Array<{
+      id: string;
+      name: string;
+      legal_name: string | null;
+      status: string;
+      primary_contact_name: string | null;
+      primary_contact_email: string | null;
+      primary_contact_whatsapp: string | null;
+      primary_contact_channel: string | null;
+      notes: string | null;
+    }>
+  >(`clients?${params.toString()}`, { method: "GET" });
+
+  return rows[0] ?? null;
+}
+
+/**
+ * IMPL-20260526-02
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ */
+export async function updateClientById(
+  tenantId: string,
+  clientId: string,
+  patch: Partial<{
+    name: string;
+    legal_name: string | null;
+    status: "active" | "prospect" | "inactive";
+    primary_contact_name: string | null;
+    primary_contact_email: string | null;
+    primary_contact_whatsapp: string | null;
+    primary_contact_channel: string | null;
+    notes: string | null;
+  }>
+): Promise<{
+  id: string;
+  name: string;
+  legal_name: string | null;
+  status: string;
+  primary_contact_name: string | null;
+  primary_contact_email: string | null;
+  primary_contact_whatsapp: string | null;
+  primary_contact_channel: string | null;
+  notes: string | null;
+} | null> {
+  const params = new URLSearchParams({
+    tenant_id: `eq.${tenantId}`,
+    id: `eq.${clientId}`
+  });
+
+  const rows = await postgrest<
+    Array<{
+      id: string;
+      name: string;
+      legal_name: string | null;
+      status: string;
+      primary_contact_name: string | null;
+      primary_contact_email: string | null;
+      primary_contact_whatsapp: string | null;
+      primary_contact_channel: string | null;
+      notes: string | null;
+    }>
+  >(`clients?${params.toString()}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch)
+  });
+
+  return rows[0] ?? null;
+}
+
+/**
+ * IMPL-20260526-02
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ */
+export async function getProjectById(
+  tenantId: string,
+  projectId: string
+): Promise<{
+  id: string;
+  name: string;
+  project_type: string;
+  status: string;
+  client_id: string;
+  objective: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+  updated_at: string;
+} | null> {
+  const params = new URLSearchParams({
+    select: "id,name,project_type,status,client_id,objective,start_date,end_date,created_at,updated_at",
+    tenant_id: `eq.${tenantId}`,
+    id: `eq.${projectId}`,
+    limit: "1"
+  });
+
+  const rows = await postgrest<
+    Array<{
+      id: string;
+      name: string;
+      project_type: string;
+      status: string;
+      client_id: string;
+      objective: string | null;
+      start_date: string | null;
+      end_date: string | null;
+      created_at: string;
+      updated_at: string;
+    }>
+  >(`projects?${params.toString()}`, { method: "GET" });
+
+  return rows[0] ?? null;
+}
+
+/**
+ * IMPL-20260526-02
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ */
+export async function updateProjectById(
+  tenantId: string,
+  projectId: string,
+  patch: Partial<{
+    name: string;
+    objective: string | null;
+    status: "draft" | "active" | "paused" | "completed" | "archived";
+    start_date: string | null;
+    end_date: string | null;
+  }>
+): Promise<{
+  id: string;
+  name: string;
+  project_type: string;
+  status: string;
+  client_id: string;
+  objective: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+  updated_at: string;
+} | null> {
+  const params = new URLSearchParams({
+    tenant_id: `eq.${tenantId}`,
+    id: `eq.${projectId}`
+  });
+
+  const rows = await postgrest<
+    Array<{
+      id: string;
+      name: string;
+      project_type: string;
+      status: string;
+      client_id: string;
+      objective: string | null;
+      start_date: string | null;
+      end_date: string | null;
+      created_at: string;
+      updated_at: string;
+    }>
+  >(`projects?${params.toString()}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch)
+  });
+
+  return rows[0] ?? null;
+}
+
+/**
+ * IMPL-20260526-02
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ */
+export async function updateAssetById(
+  tenantId: string,
+  assetId: string,
+  patch: Partial<{
+    title: string;
+    status: AssetStatus;
+    quotation_id: string | null;
+  }>
+): Promise<Asset | null> {
+  const params = new URLSearchParams({
+    tenant_id: `eq.${tenantId}`,
+    id: `eq.${assetId}`
+  });
+
+  const rows = await postgrest<AssetRow[]>(`assets?${params.toString()}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch)
+  });
+
+  return rows[0] ? normalizeAssetRow(rows[0]) : null;
+}

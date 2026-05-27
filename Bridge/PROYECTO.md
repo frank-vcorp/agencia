@@ -144,9 +144,8 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 
 ### [~] Planificado
 
-1. `ARCH-20260526-04` — completar el contrato MCP entidad-centrico con list/get/create/update/delete segun alcance aprobado para `clients`, `projects`, `briefs`, `quotations` y `assets`.
-2. Siguiente slice técnico recomendado del paraguas previo: `ARCH-20260513-19` — limpieza técnica para piloto real.
-3. Slices restantes del corte paraguas `ARCH-20260510-11` posteriores a limpieza técnica.
+1. Siguiente slice técnico recomendado del paraguas previo: `ARCH-20260513-19` — limpieza técnica para piloto real.
+2. Slices restantes del corte paraguas `ARCH-20260510-11` posteriores a limpieza técnica.
 
 ### [ ] Pendiente
 
@@ -155,14 +154,14 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 
 ## Ultimo Corte Cerrado
 
-**ARCH-20260513-16 / IMPL-20260513-16 + IMPL-20260513-17**
+**ARCH-20260526-04 / IMPL-20260526-01 + IMPL-20260526-02**
 
-1. **Sincronización local del brief endurecida** con layout `project-folders` y escritura en `briefing/brief.md` cuando se solicita por MCP.
-2. **Descarga local de archivos reales del activo** con la tool `bridge_download_asset_files`, preservando evidencias homónimas y contención de rutas.
-3. **Endpoint operativo de archivos por activo** en `/api/v1/assets/[id]/files`, devolviendo todas las evidencias reales del activo.
-4. **Visibilidad ligera para diseñador y operador** con etiquetas `Captura` y `Produccion` en `/disenador`, `/activos` y `/activos/[id]`.
-5. **Validación:** `Bridge/mcp` con 33 tests verdes y build limpio; app `Bridge` con `npm run build` limpio.
-6. **Checkpoint:** `context/checkpoints/CHECKPOINT_IMPL-20260513-16_17_vika_mcp_y_visibilidad_operativa.md`.
+1. **Contrato MCP CRUD logico por entidad** completado para `clients`, `projects`, `briefs`, `quotations` y `assets` en list/get/update, manteniendo eliminaciones seguras con `preview/execute`.
+2. **Registro y despacho MCP ampliado** en `mcp/src/index.ts` con tools nuevas de consulta y actualizacion por entidad.
+3. **Endpoints API por ID** implementados para `GET/PATCH` en `/api/v1/clients/[id]`, `/api/v1/projects/[id]`, `/api/v1/briefs/[id]`, `/api/v1/quotations/[id]` y `/api/v1/assets/[id]`.
+4. **Hardening TypeScript en delete tools** para evitar coerciones de `unknown` y mantener contratos estrictos en `bridge_delete_project`, `bridge_delete_asset`, `bridge_delete_brief`, `bridge_delete_quotation`.
+5. **Validación:** `cd Bridge && npm run build` limpio; `cd Bridge/mcp && npm run build` limpio.
+6. **Checkpoint:** `context/checkpoints/CHECKPOINT_IMPL-20260526-02_cierre_arch_20260526_04_mcp_crud_entidades.md`.
 
 ## Siguiente Paso Recomendado
 
@@ -170,11 +169,10 @@ Continuar ejecutando por slices el corte paraguas `ARCH-20260510-11` para dejar 
 
 Prioridad recomendada:
 
-1. Ejecutar `ARCH-20260526-04` para cerrar el CRUD logico por entidad en MCP.
-2. Configurar env vars de producción de SendGrid.
-3. Ejecutar `ARCH-20260513-19`.
-4. Refinamiento UX/UI.
-5. Corrida end-to-end y checkpoint.
+1. Configurar env vars de producción de SendGrid.
+2. Ejecutar `ARCH-20260513-19`.
+3. Refinamiento UX/UI.
+4. Corrida end-to-end y checkpoint.
 
 **Estado del V1 técnico:** arquitectura cerrada; pendiente operacionalización final.
 

@@ -1264,3 +1264,98 @@ export async function getBriefsByTenant(tenantId: string): Promise<
     method: "GET"
   });
 }
+
+/**
+ * IMPL-20260526-02
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ */
+export async function getBriefById(
+  tenantId: string,
+  briefId: string
+): Promise<{
+  id: string;
+  tenant_id: string;
+  client_id: string | null;
+  project_id: string | null;
+  status: string;
+  source_channel: string;
+  current_version_number: number;
+  active_version_id: string | null;
+  created_at: string;
+  updated_at: string;
+} | null> {
+  const params = new URLSearchParams({
+    select: "id,tenant_id,client_id,project_id,status,source_channel,current_version_number,active_version_id,created_at,updated_at",
+    tenant_id: `eq.${tenantId}`,
+    id: `eq.${briefId}`,
+    limit: "1"
+  });
+
+  const rows = await postgrest<
+    Array<{
+      id: string;
+      tenant_id: string;
+      client_id: string | null;
+      project_id: string | null;
+      status: string;
+      source_channel: string;
+      current_version_number: number;
+      active_version_id: string | null;
+      created_at: string;
+      updated_at: string;
+    }>
+  >(`briefs?${params.toString()}`, { method: "GET" });
+
+  return rows[0] ?? null;
+}
+
+/**
+ * IMPL-20260526-02
+ * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ */
+export async function updateBriefById(
+  tenantId: string,
+  briefId: string,
+  patch: Partial<{
+    status: BriefingStatus;
+    source_channel: string;
+    client_id: string | null;
+    project_id: string | null;
+  }>
+): Promise<{
+  id: string;
+  tenant_id: string;
+  client_id: string | null;
+  project_id: string | null;
+  status: string;
+  source_channel: string;
+  current_version_number: number;
+  active_version_id: string | null;
+  created_at: string;
+  updated_at: string;
+} | null> {
+  const params = new URLSearchParams({
+    tenant_id: `eq.${tenantId}`,
+    id: `eq.${briefId}`
+  });
+
+  const rows = await postgrest<
+    Array<{
+      id: string;
+      tenant_id: string;
+      client_id: string | null;
+      project_id: string | null;
+      status: string;
+      source_channel: string;
+      current_version_number: number;
+      active_version_id: string | null;
+      created_at: string;
+      updated_at: string;
+    }>
+  >(`briefs?${params.toString()}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch)
+  });
+
+  return rows[0] ?? null;
+}

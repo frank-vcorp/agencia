@@ -171,6 +171,115 @@ export type AssetCreateResult = {
   message: string;
 };
 
+export type ProjectListItem = {
+  id: string;
+  name: string;
+  project_type: string;
+  status: string;
+  client_id: string;
+  created_at: string;
+};
+
+export type ProjectDetail = ProjectListItem & {
+  objective: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  updated_at: string;
+};
+
+export type ClientListItem = {
+  id: string;
+  name: string;
+  legal_name: string | null;
+  status: string;
+  primary_contact_name: string | null;
+  primary_contact_email: string | null;
+  primary_contact_whatsapp: string | null;
+  primary_contact_channel: string | null;
+  notes: string | null;
+};
+
+export type BriefListItem = {
+  id: string;
+  tenant_id: string;
+  client_id: string | null;
+  project_id: string | null;
+  status: string;
+  source_channel: string;
+  current_version_number: number;
+  active_version_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type QuotationListItem = {
+  id: string;
+  tenant_id: string;
+  client_id: string;
+  project_id: string;
+  brief_id: string | null;
+  status: string;
+  active_version_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ClientUpdateInput = Partial<{
+  name: string;
+  legalName: string | null;
+  status: string;
+  primaryContactName: string | null;
+  primaryContactEmail: string | null;
+  primaryContactWhatsapp: string | null;
+  primaryContactChannel: string | null;
+  notes: string | null;
+}>;
+
+export type ProjectUpdateInput = Partial<{
+  name: string;
+  objective: string | null;
+  status: string;
+  startDate: string | null;
+  endDate: string | null;
+}>;
+
+export type BriefUpdateInput = Partial<{
+  status: string;
+  sourceChannel: string;
+  clientId: string | null;
+  projectId: string | null;
+}>;
+
+export type QuotationUpdateInput = Partial<{
+  status: string;
+  activeVersionId: string | null;
+  briefId: string | null;
+}>;
+
+export type AssetUpdateInput = Partial<{
+  title: string;
+  status: string;
+  quotationId: string | null;
+}>;
+
+export type AssetDetail = {
+  id: string;
+  tenantId: string;
+  clientId: string;
+  projectId: string;
+  quotationId: string | null;
+  quotationVersionId: string | null;
+  briefId: string | null;
+  applicationCode: string;
+  pieceTypeCode: string;
+  placementCode: string;
+  formatCode: string;
+  title: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 // ─── Tipos para eliminación de entidades (IMPL-20260526-01) ───────────────────
 
 export type EntityDeleteMode = "preview" | "execute";
@@ -363,6 +472,174 @@ export class BridgeClient {
     });
 
     return (await res.json()) as AssetCreateResult | BridgeErrorResult;
+  }
+
+  async listProjects(): Promise<{ projects: ProjectListItem[] }> {
+    const res = await fetch(`${this.baseUrl}/api/v1/projects`, {
+      method: "GET",
+      headers: this.headers()
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
+    return (await res.json()) as { projects: ProjectListItem[] };
+  }
+
+  async getProject(projectId: string): Promise<ProjectDetail> {
+    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}`, {
+      method: "GET",
+      headers: this.headers()
+    });
+    if (res.status === 404) throw new Error("project_not_found");
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
+    const data = (await res.json()) as { project: ProjectDetail };
+    return data.project;
+  }
+
+  async updateProject(projectId: string, input: ProjectUpdateInput): Promise<ProjectDetail> {
+    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}`, {
+      method: "PATCH",
+      headers: this.headers(),
+      body: JSON.stringify(input)
+    });
+    if (res.status === 404) throw new Error("project_not_found");
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
+    const data = (await res.json()) as { project: ProjectDetail };
+    return data.project;
+  }
+
+  async listClients(): Promise<{ clients: ClientListItem[] }> {
+    const res = await fetch(`${this.baseUrl}/api/v1/clients`, {
+      method: "GET",
+      headers: this.headers()
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
+    return (await res.json()) as { clients: ClientListItem[] };
+  }
+
+  async getClient(clientId: string): Promise<ClientListItem> {
+    const res = await fetch(`${this.baseUrl}/api/v1/clients/${clientId}`, {
+      method: "GET",
+      headers: this.headers()
+    });
+    if (res.status === 404) throw new Error("client_not_found");
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
+    const data = (await res.json()) as { client: ClientListItem };
+    return data.client;
+  }
+
+  async updateClient(clientId: string, input: ClientUpdateInput): Promise<ClientListItem> {
+    const res = await fetch(`${this.baseUrl}/api/v1/clients/${clientId}`, {
+      method: "PATCH",
+      headers: this.headers(),
+      body: JSON.stringify(input)
+    });
+    if (res.status === 404) throw new Error("client_not_found");
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
+    const data = (await res.json()) as { client: ClientListItem };
+    return data.client;
+  }
+
+  async listBriefs(): Promise<{ briefs: BriefListItem[] }> {
+    const res = await fetch(`${this.baseUrl}/api/v1/briefs`, {
+      method: "GET",
+      headers: this.headers()
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
+    return (await res.json()) as { briefs: BriefListItem[] };
+  }
+
+  async updateBrief(briefId: string, input: BriefUpdateInput): Promise<BriefListItem> {
+    const res = await fetch(`${this.baseUrl}/api/v1/briefs/${briefId}`, {
+      method: "PATCH",
+      headers: this.headers(),
+      body: JSON.stringify(input)
+    });
+    if (res.status === 404) throw new Error("brief_not_found");
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
+    const data = (await res.json()) as { brief: BriefListItem };
+    return data.brief;
+  }
+
+  async listQuotations(): Promise<{ quotations: QuotationListItem[] }> {
+    const res = await fetch(`${this.baseUrl}/api/v1/quotations`, {
+      method: "GET",
+      headers: this.headers()
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
+    return (await res.json()) as { quotations: QuotationListItem[] };
+  }
+
+  async getQuotation(quotationId: string): Promise<QuotationListItem> {
+    const res = await fetch(`${this.baseUrl}/api/v1/quotations/${quotationId}`, {
+      method: "GET",
+      headers: this.headers()
+    });
+    if (res.status === 404) throw new Error("quotation_not_found");
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
+    const data = (await res.json()) as { quotation: QuotationListItem };
+    return data.quotation;
+  }
+
+  async updateQuotationStatus(
+    quotationId: string,
+    input: QuotationUpdateInput
+  ): Promise<QuotationListItem> {
+    const res = await fetch(`${this.baseUrl}/api/v1/quotations/${quotationId}`, {
+      method: "PATCH",
+      headers: this.headers(),
+      body: JSON.stringify(input)
+    });
+    if (res.status === 404) throw new Error("quotation_not_found");
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
+    const data = (await res.json()) as { quotation: QuotationListItem };
+    return data.quotation;
+  }
+
+  async updateAsset(assetId: string, input: AssetUpdateInput): Promise<AssetDetail> {
+    const res = await fetch(`${this.baseUrl}/api/v1/assets/${assetId}`, {
+      method: "PATCH",
+      headers: this.headers(),
+      body: JSON.stringify(input)
+    });
+    if (res.status === 404) throw new Error("asset_not_found");
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
+    const data = (await res.json()) as { asset: AssetDetail };
+    return data.asset;
   }
 
   // ─── Métodos de eliminación (IMPL-20260526-01) ───────────────────────────────

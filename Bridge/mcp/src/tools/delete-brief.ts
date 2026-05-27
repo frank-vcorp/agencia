@@ -18,7 +18,7 @@ export const deleteBriefToolDefinition = {
     parameters: {
       type: "object" as const,
       properties: {
-        projectId: { type: "string", description: "ID del proyecto contenedor (opcional)" },
+        projectId: { type: "string", description: "ID del proyecto contenedor" },
         briefId: { type: "string", description: "ID del brief a eliminar" },
         mode: { type: "string", enum: ["preview", "execute"], description: "Modo de operación" },
         requestedByLabel: { type: "string", description: "Nombre del agente que solicitó la eliminación" },
@@ -26,7 +26,7 @@ export const deleteBriefToolDefinition = {
         reason: { type: "string", description: "Razón operativa: dato_erroneo, no_contratado, reset_pruebas, duplicado, otro" },
         confirmationText: { type: "string", description: "Texto de confirmación obligatorio en modo execute" }
       },
-      required: ["briefId", "mode", "requestedByLabel", "approvedByLabel", "reason"]
+      required: ["projectId", "briefId", "mode", "requestedByLabel", "approvedByLabel", "reason"]
     }
   }
 };
@@ -35,13 +35,17 @@ export async function handleDeleteBrief(
   client: BridgeClient,
   args: Record<string, unknown>
 ): Promise<string> {
-  const projectId = args.projectId;
-  const briefId = args.briefId;
-  const mode = args.mode;
-  const requestedByLabel = args.requestedByLabel;
-  const approvedByLabel = args.approvedByLabel;
-  const reason = args.reason;
-  const confirmationText = args.confirmationText;
+  const projectId = typeof args.projectId === "string" ? args.projectId : undefined;
+  const briefId = typeof args.briefId === "string" ? args.briefId : undefined;
+  const mode = args.mode === "preview" || args.mode === "execute" ? args.mode : undefined;
+  const requestedByLabel = typeof args.requestedByLabel === "string" ? args.requestedByLabel : undefined;
+  const approvedByLabel = typeof args.approvedByLabel === "string" ? args.approvedByLabel : undefined;
+  const reason = typeof args.reason === "string" ? args.reason : undefined;
+  const confirmationText = typeof args.confirmationText === "string" ? args.confirmationText : undefined;
+
+  if (!projectId || typeof projectId !== "string") {
+    return "Error: projectId es requerido y debe ser un string.";
+  }
 
   if (!briefId || typeof briefId !== "string") {
     return "Error: briefId es requerido y debe ser un string.";
@@ -68,8 +72,8 @@ export async function handleDeleteBrief(
   }
 
   try {
-    const result = await client.deleteBrief(projectId as string | undefined, briefId, {
-      mode: mode as "preview" | "execute",
+    const result = await client.deleteBrief(projectId, briefId, {
+      mode,
       requestedByLabel,
       approvedByLabel,
       reason,
