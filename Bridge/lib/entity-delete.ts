@@ -1146,7 +1146,7 @@ export async function softDeleteClient(
         requested_by_label: requestedByLabel,
         approved_by_label: approvedByLabel,
         reason,
-        mode: "soft_delete",
+        mode: "execute",
         impact_summary_json: { direct: 1, cascaded: 0, detached: 0 }
       })
     });
@@ -1242,7 +1242,7 @@ export async function softDeleteLead(
         requested_by_label: requestedByLabel,
         approved_by_label: approvedByLabel,
         reason,
-        mode: "soft_delete",
+        mode: "execute",
         impact_summary_json: { direct: 1, cascaded: 0, detached: 0 }
       })
     });
@@ -1375,7 +1375,7 @@ export async function executeDeleteBriefOrphan(
         requested_by_label: requestedByLabel,
         approved_by_label: approvedByLabel,
         reason,
-        mode: "soft_delete",
+        mode: "execute",
         impact_summary_json: { direct: 1, cascaded: 0, detached: 0 }
       })
     });
