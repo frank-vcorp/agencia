@@ -1,6 +1,8 @@
 /**
  * IMPL-20260527-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260527-02_timeout_fail_fast_mcp_bridge.md
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
  *
  * Cliente HTTP que consume las rutas /api/v1/ de Bridge.
  * Inyecta el token de autenticación y el tenant slug en cada request.
@@ -319,6 +321,61 @@ export type EntityDeleteInput = {
   approvedByLabel: string;
   reason: string;
   confirmationText?: string;
+};
+
+/**
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
+ */
+export type EntitySoftDeletePreviewResult = {
+  ok: true;
+  mode: "preview";
+  entityType: "client" | "lead" | "brief";
+  entityId: string;
+  entityLabel: string;
+  confirmationText?: string;
+  blockedReason?: string;
+  message?: string;
+  activeProjects?: Array<{ id: string; name: string; status: string }>;
+};
+
+export type EntitySoftDeleteExecuteResult = {
+  ok: true;
+  mode: "execute";
+  entityType: "client" | "lead" | "brief";
+  entityId: string;
+  entityLabel: string;
+  deletedAt?: string;
+  purgesAt?: string;
+  blockedReason?: string;
+  eventId?: string;
+  message?: string;
+  activeProjects?: Array<{ id: string; name: string; status: string }>;
+};
+
+export type TrashItem = {
+  entityType: "client" | "lead" | "brief";
+  entityId: string;
+  entityLabel: string;
+  deletedAt: string;
+  purgesAt: string;
+  daysRemaining: number;
+  canRestore: boolean;
+};
+
+export type ListTrashData = {
+  ok: true;
+  items: TrashItem[];
+  total: number;
+};
+
+export type RestoreEntityData = {
+  ok: true;
+  entityType: string;
+  entityId: string;
+  entityLabel: string;
+  restoredAt: string;
+  message: string;
 };
 
 const BRIDGE_HTTP_TIMEOUT_MS = 10_000;
@@ -684,15 +741,69 @@ export class BridgeClient {
   }
 
   async deleteBrief(
-    projectId: string,
+    projectId: string | undefined,
     briefId: string,
     input: EntityDeleteInput
   ): Promise<EntityDeletePreviewResult | EntityDeleteExecuteResult | BridgeErrorResult> {
-    const res = await this.request(`/api/v1/projects/${projectId}/brief/${briefId}/delete`, {
+    const path = projectId
+      ? `/api/v1/projects/${projectId}/brief/${briefId}/delete`
+      : `/api/v1/briefs/${briefId}/delete`;
+
+    const res = await this.request(path, {
       method: "POST",
       body: JSON.stringify(input)
     });
 
     return (await res.json()) as EntityDeletePreviewResult | EntityDeleteExecuteResult | BridgeErrorResult;
+  }
+
+  async deleteClient(
+    clientId: string,
+    input: EntityDeleteInput
+  ): Promise<EntitySoftDeletePreviewResult | EntitySoftDeleteExecuteResult | BridgeErrorResult> {
+    const res = await this.request(`/api/v1/clients/${clientId}/delete`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    });
+
+    return (await res.json()) as
+      | EntitySoftDeletePreviewResult
+      | EntitySoftDeleteExecuteResult
+      | BridgeErrorResult;
+  }
+
+  async deleteLead(
+    leadId: string,
+    input: EntityDeleteInput
+  ): Promise<EntitySoftDeletePreviewResult | EntitySoftDeleteExecuteResult | BridgeErrorResult> {
+    const res = await this.request(`/api/v1/leads/${leadId}/delete`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    });
+
+    return (await res.json()) as
+      | EntitySoftDeletePreviewResult
+      | EntitySoftDeleteExecuteResult
+      | BridgeErrorResult;
+  }
+
+  async listTrash(): Promise<ListTrashData | BridgeErrorResult> {
+    const res = await this.request("/api/v1/trash", {
+      method: "GET"
+    });
+
+    return (await res.json()) as ListTrashData | BridgeErrorResult;
+  }
+
+  async restoreEntity(
+    entityType: "client" | "lead" | "brief",
+    entityId: string
+  ): Promise<RestoreEntityData | BridgeErrorResult> {
+    const res = await this.request("/api/v1/trash/restore", {
+      method: "POST",
+      body: JSON.stringify({ entityType, entityId })
+    });
+
+    return (await res.json()) as RestoreEntityData | BridgeErrorResult;
   }
 }

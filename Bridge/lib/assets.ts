@@ -4,6 +4,8 @@
  *           context/SPECs/SPEC_ARCH-20260505-24_activos_vinculados_a_cotizacion_y_project_v1.md
  * IMPL-20260513-17
  * Respaldo: context/AGENTE_VIKA_Y_SKILLS_TECNICAS_V1.md
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 import { resolveTenantIdBySlug } from "./tenant";
@@ -570,9 +572,24 @@ export async function getProjectsByTenant(tenantId: string): Promise<
     created_at: string;
   }>
 > {
+  const activeClientParams = new URLSearchParams({
+    select: "id",
+    tenant_id: `eq.${tenantId}`,
+    deleted_at: "is.null"
+  });
+  const activeClients = await postgrest<{ id: string }[]>(`clients?${activeClientParams.toString()}`, {
+    method: "GET"
+  });
+
+  if (activeClients.length === 0) {
+    return [];
+  }
+
+  const clientIdsFilter = `in.(${activeClients.map((row) => row.id).join(",")})`;
   const params = new URLSearchParams({
     select: "id,name,project_type,status,client_id,created_at",
     tenant_id: `eq.${tenantId}`,
+    client_id: clientIdsFilter,
     order: "created_at.desc"
   });
   const rows = await postgrest<{
@@ -606,6 +623,7 @@ export async function getClientsByTenant(tenantId: string): Promise<
   const params = new URLSearchParams({
     select: "id,name,legal_name,status,primary_contact_name,primary_contact_email,primary_contact_whatsapp,primary_contact_channel,notes",
     tenant_id: `eq.${tenantId}`,
+    deleted_at: "is.null",
     order: "created_at.desc"
   });
   const rows = await postgrest<{
@@ -643,6 +661,7 @@ export async function getBriefsByTenant(tenantId: string): Promise<
   const params = new URLSearchParams({
     select: "id,tenant_id,client_id,project_id,status,source_channel,current_version_number,active_version_id,created_at,updated_at",
     tenant_id: `eq.${tenantId}`,
+    deleted_at: "is.null",
     order: "updated_at.desc"
   });
   const rows = await postgrest<{
@@ -973,6 +992,7 @@ export async function getClientById(
     select: "id,name,legal_name,status,primary_contact_name,primary_contact_email,primary_contact_whatsapp,primary_contact_channel,notes",
     tenant_id: `eq.${tenantId}`,
     id: `eq.${clientId}`,
+    deleted_at: "is.null",
     limit: "1"
   });
 

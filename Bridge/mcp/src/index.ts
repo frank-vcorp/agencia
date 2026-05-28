@@ -4,6 +4,8 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260510-08_mcp_server_bridge_para_agentes_vscode.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260510-10_extension_mcp_cotizaciones_y_copias_locales.md
  * Respaldo: context/SPECs/SPEC_ARCH-20260510-14_mcp_crear_cliente_proyecto_activo.md
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
  *
  * Entry point del MCP server de Bridge.
  * Expone herramientas MCP para operaciones operativas sobre assets,
@@ -74,6 +76,22 @@ import {
   deleteBriefToolDefinition,
   handleDeleteBrief
 } from "./tools/delete-brief.js";
+import {
+  deleteClientToolDefinition,
+  handleDeleteClient
+} from "./tools/delete-client.js";
+import {
+  deleteLeadToolDefinition,
+  handleDeleteLead
+} from "./tools/delete-lead.js";
+import {
+  listTrashToolDefinition,
+  handleListTrash
+} from "./tools/list-trash.js";
+import {
+  restoreEntityToolDefinition,
+  handleRestoreEntity
+} from "./tools/restore-entity.js";
 import {
   listProjectsToolDefinition,
   handleListProjects
@@ -159,7 +177,11 @@ async function main() {
       deleteProjectToolDefinition,
       deleteAssetToolDefinition,
       deleteQuotationToolDefinition,
-      deleteBriefToolDefinition
+      deleteBriefToolDefinition,
+      deleteClientToolDefinition,
+      deleteLeadToolDefinition,
+      listTrashToolDefinition,
+      restoreEntityToolDefinition
     ]
   }));
 
@@ -268,6 +290,22 @@ async function main() {
 
       case "bridge_delete_brief":
         text = await handleDeleteBrief(client, args ?? {});
+        break;
+
+      case "bridge_delete_client":
+        text = await handleDeleteClient(client, args ?? {});
+        break;
+
+      case "bridge_delete_lead":
+        text = await handleDeleteLead(client, args ?? {});
+        break;
+
+      case "bridge_list_trash":
+        text = await handleListTrash(client);
+        break;
+
+      case "bridge_restore_entity":
+        text = await handleRestoreEntity(client, args ?? {});
         break;
 
       default:

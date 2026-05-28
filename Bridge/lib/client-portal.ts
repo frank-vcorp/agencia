@@ -1,6 +1,8 @@
 /**
  * IMPL-20260508-21
  * Respaldo: context/SPECs/SPEC_ARCH-20260508-21_cliente_pwa_resultados_y_leads_v1.md
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 
@@ -414,6 +416,7 @@ async function fetchRecentLeads(tenantId: string): Promise<LeadRow[]> {
   const params = new URLSearchParams({
     select: "id,name,source_channel,requested_service,status,created_at,updated_at",
     tenant_id: `eq.${tenantId}`,
+    deleted_at: "is.null",
     order: "updated_at.desc",
     limit: "20"
   });

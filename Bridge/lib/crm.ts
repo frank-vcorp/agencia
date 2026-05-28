@@ -5,6 +5,8 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-27_vinculacion_explicita_lead_client_project_v1.md
  * IMPL-20260505-29
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-29_hardening_validacion_cruzada_crm_v1.md
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 
@@ -358,6 +360,7 @@ export async function getLeadsByTenant(tenantId: string): Promise<Lead[]> {
       "id,tenant_id,client_id,project_id,name,source_channel,requested_service," +
       "status,next_follow_up_at,created_at,updated_at",
     tenant_id: `eq.${tenantId}`,
+    deleted_at: "is.null",
     order: "created_at.desc"
   });
   const rows = await postgrest<LeadRow[]>(`leads?${params.toString()}`, { method: "GET" });
@@ -382,6 +385,7 @@ export async function getLeadWorkspace(leadId: string): Promise<LeadWorkspace | 
       "id,tenant_id,client_id,project_id,name,source_channel,requested_service," +
       "status,next_follow_up_at,created_at,updated_at",
     id: `eq.${leadId}`,
+    deleted_at: "is.null",
     limit: "1"
   });
   const rows = await postgrest<LeadRow[]>(`leads?${params.toString()}`, { method: "GET" });

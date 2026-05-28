@@ -53,6 +53,50 @@ export type EntityDeleteError = {
 
 export type EntityDeleteResult = EntityDeletePreview | EntityDeleteExecute | EntityDeleteError;
 
+/**
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
+ */
+export type EntitySoftDeleteResult = {
+  ok: true;
+  mode: "preview" | "execute";
+  entityType: "client" | "lead" | "brief";
+  entityId: string;
+  entityLabel: string;
+  blockedReason?: string;
+  deletedAt?: string;
+  purgesAt?: string;
+  confirmationText?: string;
+  eventId?: string;
+  message?: string;
+  activeProjects?: Array<{ id: string; name: string; status: string }>;
+};
+
+export type TrashItem = {
+  entityType: "client" | "lead" | "brief";
+  entityId: string;
+  entityLabel: string;
+  deletedAt: string;
+  purgesAt: string;
+  daysRemaining: number;
+  canRestore: boolean;
+};
+
+export type ListTrashResult = {
+  ok: true;
+  items: TrashItem[];
+  total: number;
+};
+
+export type RestoreEntityResult = {
+  ok: true;
+  entityType: string;
+  entityId: string;
+  entityLabel: string;
+  restoredAt: string;
+  message: string;
+};
+
 // ─── Helpers internos ─────────────────────────────────────────────────────────
 
 function getServerApiKey(): string {
@@ -102,6 +146,21 @@ async function getTenantId(slug = supabaseEnv.defaultTenant): Promise<string | n
   } catch {
     return null;
   }
+}
+
+const TRASH_RETENTION_DAYS = 30;
+
+function addRetentionDate(isoDate: string): string {
+  const value = new Date(isoDate);
+  value.setUTCDate(value.getUTCDate() + TRASH_RETENTION_DAYS);
+  return value.toISOString();
+}
+
+function computeDaysRemaining(deletedAtIso: string): number {
+  const deletedAt = new Date(deletedAtIso).getTime();
+  const now = Date.now();
+  const elapsedDays = Math.floor((now - deletedAt) / (1000 * 60 * 60 * 24));
+  return TRASH_RETENTION_DAYS - elapsedDays;
 }
 
 // ─── Project ──────────────────────────────────────────────────────────────────
@@ -969,4 +1028,546 @@ export async function executeDeleteBrief(
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, error: msg };
   }
+}
+
+// ─── Papelera de reciclaje ───────────────────────────────────────────────────
+
+/**
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
+ */
+export async function softDeleteClient(
+  tenantId: string,
+  clientId: string,
+  mode: DeleteMode,
+  requestedByLabel: string,
+  approvedByLabel: string,
+  reason: string,
+  confirmationText?: string
+): Promise<EntitySoftDeleteResult | EntityDeleteError> {
+  if (!isSupabaseConfigured) {
+    return { ok: false, error: "supabase_no_configured" };
+  }
+
+  try {
+    const clientParams = new URLSearchParams({
+      select: "id,name,deleted_at",
+      id: `eq.${clientId}`,
+      tenant_id: `eq.${tenantId}`,
+      limit: "1"
+    });
+
+    const clients = await postgrest<{ id: string; name: string; deleted_at: string | null }[]>(
+      `clients?${clientParams.toString()}`,
+      { method: "GET" }
+    );
+
+    if (clients.length === 0) {
+      return { ok: false, error: "client_not_found" };
+    }
+
+    const client = clients[0];
+    const previewConfirmationText = `MOVER A PAPELERA ${client.name.toUpperCase()}`;
+
+    const activeProjectsParams = new URLSearchParams({
+      select: "id,name,status",
+      tenant_id: `eq.${tenantId}`,
+      client_id: `eq.${clientId}`,
+      status: "neq.archived",
+      order: "created_at.desc"
+    });
+
+    const activeProjects = await postgrest<{ id: string; name: string; status: string }[]>(
+      `projects?${activeProjectsParams.toString()}`,
+      { method: "GET" }
+    );
+
+    if (mode === "preview") {
+      if (activeProjects.length > 0) {
+        return {
+          ok: true,
+          mode: "preview",
+          entityType: "client",
+          entityId: client.id,
+          entityLabel: client.name,
+          blockedReason: "client_has_active_projects",
+          activeProjects,
+          confirmationText: previewConfirmationText,
+          message: "El cliente tiene proyectos activos y no puede moverse a papelera."
+        };
+      }
+
+      return {
+        ok: true,
+        mode: "preview",
+        entityType: "client",
+        entityId: client.id,
+        entityLabel: client.name,
+        confirmationText: previewConfirmationText
+      };
+    }
+
+    if (activeProjects.length > 0) {
+      return {
+        ok: true,
+        mode: "execute",
+        entityType: "client",
+        entityId: client.id,
+        entityLabel: client.name,
+        blockedReason: "client_has_active_projects",
+        activeProjects,
+        message: "El cliente tiene proyectos activos y no puede moverse a papelera."
+      };
+    }
+
+    if (confirmationText !== previewConfirmationText) {
+      return { ok: false, error: "confirmation_mismatch" };
+    }
+
+    const deletedAt = new Date().toISOString();
+    const updateParams = new URLSearchParams({
+      id: `eq.${clientId}`,
+      tenant_id: `eq.${tenantId}`
+    });
+
+    await postgrest<{ id: string }[]>(`clients?${updateParams.toString()}`, {
+      method: "PATCH",
+      body: JSON.stringify({ deleted_at: deletedAt })
+    });
+
+    const auditRow = await postgrest<{ id: string }[]>("entity_delete_events?select=*", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tenant_id: tenantId,
+        entity_type: "client",
+        entity_id: clientId,
+        entity_label: client.name,
+        requested_by_label: requestedByLabel,
+        approved_by_label: approvedByLabel,
+        reason,
+        mode: "soft_delete",
+        impact_summary_json: { direct: 1, cascaded: 0, detached: 0 }
+      })
+    });
+
+    return {
+      ok: true,
+      mode: "execute",
+      entityType: "client",
+      entityId: client.id,
+      entityLabel: client.name,
+      deletedAt,
+      purgesAt: addRetentionDate(deletedAt),
+      eventId: auditRow[0]?.id ?? "",
+      message: `Cliente "${client.name}" movido a papelera.`
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
+ */
+export async function softDeleteLead(
+  tenantId: string,
+  leadId: string,
+  mode: DeleteMode,
+  requestedByLabel: string,
+  approvedByLabel: string,
+  reason: string,
+  confirmationText?: string
+): Promise<EntitySoftDeleteResult | EntityDeleteError> {
+  if (!isSupabaseConfigured) {
+    return { ok: false, error: "supabase_no_configured" };
+  }
+
+  try {
+    const leadParams = new URLSearchParams({
+      select: "id,name,source_channel,status,deleted_at",
+      id: `eq.${leadId}`,
+      tenant_id: `eq.${tenantId}`,
+      limit: "1"
+    });
+
+    const leads = await postgrest<
+      { id: string; name: string; source_channel: string; status: string; deleted_at: string | null }[]
+    >(`leads?${leadParams.toString()}`, { method: "GET" });
+
+    if (leads.length === 0) {
+      return { ok: false, error: "lead_not_found" };
+    }
+
+    const lead = leads[0];
+    const previewConfirmationText = `MOVER A PAPELERA ${lead.name.toUpperCase()}`;
+
+    if (mode === "preview") {
+      return {
+        ok: true,
+        mode: "preview",
+        entityType: "lead",
+        entityId: lead.id,
+        entityLabel: lead.name,
+        confirmationText: previewConfirmationText,
+        message: `Canal: ${lead.source_channel}. Estado: ${lead.status}.`
+      };
+    }
+
+    if (confirmationText !== previewConfirmationText) {
+      return { ok: false, error: "confirmation_mismatch" };
+    }
+
+    const deletedAt = new Date().toISOString();
+    const updateParams = new URLSearchParams({
+      id: `eq.${leadId}`,
+      tenant_id: `eq.${tenantId}`
+    });
+
+    await postgrest<{ id: string }[]>(`leads?${updateParams.toString()}`, {
+      method: "PATCH",
+      body: JSON.stringify({ deleted_at: deletedAt })
+    });
+
+    const auditRow = await postgrest<{ id: string }[]>("entity_delete_events?select=*", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tenant_id: tenantId,
+        entity_type: "lead",
+        entity_id: leadId,
+        entity_label: lead.name,
+        requested_by_label: requestedByLabel,
+        approved_by_label: approvedByLabel,
+        reason,
+        mode: "soft_delete",
+        impact_summary_json: { direct: 1, cascaded: 0, detached: 0 }
+      })
+    });
+
+    return {
+      ok: true,
+      mode: "execute",
+      entityType: "lead",
+      entityId: lead.id,
+      entityLabel: lead.name,
+      deletedAt,
+      purgesAt: addRetentionDate(deletedAt),
+      eventId: auditRow[0]?.id ?? "",
+      message: `Lead "${lead.name}" movido a papelera.`
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
+ */
+export async function previewDeleteBriefOrphan(
+  tenantId: string,
+  briefId: string
+): Promise<EntitySoftDeleteResult | EntityDeleteError> {
+  if (!isSupabaseConfigured) {
+    return { ok: false, error: "supabase_no_configured" };
+  }
+
+  try {
+    const briefParams = new URLSearchParams({
+      select: "id,project_id,status,deleted_at",
+      id: `eq.${briefId}`,
+      tenant_id: `eq.${tenantId}`,
+      limit: "1"
+    });
+
+    const briefs = await postgrest<
+      { id: string; project_id: string | null; status: string; deleted_at: string | null }[]
+    >(`briefs?${briefParams.toString()}`, { method: "GET" });
+
+    if (briefs.length === 0) {
+      return { ok: false, error: "brief_not_found" };
+    }
+
+    const brief = briefs[0];
+    if (brief.project_id) {
+      return { ok: false, error: "brief_not_orphan" };
+    }
+
+    return {
+      ok: true,
+      mode: "preview",
+      entityType: "brief",
+      entityId: brief.id,
+      entityLabel: `Brief ${brief.id}`,
+      confirmationText: `MOVER A PAPELERA BRIEF ${brief.id}`
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
+ */
+export async function executeDeleteBriefOrphan(
+  tenantId: string,
+  briefId: string,
+  requestedByLabel: string,
+  approvedByLabel: string,
+  reason: string,
+  confirmationText: string,
+  previewConfirmationText: string
+): Promise<EntitySoftDeleteResult | EntityDeleteError> {
+  if (!isSupabaseConfigured) {
+    return { ok: false, error: "supabase_no_configured" };
+  }
+
+  if (confirmationText !== previewConfirmationText) {
+    return { ok: false, error: "confirmation_mismatch" };
+  }
+
+  try {
+    const briefParams = new URLSearchParams({
+      select: "id,project_id",
+      id: `eq.${briefId}`,
+      tenant_id: `eq.${tenantId}`,
+      limit: "1"
+    });
+
+    const briefs = await postgrest<{ id: string; project_id: string | null }[]>(
+      `briefs?${briefParams.toString()}`,
+      { method: "GET" }
+    );
+
+    if (briefs.length === 0) {
+      return { ok: false, error: "brief_not_found" };
+    }
+
+    if (briefs[0].project_id) {
+      return { ok: false, error: "brief_not_orphan" };
+    }
+
+    const deletedAt = new Date().toISOString();
+    const updateParams = new URLSearchParams({
+      id: `eq.${briefId}`,
+      tenant_id: `eq.${tenantId}`
+    });
+
+    await postgrest<{ id: string }[]>(`briefs?${updateParams.toString()}`, {
+      method: "PATCH",
+      body: JSON.stringify({ deleted_at: deletedAt })
+    });
+
+    const auditRow = await postgrest<{ id: string }[]>("entity_delete_events?select=*", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tenant_id: tenantId,
+        entity_type: "brief",
+        entity_id: briefId,
+        entity_label: `Brief ${briefId}`,
+        requested_by_label: requestedByLabel,
+        approved_by_label: approvedByLabel,
+        reason,
+        mode: "soft_delete",
+        impact_summary_json: { direct: 1, cascaded: 0, detached: 0 }
+      })
+    });
+
+    return {
+      ok: true,
+      mode: "execute",
+      entityType: "brief",
+      entityId: briefId,
+      entityLabel: `Brief ${briefId}`,
+      deletedAt,
+      purgesAt: addRetentionDate(deletedAt),
+      eventId: auditRow[0]?.id ?? "",
+      message: `Brief huérfano "${briefId}" movido a papelera.`
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
+ */
+export async function listTrashItems(tenantId: string): Promise<ListTrashResult | EntityDeleteError> {
+  if (!isSupabaseConfigured) {
+    return { ok: false, error: "supabase_no_configured" };
+  }
+
+  try {
+    const clientsParams = new URLSearchParams({
+      select: "id,name,deleted_at",
+      tenant_id: `eq.${tenantId}`,
+      deleted_at: "not.is.null",
+      order: "deleted_at.desc"
+    });
+    const leadsParams = new URLSearchParams({
+      select: "id,name,deleted_at",
+      tenant_id: `eq.${tenantId}`,
+      deleted_at: "not.is.null",
+      order: "deleted_at.desc"
+    });
+    const briefsParams = new URLSearchParams({
+      select: "id,deleted_at",
+      tenant_id: `eq.${tenantId}`,
+      deleted_at: "not.is.null",
+      order: "deleted_at.desc"
+    });
+
+    const [clients, leads, briefs] = await Promise.all([
+      postgrest<{ id: string; name: string; deleted_at: string }[]>(`clients?${clientsParams.toString()}`, {
+        method: "GET"
+      }),
+      postgrest<{ id: string; name: string; deleted_at: string }[]>(`leads?${leadsParams.toString()}`, {
+        method: "GET"
+      }),
+      postgrest<{ id: string; deleted_at: string }[]>(`briefs?${briefsParams.toString()}`, {
+        method: "GET"
+      })
+    ]);
+
+    const items: TrashItem[] = [
+      ...clients.map((item) => {
+        const daysRemaining = computeDaysRemaining(item.deleted_at);
+        return {
+          entityType: "client" as const,
+          entityId: item.id,
+          entityLabel: item.name,
+          deletedAt: item.deleted_at,
+          purgesAt: addRetentionDate(item.deleted_at),
+          daysRemaining,
+          canRestore: daysRemaining > 0
+        };
+      }),
+      ...leads.map((item) => {
+        const daysRemaining = computeDaysRemaining(item.deleted_at);
+        return {
+          entityType: "lead" as const,
+          entityId: item.id,
+          entityLabel: item.name,
+          deletedAt: item.deleted_at,
+          purgesAt: addRetentionDate(item.deleted_at),
+          daysRemaining,
+          canRestore: daysRemaining > 0
+        };
+      }),
+      ...briefs.map((item) => {
+        const daysRemaining = computeDaysRemaining(item.deleted_at);
+        return {
+          entityType: "brief" as const,
+          entityId: item.id,
+          entityLabel: `Brief ${item.id}`,
+          deletedAt: item.deleted_at,
+          purgesAt: addRetentionDate(item.deleted_at),
+          daysRemaining,
+          canRestore: daysRemaining > 0
+        };
+      })
+    ].sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+
+    return {
+      ok: true,
+      items,
+      total: items.length
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
+ */
+export async function restoreEntity(
+  tenantId: string,
+  entityType: "client" | "lead" | "brief",
+  entityId: string
+): Promise<RestoreEntityResult | EntityDeleteError> {
+  if (!isSupabaseConfigured) {
+    return { ok: false, error: "supabase_no_configured" };
+  }
+
+  const table = entityType === "client" ? "clients" : entityType === "lead" ? "leads" : "briefs";
+  const labelField = entityType === "brief" ? "id" : "name";
+
+  try {
+    const params = new URLSearchParams({
+      select: `id,${labelField},deleted_at`,
+      id: `eq.${entityId}`,
+      tenant_id: `eq.${tenantId}`,
+      limit: "1"
+    });
+
+    const rows = await postgrest<Array<{ id: string; name?: string; deleted_at: string | null }>>(
+      `${table}?${params.toString()}`,
+      { method: "GET" }
+    );
+
+    if (rows.length === 0) {
+      return { ok: false, error: `${entityType}_not_found` };
+    }
+
+    const row = rows[0];
+    if (!row.deleted_at) {
+      return { ok: false, error: "entity_not_in_trash" };
+    }
+
+    const daysRemaining = computeDaysRemaining(row.deleted_at);
+    if (daysRemaining <= 0) {
+      return { ok: false, error: "retention_period_expired" };
+    }
+
+    const updateParams = new URLSearchParams({
+      id: `eq.${entityId}`,
+      tenant_id: `eq.${tenantId}`
+    });
+
+    await postgrest<{ id: string }[]>(`${table}?${updateParams.toString()}`, {
+      method: "PATCH",
+      body: JSON.stringify({ deleted_at: null })
+    });
+
+    const restoredAt = new Date().toISOString();
+    const entityLabel = entityType === "brief" ? `Brief ${entityId}` : row.name ?? entityId;
+
+    return {
+      ok: true,
+      entityType,
+      entityId,
+      entityLabel,
+      restoredAt,
+      message: `${entityLabel} restaurado correctamente.`
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
+}
+
+export async function executeRestoreClient(
+  tenantId: string,
+  clientId: string
+): Promise<RestoreEntityResult | EntityDeleteError> {
+  return restoreEntity(tenantId, "client", clientId);
+}
+
+export async function executeRestoreLead(
+  tenantId: string,
+  leadId: string
+): Promise<RestoreEntityResult | EntityDeleteError> {
+  return restoreEntity(tenantId, "lead", leadId);
 }
