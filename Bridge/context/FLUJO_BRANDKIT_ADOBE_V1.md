@@ -3,7 +3,7 @@
 **ID:** ARCH-20260526-01  
 **Proyecto:** Bridge  
 **Fecha:** 2026-05-26  
-**Última revisión:** 2026-05-28 (v2 — cotización como gate obligatorio)  
+**Última revisión:** 2026-05-28 (v3 — brief creado por el cliente en su portal, dentro de un proyecto preexistente)  
 **Estado:** Documento de flujo operativo
 
 ## Propósito
@@ -21,10 +21,10 @@ La regla operativa es esta:
 
 ```mermaid
 flowchart LR
-    A[Necesidad comercial / oportunidad] --> B[Brief conversacional]
-    B --> C[Bridge estructura datos]
-    C --> D[Proyecto y tenant]
-    D --> E{¿La marca ya tiene Brand Kit?}
+    A[Necesidad comercial / oportunidad] --> A1[Operador crea cliente y proyecto en Bridge]
+    A1 --> B[Cliente crea brief en su portal — conversacional]
+    B --> C[Bridge estructura datos del brief]
+    C --> E{¿La marca ya tiene Brand Kit?}
 
     E -- "Sí — scope: solo activos" --> J[Cotización versionada]
     E -- "No — scope: incluye Brand Kit" --> J
@@ -64,7 +64,9 @@ flowchart LR
 
 ## Responsabilidad por tramo
 
-- El operador diagnostica si la marca ya existe y lo refleja en el brief — eso define el scope de la cotización.
+- El operador crea el cliente y el proyecto en Bridge antes de que el cliente interactúe con su portal.
+- El cliente crea el brief conversacionalmente desde su portal, dentro del proyecto ya creado.
+- El operador o Vika lee el brief para diagnosticar si la marca ya tiene identidad definida — eso determina el scope de la cotización.
 - La cotización incluye o no la creación del Brand Kit según el diagnóstico; debe ser aprobada antes de producir nada.
 - Solo con cotización aprobada se registra o construye el Brand Kit en Bridge.
 - El diseñador traduce la identidad visual definida a los activos de producción.
@@ -76,7 +78,7 @@ flowchart LR
 
 El Brand Kit no puede ejecutarse sin cotización aprobada.
 
-El diagnóstico (`E`) ocurre en el brief y determina el alcance de la cotización:
+El diagnóstico (`E`) ocurre al leer el brief — el operador o Vika determina el alcance a partir de lo que el cliente declaró en su portal:
 
 1. **marca existente**: cotización cubre solo los activos solicitados → aprobación → se registra el Brand Kit en Bridge;
 2. **marca inexistente**: cotización incluye la creación de identidad + activos → aprobación → se crea el Brand Kit y se guarda en Bridge.

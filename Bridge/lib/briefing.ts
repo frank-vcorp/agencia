@@ -1359,3 +1359,116 @@ export async function updateBriefById(
 
   return rows[0] ?? null;
 }
+
+/**
+ * IMPL-20260528-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260528-04_brief_chat_portal_cliente_v1.md
+ */
+export async function getBriefByProjectId(projectId: string, tenantSlug = supabaseEnv.defaultTenant): Promise<BriefRecord | null> {
+  const tenant = await getTenantRecord(tenantSlug);
+
+  if (!tenant) {
+    return null;
+  }
+
+  const [briefRow] = await postgrest<BriefRow[]>(
+    `briefs?tenant_id=eq.${tenant.id}&project_id=eq.${projectId}&order=updated_at.desc&limit=1`
+  );
+
+  if (!briefRow) {
+    return null;
+  }
+
+  const currentVersionRow = briefRow.active_version_id
+    ? await getBriefVersionRow(briefRow.active_version_id)
+    : await getLatestBriefVersionRow(briefRow.id);
+  const container = await resolveBriefOperationalContainer(briefRow);
+  const currentVersion = currentVersionRow ? await serializeVersion(currentVersionRow) : null;
+
+  return {
+    id: briefRow.id,
+    tenantId: briefRow.tenant_id,
+    tenantSlug: tenant.slug,
+    clientId: briefRow.client_id,
+    projectId: briefRow.project_id,
+    status: briefRow.status,
+    sourceChannel: briefRow.source_channel,
+    currentVersionNumber: briefRow.current_version_number,
+    createdAt: briefRow.created_at,
+    updatedAt: briefRow.updated_at,
+    container,
+    currentVersion
+  };
+}
+
+/**
+ * IMPL-20260528-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260528-04_brief_chat_portal_cliente_v1.md
+ */
+export async function createBriefForProject(projectId: string, tenantSlug = supabaseEnv.defaultTenant): Promise<BriefRecord> {
+  const tenant = await getTenantRecord(tenantSlug);
+
+  if (!tenant) {
+    throw new Error("tenant_not_found");
+  }
+
+  const projectContainer = await getProjectContainerById(projectId);
+
+  if (!projectContainer || projectContainer.project?.tenantId !== tenant.id) {
+    throw new Error("project_not_found");
+  }
+
+  const [briefRow] = await postgrest<BriefRow[]>("briefs", {
+    method: "POST",
+    body: JSON.stringify({
+      tenant_id: tenant.id,
+      client_id: projectContainer.client?.id ?? null,
+      project_id: projectId,
+      status: "stage_1_discovery",
+      source_channel: "bridge_web",
+      current_version_number: 1
+    })
+  });
+  const [versionRow] = await postgrest<BriefVersionRow[]>("brief_versions", {
+    method: "POST",
+    body: JSON.stringify({
+      tenant_id: tenant.id,
+      brief_id: briefRow.id,
+      version_number: 1,
+      stage_key: "discovery",
+      status: "stage_1_discovery",
+      structured_summary_json: emptyStructuredBriefSummary(),
+      final_summary_text: ""
+    })
+  });
+
+  const identity = await getTenantIdentityContextByTenantId(tenant.id);
+  const assistantTrace = resolveActorTrace({
+    fallbackLabel: "Bridge briefing",
+    technicalActor: identity?.serviceAgent,
+    effectiveMembership: identity?.operatorMembership
+  });
+
+  await updateBriefStatus(briefRow.id, "stage_1_discovery", versionRow.id, 1);
+  await appendBriefMessage({
+    briefId: briefRow.id,
+    versionId: versionRow.id,
+    authorRole: "assistant",
+    actorLabel: assistantTrace.actorLabel,
+    actorUserId: assistantTrace.actorUserId,
+    actorMembershipId: assistantTrace.actorMembershipId,
+    actorAgentId: assistantTrace.actorAgentId,
+    effectiveUserId: assistantTrace.effectiveUserId,
+    effectiveMembershipId: assistantTrace.effectiveMembershipId,
+    messageText: buildAssistantGuidance("discovery", emptyStructuredBriefSummary()),
+    stage: "discovery"
+  });
+
+  const workspace = await getBriefByProjectId(projectId, tenantSlug);
+
+  if (!workspace) {
+    throw new Error("brief_creation_failed");
+  }
+
+  return workspace;
+}
