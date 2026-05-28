@@ -2,7 +2,7 @@
  * IMPL-ARCH-20260528-02
  * Respaldo: context/SPECs/SPEC_ARCH-20260528-05_directorio_clientes_operador_v1.md
  */
-import { getClientsByTenant, getTenantIdBySlug } from "./assets";
+import { getClientsByTenant, getProjectsByTenant, getTenantIdBySlug } from "./assets";
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 
 export type ClientStatus = "active" | "prospect" | "inactive";
@@ -17,6 +17,7 @@ export type ClientSummary = {
   primaryContactWhatsapp: string | null;
   primaryContactChannel: string | null;
   notes: string | null;
+  recentProjectId: string | null;
 };
 
 export type ClientDirectory = {
@@ -50,7 +51,19 @@ export async function getClientDirectory(tenantSlug?: string): Promise<ClientDir
     return { tenantSlug: slug, clients: [], isEmpty: true };
   }
 
-  const rows = await getClientsByTenant(tenantId);
+  const [rows, projectRows] = await Promise.all([
+    getClientsByTenant(tenantId),
+    getProjectsByTenant(tenantId)
+  ]);
+
+  // Primer proyecto por cliente (ya vienen ordenados desc por created_at)
+  const recentProjectByClient = new Map<string, string>();
+  for (const proj of projectRows) {
+    if (!recentProjectByClient.has(proj.client_id)) {
+      recentProjectByClient.set(proj.client_id, proj.id);
+    }
+  }
+
   const clients: ClientSummary[] = rows.map((row) => ({
     id: row.id,
     name: row.name,
@@ -60,7 +73,8 @@ export async function getClientDirectory(tenantSlug?: string): Promise<ClientDir
     primaryContactEmail: row.primary_contact_email,
     primaryContactWhatsapp: row.primary_contact_whatsapp,
     primaryContactChannel: row.primary_contact_channel,
-    notes: row.notes
+    notes: row.notes,
+    recentProjectId: recentProjectByClient.get(row.id) ?? null
   }));
 
   return { tenantSlug: slug, clients, isEmpty: clients.length === 0 };

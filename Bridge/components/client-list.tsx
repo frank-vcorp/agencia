@@ -4,6 +4,8 @@
  * IMPL-ARCH-20260528-02
  * Respaldo: context/SPECs/SPEC_ARCH-20260528-05_directorio_clientes_operador_v1.md
  */
+import { useState } from "react";
+
 import type { ClientDirectory, ClientStatus } from "@/lib/clients";
 import { CLIENT_STATUS_LABELS } from "@/lib/clients";
 
@@ -24,7 +26,33 @@ function toWhatsappHandle(value: string): string | null {
   return `+${digits}`;
 }
 
-export function ClientListView({ directory }: { directory: ClientDirectory }) {
+function CopyUrlButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="ml-2 rounded-lg bg-[color:var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent-deep)] transition hover:opacity-80"
+    >
+      {copied ? "Copiado" : "Copiar"}
+    </button>
+  );
+}
+
+export function ClientListView({
+  directory,
+  portalBaseUrl
+}: {
+  directory: ClientDirectory;
+  portalBaseUrl: string;
+}) {
   if (directory.isEmpty) {
     return (
       <section className="panel rounded-[28px] px-6 py-8 ring-1 ring-[color:var(--line)]">
@@ -52,6 +80,9 @@ export function ClientListView({ directory }: { directory: ClientDirectory }) {
           const badgeClass = STATUS_BADGE_CLASS[client.status];
           const whatsappHandle = client.primaryContactWhatsapp
             ? toWhatsappHandle(client.primaryContactWhatsapp)
+            : null;
+          const briefUrl = client.recentProjectId
+            ? `${portalBaseUrl}/cliente/brief/${client.recentProjectId}`
             : null;
 
           return (
@@ -111,6 +142,20 @@ export function ClientListView({ directory }: { directory: ClientDirectory }) {
                 {client.notes ? (
                   <p className="text-[color:var(--muted)]">Notas: {truncateNotes(client.notes)}</p>
                 ) : null}
+
+                {briefUrl ? (
+                  <div className="mt-3 rounded-[14px] bg-slate-50 px-3 py-2.5 ring-1 ring-[color:var(--line)]">
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--muted)]">
+                      URL del panel del cliente
+                    </p>
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <span className="truncate text-xs text-slate-700">{briefUrl}</span>
+                      <CopyUrlButton url={briefUrl} />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-[color:var(--muted)]">Sin proyecto activo — la URL del panel estará disponible al crear un proyecto.</p>
+                )}
               </div>
             </article>
           );

@@ -7,5 +7,6 @@ import { getClientDirectory } from "@/lib/clients";
 
 export default async function ClientesPage() {
   const directory = await getClientDirectory();
-  return <ClientListView directory={directory} />;
+  const portalBaseUrl = process.env.BRIDGE_PORTAL_URL ?? "https://vectoria-zeta.vercel.app";
+  return <ClientListView directory={directory} portalBaseUrl={portalBaseUrl} />;
 }
