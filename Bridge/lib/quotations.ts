@@ -7,7 +7,7 @@
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 import { resolveTenantIdBySlug } from "./tenant";
 
-export type QuotationStatus = "draft" | "sent" | "approved" | "invoiced" | "paid";
+export type QuotationStatus = "draft" | "sent" | "approved" | "invoiced" | "paid" | "rejected";
 
 export type QuotationVersionAdminStatus =
   | "draft"
@@ -89,7 +89,8 @@ export const quotationStatusLabels: Record<QuotationStatus, string> = {
   sent: "Enviada",
   approved: "Aprobada",
   invoiced: "Facturada",
-  paid: "Pagada"
+  paid: "Pagada",
+  rejected: "Rechazada"
 };
 
 export const versionAdminStatusLabels: Record<QuotationVersionAdminStatus, string> = {

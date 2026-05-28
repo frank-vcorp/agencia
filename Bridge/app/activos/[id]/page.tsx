@@ -51,7 +51,8 @@ const REVIEW_STATE_COLORS: Record<AssetStatus, string> = {
   in_review: "bg-violet-50 text-violet-700 ring-violet-200",
   approved: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   delivered: "bg-[color:var(--accent-soft)] text-[color:var(--accent-deep)] ring-[color:rgba(200,93,39,0.18)]",
-  archived: "bg-gray-100 text-gray-500 ring-gray-200"
+  archived: "bg-gray-100 text-gray-500 ring-gray-200",
+  changes_requested: "bg-rose-50 text-rose-700 ring-rose-200"
 };
 
 function reviewStateNote(state: ReviewState): string {

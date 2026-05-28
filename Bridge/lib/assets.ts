@@ -122,7 +122,7 @@ export const formatLabels: Record<FormatCode, string> = {
 
 // ─── Tipos de dominio ─────────────────────────────────────────────────────────
 
-export type AssetStatus = "draft" | "in_progress" | "in_review" | "approved" | "delivered" | "archived";
+export type AssetStatus = "draft" | "in_progress" | "in_review" | "approved" | "delivered" | "archived" | "changes_requested";
 
 export type PromptVersionStatus = "draft" | "active" | "superseded" | "archived";
 
@@ -235,7 +235,8 @@ export const assetStatusLabels: Record<AssetStatus, string> = {
   in_review: "En revision",
   approved: "Aprobado",
   delivered: "Entregado",
-  archived: "Archivado"
+  archived: "Archivado",
+  changes_requested: "Cambios solicitados"
 };
 
 export function assetStatusLabel(status: AssetStatus): string {

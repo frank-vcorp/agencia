@@ -12,7 +12,7 @@ export const updateAssetToolDefinition = {
     properties: {
       assetId: { type: "string", description: "UUID del activo" },
       title: { type: "string" },
-      status: { type: "string", enum: ["draft", "in_progress", "in_review", "approved", "delivered", "archived"] },
+      status: { type: "string", enum: ["draft", "in_progress", "in_review", "approved", "delivered", "archived", "changes_requested"] },
       quotationId: { type: "string" }
     },
     required: ["assetId"]

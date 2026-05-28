@@ -11,7 +11,7 @@ export const updateQuotationStatusToolDefinition = {
     type: "object" as const,
     properties: {
       quotationId: { type: "string", description: "UUID de la cotización" },
-      status: { type: "string", enum: ["draft", "sent", "approved", "invoiced", "paid"] },
+      status: { type: "string", enum: ["draft", "sent", "approved", "invoiced", "paid", "rejected"] },
       activeVersionId: { type: "string" },
       briefId: { type: "string" }
     },
