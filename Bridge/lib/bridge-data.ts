@@ -1,9 +1,11 @@
 /**
  * IMPL-20260505-01
+ * IMPL-ARCH-20260528-02
  * Respaldo: context/00_ARQUITECTURA.md, context/CATALOGO_ACTIVOS_V1.md, context/MATRIZ_COMBINACIONES_ACTIVOS_P0.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-05_directorio_clientes_operador_v1.md
  */
 export type RoleKey = "operador" | "disenador" | "cliente";
-export type ModuleKey = "briefs" | "cotizaciones" | "activos" | "crm" | "contexto-agentes";
+export type ModuleKey = "briefs" | "cotizaciones" | "activos" | "crm" | "contexto-agentes" | "clientes";
 
 type RolePage = {
   key: RoleKey;
@@ -111,6 +113,13 @@ export const modulePages: ModulePage[] = [
     label: "Contexto para agentes",
     description: "Resumen derivado, frescura y puntos de handoff para VS Code y agentes remotos.",
     metric: "5 snapshots"
+  },
+  {
+    key: "clientes",
+    href: "/clientes",
+    label: "Clientes",
+    description: "Directorio del tenant con contacto estructurado por cliente.",
+    metric: ""
   }
 ];
 
@@ -590,6 +599,26 @@ export const moduleDetails: Record<
       { title: "Estadisticas luego", detail: "El modulo no depende de dashboards complejos para ser util desde ya." },
       { title: "Scope controlado", detail: "Se mantiene como CRM mini, en linea con la arquitectura y el dictamen tecnico." },
       { title: "Tenant por defecto", detail: "La configuracion futura puede filtrar por tenant sin rehacer navegacion ni cards." }
+    ]
+  },
+  clientes: {
+    roles: ["operador", "cliente"],
+    status: "Directorio operativo para consultar contacto estructurado por cliente.",
+    metrics: [
+      { label: "Clientes", value: "tenant", detail: "El modulo lista clientes reales del tenant activo sin duplicar origen de datos." },
+      { label: "Canales", value: "2", detail: "Email y WhatsApp quedan accionables desde la misma tarjeta." },
+      { label: "Estado", value: "3", detail: "Activo, prospecto e inactivo para lectura comercial rapida." }
+    ],
+    flow: [
+      { stage: "1", title: "Directorio visible", detail: "El operador identifica a quien contactar sin recorrer otros modulos." },
+      { stage: "2", title: "Accion por canal", detail: "Los accesos mailto y wa.me habilitan respuesta inmediata." },
+      { stage: "3", title: "Seguimiento", detail: "El estado del cliente orienta prioridades de briefs, cotizaciones y activos." }
+    ],
+    readiness: [
+      { title: "Fuente unica", detail: "Reutiliza getClientsByTenant y evita reimplementar acceso a base de datos." },
+      { title: "Lectura segura", detail: "Si no hay tenant o datos, muestra estado vacio sin fallar la ruta." },
+      { title: "Escalable", detail: "La tarjeta admite sumar campos operativos sin romper el contrato base." },
+      { title: "Consistente", detail: "Mantiene estilo visual del shell con paneles y paleta compartida." }
     ]
   },
   "contexto-agentes": {
