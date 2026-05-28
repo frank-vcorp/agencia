@@ -140,6 +140,14 @@ import {
   updateAssetToolDefinition,
   handleUpdateAsset
 } from "./tools/update-asset.js";
+import {
+  getBrandKitToolDefinition,
+  handleGetBrandKit
+} from "./tools/get-brand-kit.js";
+import {
+  updateBrandKitToolDefinition,
+  handleUpdateBrandKit
+} from "./tools/update-brand-kit.js";
 
 async function main() {
   const config = loadConfig();
@@ -174,6 +182,8 @@ async function main() {
       getQuotationToolDefinition,
       updateQuotationStatusToolDefinition,
       updateAssetToolDefinition,
+      getBrandKitToolDefinition,
+      updateBrandKitToolDefinition,
       deleteProjectToolDefinition,
       deleteAssetToolDefinition,
       deleteQuotationToolDefinition,
@@ -274,6 +284,14 @@ async function main() {
 
       case "bridge_update_asset":
         text = await handleUpdateAsset(client, args ?? {});
+        break;
+
+      case "bridge_get_brand_kit":
+        text = await handleGetBrandKit(client, args ?? {});
+        break;
+
+      case "bridge_update_brand_kit":
+        text = await handleUpdateBrandKit(client, args ?? {});
         break;
 
       case "bridge_delete_project":

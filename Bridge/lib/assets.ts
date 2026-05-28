@@ -162,6 +162,38 @@ export type AssetWorkspace = {
   activePrompt: AssetPromptVersion | null;
 };
 
+/**
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-02_brand_kit_cliente_bridge_v1.md
+ */
+export type BrandKitLogo = {
+  nombre: string;
+  storage_path: string;
+  url: string;
+};
+
+export type BrandKitColor = {
+  nombre: string;
+  hex: string;
+  uso: string;
+};
+
+export type BrandKitTipografia = {
+  nombre: string;
+  familia: string;
+  uso: string;
+};
+
+export type BrandKit = {
+  logos: BrandKitLogo[];
+  colores: BrandKitColor[];
+  tipografias: BrandKitTipografia[];
+  estilo_visual: string;
+  tono_marca: string[];
+  carpeta_compartida: string | null;
+  notas: string | null;
+};
+
 // ─── Tipos de filas DB ────────────────────────────────────────────────────────
 
 type AssetRow = {
@@ -987,9 +1019,10 @@ export async function getClientById(
   primary_contact_whatsapp: string | null;
   primary_contact_channel: string | null;
   notes: string | null;
+  brand_kit: BrandKit | null;
 } | null> {
   const params = new URLSearchParams({
-    select: "id,name,legal_name,status,primary_contact_name,primary_contact_email,primary_contact_whatsapp,primary_contact_channel,notes",
+    select: "id,name,legal_name,status,primary_contact_name,primary_contact_email,primary_contact_whatsapp,primary_contact_channel,notes,brand_kit",
     tenant_id: `eq.${tenantId}`,
     id: `eq.${clientId}`,
     deleted_at: "is.null",
@@ -1007,10 +1040,36 @@ export async function getClientById(
       primary_contact_whatsapp: string | null;
       primary_contact_channel: string | null;
       notes: string | null;
+      brand_kit: BrandKit | null;
     }>
   >(`clients?${params.toString()}`, { method: "GET" });
 
   return rows[0] ?? null;
+}
+
+/**
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-02_brand_kit_cliente_bridge_v1.md
+ */
+export async function updateClientBrandKit(
+  tenantId: string,
+  clientId: string,
+  brandKit: BrandKit
+): Promise<void> {
+  const params = new URLSearchParams({
+    tenant_id: `eq.${tenantId}`,
+    id: `eq.${clientId}`,
+    select: "id"
+  });
+
+  const rows = await postgrest<Array<{ id: string }>>(`clients?${params.toString()}`, {
+    method: "PATCH",
+    body: JSON.stringify({ brand_kit: brandKit })
+  });
+
+  if (!rows[0]) {
+    throw new Error("client_not_found");
+  }
 }
 
 /**

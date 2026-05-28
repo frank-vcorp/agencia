@@ -201,6 +201,42 @@ export type ClientListItem = {
   notes: string | null;
 };
 
+/**
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-02_brand_kit_cliente_bridge_v1.md
+ */
+export type BrandKitLogo = {
+  nombre: string;
+  storage_path: string;
+  url: string;
+};
+
+export type BrandKitColor = {
+  nombre: string;
+  hex: string;
+  uso: string;
+};
+
+export type BrandKitTipografia = {
+  nombre: string;
+  familia: string;
+  uso: string;
+};
+
+export type BrandKit = {
+  logos: BrandKitLogo[];
+  colores: BrandKitColor[];
+  tipografias: BrandKitTipografia[];
+  estilo_visual: string;
+  tono_marca: string[];
+  carpeta_compartida: string | null;
+  notas: string | null;
+};
+
+export type BrandKitInput = Partial<Omit<BrandKit, "logos">> & {
+  logos: BrandKitLogo[];
+};
+
 export type BriefListItem = {
   id: string;
   tenant_id: string;
@@ -619,6 +655,31 @@ export class BridgeClient {
     }
     const data = (await res.json()) as { client: ClientListItem };
     return data.client;
+  }
+
+  async getBrandKit(clientId: string): Promise<BrandKit | null> {
+    const res = await this.request(`/api/v1/clients/${clientId}/brand-kit`, {
+      method: "GET"
+    });
+    if (res.status === 404) throw new Error("client_not_found");
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
+    const data = (await res.json()) as { brand_kit: BrandKit | null };
+    return data.brand_kit;
+  }
+
+  async updateBrandKit(clientId: string, brandKit: BrandKitInput): Promise<void> {
+    const res = await this.request(`/api/v1/clients/${clientId}/brand-kit`, {
+      method: "PATCH",
+      body: JSON.stringify({ brand_kit: brandKit })
+    });
+    if (res.status === 404) throw new Error("client_not_found");
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      throw new Error(`bridge_api_error:${res.status}:${body.error ?? "unknown"}`);
+    }
   }
 
   async listBriefs(): Promise<{ briefs: BriefListItem[] }> {
