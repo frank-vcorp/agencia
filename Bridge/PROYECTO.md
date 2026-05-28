@@ -337,7 +337,7 @@ Prioridad recomendada:
 ### [~] Planificado para el siguiente corte
 
 1. Generar PDFs de cotizaciones con identidad visual.
-2. Crear agente Frank especializado en VS Code con skills dedicados.
+2. ✅ Agentes VS Code operativos — Vika (estratega Bridge + marketing) y Vic (operador rápido Bridge) implementados con skills dedicados (2026-05-28).
 3. Cerrar modelo de contacto del cliente con campos explícitos para email y WhatsApp.
 4. Integrar disparadores reales de MCT en eventos de negocio.
 5. Refinar plantillas de email y PDF con identidad final.
@@ -357,7 +357,7 @@ Prioridad recomendada:
 
 1. No configurar env vars de producción (RESEND_API_KEY, GOOGLE_CHAT_WEBHOOK_URL) rompe MCT silenciosamente
 2. Las cotizaciones sin PDF pueden no ser formales suficiente para clientes corporativos
-3. El agente Frank sin skills dedicados puede generar ruido operativo al explorar
+3. ~~El agente Frank sin skills dedicados puede generar ruido operativo al explorar~~ — **Resuelto:** Vika y Vic cubren los roles de estrategia y operación respectivamente
 4. Sin un campo estructurado de email y WhatsApp del cliente, el MCT no puede operar de forma confiable
 5. Código no usado acumula deuda técnica y aumenta bundle size
 6. UX/UI sin refinar puede generar fricción en adopción real del piloto
@@ -414,7 +414,7 @@ Prioridad recomendada:
 | Pendiente | Prioridad | Esfuerzo | Bloqueante Piloto |
 |-----------|-----------|----------|-------------------|
 | **1. PDFs de cotizaciones** | Alta | 2-3 horas | ⚠️ Sí (formalidad) |
-| **2. Agente Frank + skills** | Alta | 3-4 horas | ⚠️ Sí (eficiencia) |
+| ~~**2. Agente Frank + skills**~~ | ~~Alta~~ | ✅ Completado | Vika + Vic operativos |
 | **3. Email + WhatsApp estructurados del cliente** | Alta | 1-2 horas | ⚠️ Sí (MCT) |
 | **4. Disparadores MCT reales** | Media | 1-2 horas | No (degrada silencioso) |
 | **5. Plantillas finales** | Media | 2-3 horas | No (estético) |
@@ -422,7 +422,7 @@ Prioridad recomendada:
 | **7. Refinamiento UX/UI** | Media | 3-5 horas | No (usabilidad) |
 
 **Estimación de completitud técnica:** 95%  
-**Estimación de preparación para piloto real:** 85% (falta PDF + agente Frank)
+**Estimación de preparación para piloto real:** 90% (falta PDF + MCT disparadores reales)
 
 ### 🚀 OPCIONES FUTURAS — Post-Piloto (V2)
 
@@ -447,7 +447,7 @@ Prioridad recomendada:
 
 **Lo único pendiente es refinamiento operativo** para usar en piloto real:
 
-- **Crítico:** PDFs de cotizaciones + agente Frank
+- **Crítico:** PDFs de cotizaciones
 - **Crítico:** modelo de contacto del cliente con email + WhatsApp reales
 - **Recomendado:** Disparadores MCT + plantillas finales
 - **Opcional:** Limpieza código + UX/UI
