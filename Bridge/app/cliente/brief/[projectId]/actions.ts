@@ -16,10 +16,11 @@ import {
   submitBriefForOperatorReview,
   updateBriefSummary
 } from "@/lib/briefing";
+import { generateBriefAssistantReply } from "@/lib/briefing-assistant-ai";
 
 /**
- * IMPL-20260528-02
- * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260528-04_brief_chat_portal_cliente_v1.md
+ * IMPL-20260528-08
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-08_brief_cliente_ia_real_gemini_v1.md
  */
 export async function sendClientMessageAction(
   projectId: string,
@@ -47,13 +48,19 @@ export async function sendClientMessageAction(
     const nextVersion = Object.keys(inferredPatch).length
       ? await updateBriefSummary({ briefId, versionId }, inferredPatch)
       : currentVersion;
+    const fallbackMessage = buildAssistantGuidance(nextVersion.stage, nextVersion.structuredSummary);
+    const aiReply = await generateBriefAssistantReply({
+      stage: nextVersion.stage,
+      summary: nextVersion.structuredSummary,
+      clientMessage: normalizedText
+    });
 
     await appendBriefMessage({
       briefId,
       versionId,
       authorRole: "assistant",
       actorLabel: "Bridge briefing",
-      messageText: buildAssistantGuidance(nextVersion.stage, nextVersion.structuredSummary),
+      messageText: aiReply ?? fallbackMessage,
       stage: nextVersion.stage
     });
   }

@@ -151,6 +151,7 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 1. Cierre operativo final del corte `ARCH-20260510-11`: corrida e2e final de punta a punta y trazabilidad Jira del cierre tecnico `20260526-06..09`.
 2. Slices posteriores del corte paraguas `ARCH-20260510-11`, una vez liberado el bloqueador operativo.
 3. `ARCH-20260528-07` autorizado: portal cliente por proyecto con brief conversacional como entrada principal; la capa informativa posterior al brief queda fuera de alcance y se tratara en un slice independiente.
+4. `ARCH-20260528-08` autorizado: brief cliente en capa IA real (Gemini) con fallback determinista y alcance tecnico acotado a 3 archivos.
 
 ### [ ] Pendiente
 

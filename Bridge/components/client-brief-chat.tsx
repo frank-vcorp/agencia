@@ -5,8 +5,9 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260528-04_brief_chat_portal_cliente_v1.md
  * FIX-20260528-01: Envio con Enter y timestamp corto por mensaje.
  * FIX-20260528-03: Layout compacto para chat cliente.
+ * FIX-20260528-04: Autoscroll al ultimo mensaje.
  */
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import type { BriefMessage, BriefRecord, StructuredBriefSummary } from "@/lib/briefing";
 
@@ -89,6 +90,7 @@ function summaryEntries(summary: StructuredBriefSummary): Array<{ label: string;
 export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewProps) {
   const [messageText, setMessageText] = useState("");
   const [isPending, startTransition] = useTransition();
+  const messageListRef = useRef<HTMLDivElement | null>(null);
   const currentVersion = brief.currentVersion;
 
   const messages = currentVersion?.messages ?? [];
@@ -128,6 +130,19 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
 
   const canSend = editable && !disabledReason;
 
+  useEffect(() => {
+    const container = messageListRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: "smooth"
+    });
+  }, [messages.length]);
+
   function handleSendMessage() {
     if (!currentVersion || !canSend || !messageText.trim()) {
       return;
@@ -152,7 +167,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
       </section>
 
       <section className="panel rounded-[22px] px-3 py-3 sm:px-4 sm:py-4">
-        <div className="max-h-[42vh] space-y-2.5 overflow-y-auto pr-1">
+        <div ref={messageListRef} className="max-h-[42vh] space-y-2.5 overflow-y-auto pr-1">
           {messages.length === 0 ? (
             <p className="rounded-[14px] border border-dashed border-stone-300 p-2.5 text-xs text-stone-500 sm:text-sm">
               Aun no hay mensajes en este brief.

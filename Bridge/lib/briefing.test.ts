@@ -1,8 +1,8 @@
 /**
- * IMPL-20260505-22
- * Respaldo: context/CLIENTS_Y_PROJECTS_V1.md, context/SPECs/SPEC_ARCH-20260505-22_clients_y_projects_v1.md, context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md, context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, context/IDENTIDAD_Y_MEMBERSHIPS_V1.md
+ * IMPL-20260528-08
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-08_brief_cliente_ia_real_gemini_v1.md
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildAssistantGuidance,
@@ -14,6 +14,7 @@ import {
   selectPreferredProject,
   statusFromStage
 } from "./briefing";
+import { generateBriefAssistantReply } from "./briefing-assistant-ai";
 
 describe("briefing", () => {
   it("calcula la secuencia obligatoria de tres etapas", () => {
@@ -62,5 +63,63 @@ describe("briefing", () => {
     ]);
 
     expect(selected?.id).toBe("project-active");
+  });
+});
+
+describe("briefing-assistant-ai", () => {
+  it("devuelve null cuando GEMINI_API_KEY no esta configurada", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "");
+
+    const result = await generateBriefAssistantReply({
+      stage: "discovery",
+      summary: emptyStructuredBriefSummary(),
+      clientMessage: "Necesito ayuda para definir mi oferta"
+    });
+
+    expect(result).toBeNull();
+    vi.unstubAllEnvs();
+  });
+
+  it("devuelve texto cuando Gemini responde contenido valido", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "fake-key");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: "Perfecto, avancemos con objetivo y audiencia." }]
+            }
+          }
+        ]
+      })
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateBriefAssistantReply({
+      stage: "discovery",
+      summary: emptyStructuredBriefSummary(),
+      clientMessage: "Quiero captar leads en Instagram"
+    });
+
+    expect(result).toBe("Perfecto, avancemos con objetivo y audiencia.");
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("devuelve null cuando Gemini falla", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "fake-key");
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateBriefAssistantReply({
+      stage: "precision",
+      summary: emptyStructuredBriefSummary(),
+      clientMessage: "Mi servicio es una mentoria"
+    });
+
+    expect(result).toBeNull();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 });
