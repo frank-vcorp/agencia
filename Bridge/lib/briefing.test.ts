@@ -1,6 +1,6 @@
 /**
- * IMPL-20260528-08
- * Respaldo: context/SPECs/SPEC_ARCH-20260528-08_brief_cliente_ia_real_gemini_v1.md
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-09_hardening_prompt_brief_cliente_por_etapas_v1.md
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -14,7 +14,11 @@ import {
   selectPreferredProject,
   statusFromStage
 } from "./briefing";
-import { generateBriefAssistantReply } from "./briefing-assistant-ai";
+import {
+  buildBriefAssistantSystemPrompt,
+  generateBriefAssistantReply,
+  sanitizeAssistantReply
+} from "./briefing-assistant-ai";
 
 describe("briefing", () => {
   it("calcula la secuencia obligatoria de tres etapas", () => {
@@ -67,6 +71,25 @@ describe("briefing", () => {
 });
 
 describe("briefing-assistant-ai", () => {
+  it("incluye etapa, faltantes prioritarios y reglas estrictas en el system prompt", () => {
+    const prompt = buildBriefAssistantSystemPrompt("discovery", emptyStructuredBriefSummary());
+
+    expect(prompt).toContain("Etapa actual: discovery");
+    expect(prompt).toContain("Faltantes prioritarios de etapa: projectObjective (objetivo del proyecto), mainOffer (oferta principal), requestReason (motivo del pedido), businessContext (contexto del negocio)");
+    expect(prompt).toContain("Prohibe saludo, agradecimiento o relleno social cuando existan faltantes.");
+    expect(prompt).toContain("Formula maximo 2 preguntas concretas por turno.");
+  });
+
+  it("postprocesa salida para limitar desborde y limpiar lineas vacias repetidas", () => {
+    const noisyReply = `FOCO: discovery\n\n\n${"dato ".repeat(160)}`;
+
+    const sanitized = sanitizeAssistantReply(noisyReply);
+
+    expect(sanitized).not.toContain("\n\n\n");
+    expect(sanitized.endsWith("...")).toBe(true);
+    expect(sanitized.split(/\s+/).length).toBeLessThanOrEqual(121);
+  });
+
   it("devuelve null cuando GEMINI_API_KEY no esta configurada", async () => {
     vi.stubEnv("GEMINI_API_KEY", "");
 
