@@ -584,8 +584,40 @@ export function inferBriefSummaryPatchFromClientMessage(
     patch.operatorReviewNote = normalizedMessage;
   }
 
+  // FIX-20260529-03: blindaje anti-bucle. Si el cliente responde la pregunta visible
+  // pendiente y la heuristica no logro mapear ese campo narrativo, capturamos su
+  // respuesta literal para que la conversacion avance en lugar de repetir siempre la
+  // misma pregunta (caso mainOffer en discovery observado en produccion).
+  // Respaldo: context/interconsultas/DICTAMEN_FIX-20260529-03_loop_main_offer_en_produccion.md
+  const pendingQuestion = getCurrentVisibleStageQuestion(stage, currentSummary);
+
+  if (pendingQuestion && NARRATIVE_ANSWER_FIELDS.has(pendingQuestion.key)) {
+    const pendingField = pendingQuestion.key;
+    const alreadyHasValue =
+      Boolean(currentSummary[pendingField]?.trim()) || Boolean(patch[pendingField]?.trim());
+
+    if (!alreadyHasValue && hasMeaningfulSummaryValue(pendingField, normalizedMessage)) {
+      patch[pendingField] = normalizedMessage;
+    }
+  }
+
   return patch;
 }
+
+/**
+ * FIX-20260529-03
+ * Campos narrativos cuya respuesta valida es la prosa literal del cliente. Solo
+ * sobre estos aplicamos la captura anti-bucle, para no contaminar campos de tipo
+ * keyword (platform, deliverable, cta, recommendedProductSlotKey) con frases largas.
+ */
+const NARRATIVE_ANSWER_FIELDS = new Set<keyof StructuredBriefSummary>([
+  "mainOffer",
+  "projectObjective",
+  "requestReason",
+  "businessContext",
+  "audience",
+  "commercialFitReason"
+]);
 
 type StageQuestionConfig = {
   key: keyof StructuredBriefSummary;

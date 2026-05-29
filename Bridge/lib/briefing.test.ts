@@ -66,12 +66,12 @@ describe("briefing", () => {
     });
 
     expect(buildFinalSummaryText(summary)).toContain("Slot comercial sugerido: slot_lanzamiento_conversacional.");
-    expect(buildAssistantGuidance("commercial_fit", summary)).toContain("ruta comercial clara");
+    expect(buildAssistantGuidance("commercial_fit", summary)).toContain("Ya veo por d\u00f3nde puede ir la propuesta");
   });
 
   it("suaviza la guia visible en discovery y precision sin perder foco comercial", () => {
     expect(buildAssistantGuidance("discovery", emptyStructuredBriefSummary())).toContain(
-      "que te gustaria ver pasar si esto sale bien"
+      "qu\u00e9 te gustar\u00eda ver pasar si esto sale bien"
     );
     expect(buildAssistantGuidance("precision", {
       ...emptyStructuredBriefSummary(),
@@ -79,7 +79,7 @@ describe("briefing", () => {
       platform: "Instagram",
       deliverable: "Landing",
       cta: "Agendar llamada"
-    })).toContain("base util");
+    })).toContain("base \u00fatil");
   });
 
   it("valida suficiencia en background con contenido significativo y no por texto vacio", () => {
@@ -98,7 +98,7 @@ describe("briefing", () => {
     const patch = inferBriefSummaryPatchFromClientMessage(
       "discovery",
       emptyStructuredBriefSummary(),
-      "Quiero vender mi mentoria a duenos de negocio por Instagram con una landing para agendar"
+      "Quiero vender mi mentoria dirigido a duenos de negocio por Instagram con una landing para agendar"
     );
 
     expect(patch.mainOffer?.toLowerCase()).toContain("mentoria");
@@ -114,6 +114,17 @@ describe("briefing", () => {
     expect(question?.key).toBe("mainOffer");
     expect(question?.question).toBe("\u00bfCu\u00e1l es el servicio o producto principal que quieres mover primero?");
     expect(question?.question.toLowerCase()).not.toContain("oferta principal");
+  });
+
+  it("captura la respuesta literal del campo visible pendiente para no repetir la misma pregunta (FIX-20260529-03)", () => {
+    const summary = emptyStructuredBriefSummary();
+    const clientAnswer = "Principalmente queremos mover el servicio de cambio de aceite y mantenimiento preventivo";
+
+    const patch = inferBriefSummaryPatchFromClientMessage("discovery", summary, clientAnswer);
+    const nextSummary = mergeStructuredBriefSummary(summary, patch);
+
+    expect(patch.mainOffer?.toLowerCase()).toContain("cambio de aceite");
+    expect(getCurrentVisibleStageQuestion("discovery", nextSummary)?.key).not.toBe("mainOffer");
   });
 
   it("prioriza el project activo como contenedor operativo por encima de otros estados", () => {
@@ -143,15 +154,15 @@ describe("briefing-assistant-ai", () => {
   it("genera fallback natural cuando el cliente solo saluda", () => {
     const reply = buildBriefChatFallbackReply("discovery", emptyStructuredBriefSummary(), "Hola");
 
-    expect(reply).toContain("que quieres mover con este proyecto");
-    expect(reply).toContain("que te gustaria ver pasar si esto sale bien");
+    expect(reply).toContain("qu\u00e9 quieres mover con este proyecto");
+    expect(reply).toContain("qu\u00e9 te gustar\u00eda ver pasar si esto sale bien");
   });
 
   it("genera fallback natural cuando el cliente hace una pregunta meta", () => {
     const reply = buildBriefChatFallbackReply("discovery", emptyStructuredBriefSummary(), "que vamos a hacer?");
 
     expect(reply).toContain("propuesta salga alineada");
-    expect(reply).toContain("valio la pena");
+    expect(reply).toContain("vali\u00f3 la pena");
   });
 
   it("detecta una repregunta de aclaracion sobre el faltante actual", () => {
