@@ -1,6 +1,6 @@
 /**
  * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-08_historial_optimista_y_tono_mas_natural_v1.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 import { getTenantIdentityContextByTenantId, resolveActorTrace } from "./identity";
@@ -784,11 +784,11 @@ export function buildAssistantGuidance(stage: BriefingStage, summary: Structured
 
   if (stage === "discovery") {
     if (!summary.mainOffer && !summary.projectObjective && !summary.requestReason && !summary.businessContext) {
-      return "Cu\u00e9ntame qu\u00e9 est\u00e1s buscando mover con este proyecto y qu\u00e9 resultado te gustar\u00eda conseguir primero.";
+      return "Cu\u00e9ntame un poco qu\u00e9 quieres mover con este proyecto y qu\u00e9 te gustar\u00eda ver pasar si esto sale bien.";
     }
 
     if (!currentQuestion) {
-      return "Perfecto, ya tengo una base clara del proyecto. Ahora quiero aterrizar a qui\u00e9n quieres llegar primero y en qu\u00e9 canal conviene moverlo.";
+      return "Ya ubico bien el frente principal. Ahora me sirve saber a qui\u00e9n quieres llegar primero y en qu\u00e9 canal tiene m\u00e1s sentido moverlo.";
     }
 
     return currentQuestion.question;
@@ -797,13 +797,13 @@ export function buildAssistantGuidance(stage: BriefingStage, summary: Structured
   if (stage === "precision") {
     return currentQuestion?.question
       ? currentQuestion.question
-      : "Ya tengo claro el frente de ejecuci\u00f3n. Si hay un matiz clave sobre tono, tiempos o limites que deba cuidar, cuentamelo y lo dejo contemplado.";
+      : "Con eso ya tengo una base \u00fatil. Si hay un matiz de tono, tiempos o l\u00edmites que deba cuidar, cu\u00e9ntamelo y lo considero desde la propuesta.";
   }
 
   return summary.recommendedProductSlotKey
-    ? "Ya veo una ruta comercial clara para tu caso. Si hay algo importante que la propuesta deba respetar, cuentamelo y cierro el encaje final."
+    ? "Ya veo por d\u00f3nde puede ir la propuesta. Si hay algo importante que debamos respetar s\u00ed o s\u00ed, cu\u00e9ntamelo y cierro el encaje final."
     : currentQuestion?.question ||
-        "Antes de cerrar la propuesta, quiero confirmar que tipo de solucion sientes que encaja mejor con lo que necesitas ahora.";
+        "Antes de cerrar, quiero confirmar qu\u00e9 tipo de soluci\u00f3n te har\u00eda m\u00e1s sentido en este momento.";
 }
 
 export function selectPreferredProject<T extends { status: BriefProjectContainer["status"] }>(projects: T[]): T | null {

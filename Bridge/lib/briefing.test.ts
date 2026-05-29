@@ -1,6 +1,6 @@
 /**
  * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-08_historial_optimista_y_tono_mas_natural_v1.md
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -69,6 +69,19 @@ describe("briefing", () => {
     expect(buildAssistantGuidance("commercial_fit", summary)).toContain("ruta comercial clara");
   });
 
+  it("suaviza la guia visible en discovery y precision sin perder foco comercial", () => {
+    expect(buildAssistantGuidance("discovery", emptyStructuredBriefSummary())).toContain(
+      "que te gustaria ver pasar si esto sale bien"
+    );
+    expect(buildAssistantGuidance("precision", {
+      ...emptyStructuredBriefSummary(),
+      audience: "Duenas de negocio",
+      platform: "Instagram",
+      deliverable: "Landing",
+      cta: "Agendar llamada"
+    })).toContain("base util");
+  });
+
   it("valida suficiencia en background con contenido significativo y no por texto vacio", () => {
     const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
       projectObjective: "Captar leads calificados para una preventa",
@@ -124,20 +137,21 @@ describe("briefing-assistant-ai", () => {
     expect(prompt).toContain("No devuelvas JSON");
     expect(prompt).toContain("Usa el resumen estructurado solo como contexto silencioso");
     expect(prompt).toContain("Nunca digas frases como 'mi objetivo es' o 'necesito entender'.");
+    expect(prompt).toContain("evita sentirse robotica o demasiado ensayada");
   });
 
   it("genera fallback natural cuando el cliente solo saluda", () => {
     const reply = buildBriefChatFallbackReply("discovery", emptyStructuredBriefSummary(), "Hola");
 
-    expect(reply).toContain("que estas buscando mover");
-    expect(reply).toContain("resultado te gustar\u00eda conseguir");
+    expect(reply).toContain("que quieres mover con este proyecto");
+    expect(reply).toContain("que te gustaria ver pasar si esto sale bien");
   });
 
   it("genera fallback natural cuando el cliente hace una pregunta meta", () => {
     const reply = buildBriefChatFallbackReply("discovery", emptyStructuredBriefSummary(), "que vamos a hacer?");
 
     expect(reply).toContain("propuesta salga alineada");
-    expect(reply).toContain("que estas buscando mover");
+    expect(reply).toContain("valio la pena");
   });
 
   it("detecta una repregunta de aclaracion sobre el faltante actual", () => {

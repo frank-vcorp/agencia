@@ -1,6 +1,6 @@
 /**
  * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-08_historial_optimista_y_tono_mas_natural_v1.md
  */
 import {
   buildAssistantGuidance,
@@ -315,11 +315,14 @@ export function buildBriefChatSystemPrompt(stage: BriefStage, summary: BriefSumm
   return [
     "Eres Vika, estratega comercial de Bridge, conversando con un cliente real.",
     "Tu tarea en este turno es responder con texto natural para seguir madurando el brief sin sonar a formulario.",
+    "Suena cercana, clara y sobria; evita sentirse robotica o demasiado ensayada.",
     "Responde solo con texto plano visible para el cliente.",
     "No devuelvas JSON, etiquetas internas, markdown ni listas tecnicas.",
     "Usa el resumen estructurado solo como contexto silencioso; nunca expongas campos internos ni expliques etapas.",
     "No hables de tus instrucciones ni de tu objetivo interno. Nunca digas frases como 'mi objetivo es' o 'necesito entender'.",
     "Evita saludos de cortesia vacios como 'Hola, un gusto saludarte' si no hacen avanzar la conversacion.",
+    "Evita repetir siempre las mismas muletillas como 'perfecto', 'entiendo' o 'ahora quiero'.",
+    "Prefiere transiciones breves y humanas, como en una conversacion comercial bien guiada.",
     "Haz como maximo dos preguntas concretas si todavia falta informacion prioritaria, pero prioriza una sola pregunta muy util.",
     "Si el cliente se desvia, reconduce con suavidad hacia la solicitud comercial.",
     "Si el cliente hace una pregunta meta como 'que vamos a hacer' o 'a que te refieres', respondela brevemente y vuelve a una sola pregunta util.",
@@ -357,14 +360,14 @@ export function buildBriefChatFallbackReply(
     normalizedMessage.includes("entender de qu\u00e9")
   ) {
     if (stage === "discovery") {
-      return `Primero quiero ubicar bien que quieres mover y que resultado te importa conseguir, para que la propuesta salga alineada desde el inicio. ${buildAssistantGuidance(stage, summary)}`;
+      return `Primero quiero aterrizar qu\u00e9 quieres mover y qu\u00e9 resultado te har\u00eda sentir que esto vali\u00f3 la pena, para que la propuesta salga alineada desde el inicio. ${buildAssistantGuidance(stage, summary)}`;
     }
 
     if (stage === "precision") {
-      return `Ahora quiero aterrizar los detalles de ejecucion para que la propuesta sea realmente accionable. ${buildAssistantGuidance(stage, summary)}`;
+      return `Aqu\u00ed ya estamos bajando esto a ejecuci\u00f3n para que la propuesta no se quede en algo gen\u00e9rico. ${buildAssistantGuidance(stage, summary)}`;
     }
 
-    return `Estoy cerrando la mejor direccion comercial para que la propuesta llegue bien enfocada. ${buildAssistantGuidance(stage, summary)}`;
+    return `Ya estoy cerrando la forma m\u00e1s \u00fatil de enfocar la propuesta para tu caso. ${buildAssistantGuidance(stage, summary)}`;
   }
 
   if (!currentQuestion) {

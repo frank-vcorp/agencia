@@ -2,7 +2,7 @@
 
 /**
  * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-08_historial_optimista_y_tono_mas_natural_v1.md
  * FIX-20260528-01: Envio con Enter y timestamp corto por mensaje.
  * FIX-20260528-03: Layout compacto para chat cliente.
  * FIX-20260528-04: Autoscroll al ultimo mensaje.
@@ -16,6 +16,11 @@ import { sendClientMessageAction } from "@/app/cliente/brief/[projectId]/actions
 type ClientBriefChatViewProps = {
   brief: BriefRecord;
   projectId: string;
+};
+
+type OptimisticClientMessage = BriefMessage & {
+  pending?: boolean;
+  optimisticKey?: string;
 };
 
 function stageCopy(stage: BriefRecord["status"]): string {
@@ -72,8 +77,13 @@ function formatShortDateTime(iso: string): string {
   }
 }
 
+function createOptimisticMessageSignature(message: Pick<BriefMessage, "authorRole" | "versionId" | "messageText">): string {
+  return [message.versionId, message.authorRole, message.messageText.trim().replace(/\s+/g, " ").toLowerCase()].join("::");
+}
+
 export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewProps) {
   const [messageText, setMessageText] = useState("");
+  const [optimisticMessages, setOptimisticMessages] = useState<OptimisticClientMessage[]>([]);
   const [isPending, startTransition] = useTransition();
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const currentVersion = brief.currentVersion;
@@ -81,6 +91,17 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
   const messages = currentVersion?.messages ?? [];
   const editable = currentVersion?.editable === true;
   const status = brief.status;
+  const confirmedClientMessageSignatures = new Set(
+    messages
+      .filter((message) => message.authorRole === "client")
+      .map((message) => createOptimisticMessageSignature(message))
+  );
+  const visibleMessages: OptimisticClientMessage[] = [
+    ...messages,
+    ...optimisticMessages.filter(
+      (message) => !confirmedClientMessageSignatures.has(createOptimisticMessageSignature(message))
+    )
+  ];
 
   const isReviewStatus =
     status === "pending_operator_review" || status === "operator_review_in_progress";
@@ -106,16 +127,62 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
       top: container.scrollHeight,
       behavior: "smooth"
     });
-  }, [messages.length]);
+  }, [visibleMessages.length]);
+
+  useEffect(() => {
+    setOptimisticMessages((current) => {
+      const confirmedSignatures = new Set(
+        messages
+          .filter((message) => message.authorRole === "client")
+          .map((message) => createOptimisticMessageSignature(message))
+      );
+      const next = current.filter(
+        (message) => !confirmedSignatures.has(createOptimisticMessageSignature(message))
+      );
+
+      return next.length === current.length ? current : next;
+    });
+  }, [messages]);
 
   function handleSendMessage() {
-    if (!currentVersion || !canSend || !messageText.trim()) {
+    const trimmedMessage = messageText.trim();
+
+    if (!currentVersion || !canSend || !trimmedMessage) {
       return;
     }
 
+    const optimisticKey =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `optimistic-${Date.now()}`;
+    const optimisticMessage: OptimisticClientMessage = {
+      id: optimisticKey,
+      optimisticKey,
+      versionId: currentVersion.id,
+      stage: currentVersion.stage,
+      authorRole: "client",
+      actorLabel: "Cliente",
+      actorUserId: null,
+      actorMembershipId: null,
+      actorAgentId: null,
+      effectiveUserId: null,
+      effectiveMembershipId: null,
+      messageText: trimmedMessage,
+      createdAt: new Date().toISOString(),
+      pending: true
+    };
+
+    setOptimisticMessages((current) => [...current, optimisticMessage]);
+    setMessageText("");
+
     startTransition(async () => {
-      await sendClientMessageAction(projectId, brief.id, currentVersion.id, messageText);
-      setMessageText("");
+      try {
+        await sendClientMessageAction(projectId, brief.id, currentVersion.id, trimmedMessage);
+      } catch (error) {
+        setOptimisticMessages((current) => current.filter((message) => message.optimisticKey !== optimisticKey));
+        setMessageText(trimmedMessage);
+        throw error;
+      }
     });
   }
 
@@ -141,15 +208,15 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
             ref={messageListRef}
             className="min-h-[48vh] max-h-[68vh] space-y-1.5 overflow-y-auto rounded-[18px] bg-[#efeae2] px-2 py-2 pr-1 sm:px-3"
           >
-            {messages.length === 0 ? (
+            {visibleMessages.length === 0 ? (
               <p className="rounded-[14px] border border-dashed border-stone-300 p-2.5 text-xs text-stone-500 sm:text-sm">
                 Aun no hay mensajes en este brief.
               </p>
             ) : (
-              messages.map((message) => (
+              visibleMessages.map((message) => (
                 <article
                   key={message.id}
-                  className={`max-w-[84%] px-3 py-2 text-[13px] leading-5 sm:text-sm sm:leading-5 ${messageBubbleClass(message.authorRole)}`}
+                  className={`max-w-[84%] px-3 py-2 text-[13px] leading-5 sm:text-sm sm:leading-5 ${messageBubbleClass(message.authorRole)} ${message.pending ? "opacity-75" : ""}`}
                 >
                   <div className="mb-1 flex items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-[0.12em] opacity-65">
                     <span>{messageAuthor(message.authorRole)}</span>
@@ -160,6 +227,9 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
                   <p className="whitespace-pre-wrap break-words text-[13px] leading-5 sm:text-sm">
                     {message.messageText}
                   </p>
+                  {message.pending && (
+                    <p className="mt-1 text-[10px] font-medium text-stone-500">Enviando...</p>
+                  )}
                 </article>
               ))
             )}
