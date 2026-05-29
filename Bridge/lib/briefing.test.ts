@@ -216,6 +216,40 @@ describe("briefing-assistant-ai", () => {
     vi.unstubAllEnvs();
   });
 
+  it("acepta una respuesta de texto plano del modelo cuando no trae JSON estructurado", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "fake-key");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            finishReason: "STOP",
+            content: {
+              parts: [
+                {
+                  text: "Entendido, el foco es cambio de aceite y mantenimiento preventivo. ¿Qué los impulsa a mover esta línea justo ahora?"
+                }
+              ]
+            }
+          }
+        ]
+      })
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateBriefChatReply({
+      stage: "discovery",
+      summary: emptyStructuredBriefSummary(),
+      clientMessage: "Queremos mover cambio de aceite y mantenimiento preventivo"
+    });
+
+    expect(result.visibleReply).toContain("cambio de aceite");
+    expect(result.summaryPatch).toEqual({});
+    expect(result.stageHasSufficientInfo).toBe(false);
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
   it("falla cuando Gemini devuelve una respuesta visible tecnica", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockResolvedValue({
@@ -246,7 +280,7 @@ describe("briefing-assistant-ai", () => {
         summary: emptyStructuredBriefSummary(),
         clientMessage: "Quiero captar leads"
       })
-    ).rejects.toThrow("brief_chat_ai_unavailable");
+    ).rejects.toThrow("brief_chat_ai_invalid_visible_reply");
 
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
@@ -282,7 +316,7 @@ describe("briefing-assistant-ai", () => {
         summary: emptyStructuredBriefSummary(),
         clientMessage: "Quiero lanzar una campana"
       })
-    ).rejects.toThrow("brief_chat_ai_unavailable");
+    ).rejects.toThrow("brief_chat_ai_invalid_visible_reply");
 
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
@@ -318,7 +352,7 @@ describe("briefing-assistant-ai", () => {
         summary: emptyStructuredBriefSummary(),
         clientMessage: "Necesito una landing para vender"
       })
-    ).rejects.toThrow("brief_chat_ai_unavailable");
+    ).rejects.toThrow("brief_chat_ai_invalid_visible_reply");
 
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
@@ -335,7 +369,7 @@ describe("briefing-assistant-ai", () => {
         summary: emptyStructuredBriefSummary(),
         clientMessage: "Mi servicio es una mentoria"
       })
-    ).rejects.toThrow("brief_chat_ai_unavailable");
+    ).rejects.toThrow("network error");
 
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();

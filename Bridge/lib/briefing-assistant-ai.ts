@@ -347,6 +347,22 @@ function sanitizeBriefChatTurn(rawValue: unknown): { visibleReply: string; summa
   };
 }
 
+function buildPlainTextChatTurn(
+  rawReply: string,
+  finishReason?: string
+): { visibleReply: string; summaryPatch: Partial<BriefSummary> } | null {
+  const visibleReply = sanitizeAssistantReply(rawReply);
+
+  if (!isAcceptableAssistantVisibleReply(visibleReply, finishReason)) {
+    return null;
+  }
+
+  return {
+    visibleReply,
+    summaryPatch: {}
+  };
+}
+
 export function buildBriefFinalJsonPrompt(input: GenerateBriefFinalJsonInput): string {
   const conversation = input.messages
     .map((message) => `${message.authorRole === "client" ? "Cliente" : message.authorRole === "assistant" ? "Vika" : "Operador"}: ${message.messageText}`)
@@ -485,9 +501,29 @@ export async function generateBriefChatReply(
       throw new Error("brief_chat_ai_invalid_json");
     }
 
-    const parsedTurn = sanitizeBriefChatTurn(JSON.parse(jsonText));
+    let parsedTurn: ReturnType<typeof sanitizeBriefChatTurn> = null;
 
-    if (!parsedTurn || !isAcceptableAssistantVisibleReply(parsedTurn.visibleReply, candidate?.finishReason)) {
+    try {
+      parsedTurn = sanitizeBriefChatTurn(JSON.parse(jsonText));
+    } catch {
+      parsedTurn = null;
+    }
+
+    if (!parsedTurn) {
+      const plainTextTurn = candidateText ? buildPlainTextChatTurn(candidateText, candidate?.finishReason) : null;
+
+      if (!plainTextTurn) {
+        throw new Error("brief_chat_ai_invalid_visible_reply");
+      }
+
+      return {
+        visibleReply: plainTextTurn.visibleReply,
+        summaryPatch: plainTextTurn.summaryPatch,
+        stageHasSufficientInfo: hasStageSufficientInfo(input.stage, input.summary)
+      };
+    }
+
+    if (!isAcceptableAssistantVisibleReply(parsedTurn.visibleReply, candidate?.finishReason)) {
       throw new Error("brief_chat_ai_invalid_visible_reply");
     }
 
@@ -498,8 +534,9 @@ export async function generateBriefChatReply(
       summaryPatch: parsedTurn.summaryPatch,
       stageHasSufficientInfo: hasStageSufficientInfo(input.stage, nextSummary)
     };
-  } catch {
-    throw new Error("brief_chat_ai_unavailable");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "brief_chat_ai_unavailable";
+    throw new Error(message);
   }
 }
 
