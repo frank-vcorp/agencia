@@ -162,16 +162,17 @@ describe("briefing-assistant-ai", () => {
     ).toBe(true);
   });
 
-  it("falla cuando GEMINI_API_KEY no esta configurada", async () => {
+  it("devuelve una respuesta operativa cuando GEMINI_API_KEY no esta configurada", async () => {
     vi.stubEnv("GEMINI_API_KEY", "");
 
-    await expect(
-      generateBriefChatReply({
-        stage: "discovery",
-        summary: emptyStructuredBriefSummary(),
-        clientMessage: "Necesito ayuda para definir mi oferta"
-      })
-    ).rejects.toThrow("brief_chat_ai_unavailable");
+    const result = await generateBriefChatReply({
+      stage: "discovery",
+      summary: emptyStructuredBriefSummary(),
+      clientMessage: "Necesito ayuda para definir mi oferta"
+    });
+
+    expect(result.summaryPatch).toEqual({});
+    expect(result.visibleReply).toContain("Se interrumpio este turno");
 
     vi.unstubAllEnvs();
   });
@@ -250,7 +251,7 @@ describe("briefing-assistant-ai", () => {
     vi.unstubAllEnvs();
   });
 
-  it("falla cuando Gemini devuelve una respuesta visible tecnica", async () => {
+  it("devuelve una respuesta operativa cuando Gemini devuelve una respuesta visible tecnica", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -274,19 +275,20 @@ describe("briefing-assistant-ai", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      generateBriefChatReply({
-        stage: "discovery",
-        summary: emptyStructuredBriefSummary(),
-        clientMessage: "Quiero captar leads"
-      })
-    ).rejects.toThrow("brief_chat_ai_invalid_visible_reply");
+    const result = await generateBriefChatReply({
+      stage: "discovery",
+      summary: emptyStructuredBriefSummary(),
+      clientMessage: "Quiero captar leads"
+    });
+
+    expect(result.summaryPatch).toEqual({});
+    expect(result.visibleReply).toContain("Se interrumpio este turno");
 
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
-  it("falla cuando Gemini devuelve una frase truncada", async () => {
+  it("devuelve una respuesta operativa cuando Gemini devuelve una frase truncada", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -310,19 +312,20 @@ describe("briefing-assistant-ai", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      generateBriefChatReply({
-        stage: "discovery",
-        summary: emptyStructuredBriefSummary(),
-        clientMessage: "Quiero lanzar una campana"
-      })
-    ).rejects.toThrow("brief_chat_ai_invalid_visible_reply");
+    const result = await generateBriefChatReply({
+      stage: "discovery",
+      summary: emptyStructuredBriefSummary(),
+      clientMessage: "Quiero lanzar una campana"
+    });
+
+    expect(result.summaryPatch).toEqual({});
+    expect(result.visibleReply).toContain("Se interrumpio este turno");
 
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
-  it("falla cuando Gemini corta la salida por maximo de tokens", async () => {
+  it("devuelve una respuesta operativa cuando Gemini corta la salida por maximo de tokens", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -346,30 +349,32 @@ describe("briefing-assistant-ai", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      generateBriefChatReply({
-        stage: "precision",
-        summary: emptyStructuredBriefSummary(),
-        clientMessage: "Necesito una landing para vender"
-      })
-    ).rejects.toThrow("brief_chat_ai_invalid_visible_reply");
+    const result = await generateBriefChatReply({
+      stage: "precision",
+      summary: emptyStructuredBriefSummary(),
+      clientMessage: "Necesito una landing para vender"
+    });
+
+    expect(result.summaryPatch).toEqual({});
+    expect(result.visibleReply).toContain("Se interrumpio este turno");
 
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
-  it("falla cuando Gemini falla", async () => {
+  it("devuelve una respuesta operativa cuando Gemini falla", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      generateBriefChatReply({
-        stage: "precision",
-        summary: emptyStructuredBriefSummary(),
-        clientMessage: "Mi servicio es una mentoria"
-      })
-    ).rejects.toThrow("network error");
+    const result = await generateBriefChatReply({
+      stage: "precision",
+      summary: emptyStructuredBriefSummary(),
+      clientMessage: "Mi servicio es una mentoria"
+    });
+
+    expect(result.summaryPatch).toEqual({});
+    expect(result.visibleReply).toContain("Se interrumpio este turno");
 
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();

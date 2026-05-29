@@ -91,6 +91,8 @@ const PRIORITY_FIELDS_BY_STAGE: Record<BriefStage, StagePriorityField[]> = {
 };
 
 const MAX_CHAT_REPLY_WORDS = 110;
+const BRIEF_CHAT_RECOVERY_REPLY =
+  "Se interrumpio este turno. Escribeme una vez mas y retomo desde lo que ya compartiste.";
 const TECHNICAL_LEAK_PATTERN =
   /(^|\s)(FOCO|CAPTURADO|PREGUNTAS|SIGUIENTE_ACCION|summaryPatch|missingPriorityFields|stageHasSufficientInfo|redirectNote)\s*:/i;
 const RELIABLE_VISIBLE_FINISH_REASONS = new Set(["", "STOP"]);
@@ -453,10 +455,15 @@ export function isBriefReadyForProposal(summary: BriefSummary): boolean {
 export async function generateBriefChatReply(
   input: GenerateBriefChatReplyInput
 ): Promise<BriefChatReply> {
+  const currentStageHasSufficientInfo = hasStageSufficientInfo(input.stage, input.summary);
   const apiKey = process.env.GEMINI_API_KEY?.trim();
 
   if (!apiKey) {
-    throw new Error("brief_chat_ai_unavailable");
+    return {
+      visibleReply: BRIEF_CHAT_RECOVERY_REPLY,
+      summaryPatch: {},
+      stageHasSufficientInfo: currentStageHasSufficientInfo
+    };
   }
 
   const systemPrompt = buildBriefChatTurnPrompt(input);
@@ -535,8 +542,11 @@ export async function generateBriefChatReply(
       stageHasSufficientInfo: hasStageSufficientInfo(input.stage, nextSummary)
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "brief_chat_ai_unavailable";
-    throw new Error(message);
+    return {
+      visibleReply: BRIEF_CHAT_RECOVERY_REPLY,
+      summaryPatch: {},
+      stageHasSufficientInfo: currentStageHasSufficientInfo
+    };
   }
 }
 
