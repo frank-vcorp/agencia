@@ -3,11 +3,10 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260529-08_historial_optimista_y_tono_mas_natural_v1.md
  */
 import {
-  buildAssistantGuidance,
   emptyStructuredBriefSummary,
-  getCurrentVisibleStageQuestion,
   getCriticalMissingFields,
   hasBackgroundStageSufficientInfo,
+  mergeStructuredBriefSummary,
   type BriefMessage,
   type BriefingStage,
   type StructuredBriefSummary
@@ -40,6 +39,7 @@ export type GenerateBriefChatReplyInput = {
 
 export type BriefChatReply = {
   visibleReply: string;
+  summaryPatch: Partial<BriefSummary>;
   stageHasSufficientInfo: boolean;
 };
 
@@ -118,34 +118,11 @@ const FINAL_JSON_KEYS = new Set<keyof BriefFinalJson>([
 ]);
 
 const readSummaryValue = (summary: BriefSummary, key: keyof BriefSummary): string => summary[key].trim();
+const SUMMARY_PATCH_KEYS = new Set<keyof BriefSummary>(
+  Object.keys(emptyStructuredBriefSummary()) as Array<keyof BriefSummary>
+);
 
 const normalizeText = (value: string): string => value.trim().toLowerCase();
-
-const CLARIFICATION_HINTS = [
-  "a que te refieres",
-  "a qu\u00e9 te refieres",
-  "que quieres decir",
-  "qu\u00e9 quieres decir",
-  "que significa",
-  "qu\u00e9 significa",
-  "cual seria",
-  "cu\u00e1l ser\u00eda",
-  "cual es",
-  "cu\u00e1l es"
-];
-
-const FIELD_REFERENCE_HINTS: Partial<Record<keyof BriefSummary, string[]>> = {
-  projectObjective: ["objetivo", "resultado", "meta"],
-  businessContext: ["contexto", "situacion", "situaci\u00f3n", "negocio"],
-  requestReason: ["por que", "por qu\u00e9", "motivo", "razon", "raz\u00f3n"],
-  mainOffer: ["oferta", "servicio", "producto", "vendo", "venden"],
-  audience: ["publico", "p\u00fablico", "personas", "clientes", "audiencia"],
-  platform: ["plataforma", "canal", "donde", "d\u00f3nde"],
-  deliverable: ["pieza", "solucion", "soluci\u00f3n", "entregable", "necesitan"],
-  cta: ["accion", "acci\u00f3n", "haga", "hacer", "llamado"],
-  recommendedProductSlotKey: ["solucion", "soluci\u00f3n", "encaja", "tipo"],
-  commercialFitReason: ["direccion", "direcci\u00f3n", "encaja", "por que", "por qu\u00e9"]
-};
 
 function extractJsonObject(rawText: string): string | null {
   const fencedMatch = rawText.match(/```json\s*([\s\S]*?)```/i);
@@ -278,29 +255,6 @@ export function hasStageSufficientInfo(stage: BriefStage, summary: BriefSummary)
   return hasBackgroundStageSufficientInfo(stage, summary);
 }
 
-/**
- * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-06_reescritura_controlada_runtime_chat_brief_v1.md
- */
-export function isClarificationRequestForCurrentQuestion(
-  stage: BriefStage,
-  summary: BriefSummary,
-  clientMessage: string
-): boolean {
-  const currentQuestion = getCurrentVisibleStageQuestion(stage, summary);
-
-  if (!currentQuestion) {
-    return false;
-  }
-
-  const normalizedMessage = normalizeText(clientMessage);
-  const mentionsClarificationHint = CLARIFICATION_HINTS.some((hint) => normalizedMessage.includes(hint));
-  const fieldHints = FIELD_REFERENCE_HINTS[currentQuestion.key] ?? [];
-  const mentionsCurrentField = fieldHints.some((hint) => normalizedMessage.includes(hint));
-
-  return mentionsClarificationHint || mentionsCurrentField;
-}
-
 export function buildBriefChatSystemPrompt(stage: BriefStage, summary: BriefSummary): string {
   const stageStatus = buildPrioritizedStageStatus(stage, summary);
   const capturedFieldList =
@@ -335,46 +289,62 @@ export function buildBriefChatSystemPrompt(stage: BriefStage, summary: BriefSumm
   ].join("\n");
 }
 
-export function buildBriefChatFallbackReply(
-  stage: BriefStage,
-  summary: BriefSummary,
-  clientMessage: string
-): string {
-  const normalizedMessage = normalizeText(clientMessage);
-  const currentQuestion = getCurrentVisibleStageQuestion(stage, summary);
+function buildBriefChatTurnPrompt(input: GenerateBriefChatReplyInput): string {
+  return [
+    buildBriefChatSystemPrompt(input.stage, input.summary),
+    "Devuelve solo JSON valido y sin markdown con este contrato:",
+    '{"visibleReply":"","summaryPatch":{}}',
+    "visibleReply: texto natural visible para el cliente, breve, claro y comercial.",
+    "summaryPatch: solo los campos del resumen que el ultimo mensaje del cliente deja mas claros o confirma con suficiente sustancia.",
+    "No inventes datos. Si un campo no cambio o no quedo claro, omitelo del summaryPatch.",
+    "Puedes usar solo claves validas del resumen estructurado de Bridge.",
+    "Ultimo mensaje del cliente:",
+    input.clientMessage
+  ].join("\n");
+}
 
-  if (["hola", "buenas", "buen día", "buen dia", "hello"].includes(normalizedMessage)) {
-    return buildAssistantGuidance(stage, summary);
+function sanitizeSummaryPatch(rawValue: unknown): Partial<BriefSummary> {
+  if (!rawValue || typeof rawValue !== "object" || Array.isArray(rawValue)) {
+    return {};
   }
 
-  if (isClarificationRequestForCurrentQuestion(stage, summary, clientMessage) && currentQuestion) {
-    return currentQuestion.clarification;
-  }
+  const patch: Partial<BriefSummary> = {};
 
-  if (
-    normalizedMessage.includes("que vamos a hacer") ||
-    normalizedMessage.includes("qu\u00e9 vamos a hacer") ||
-    normalizedMessage.includes("cual contexto") ||
-    normalizedMessage.includes("cu\u00e1l contexto") ||
-    normalizedMessage.includes("entender de que") ||
-    normalizedMessage.includes("entender de qu\u00e9")
-  ) {
-    if (stage === "discovery") {
-      return `Primero quiero aterrizar qu\u00e9 quieres mover y qu\u00e9 resultado te har\u00eda sentir que esto vali\u00f3 la pena, para que la propuesta salga alineada desde el inicio. ${buildAssistantGuidance(stage, summary)}`;
+  for (const [key, value] of Object.entries(rawValue)) {
+    if (!SUMMARY_PATCH_KEYS.has(key as keyof BriefSummary) || typeof value !== "string") {
+      continue;
     }
 
-    if (stage === "precision") {
-      return `Aqu\u00ed ya estamos bajando esto a ejecuci\u00f3n para que la propuesta no se quede en algo gen\u00e9rico. ${buildAssistantGuidance(stage, summary)}`;
+    const normalizedValue = value.trim();
+
+    if (!normalizedValue) {
+      continue;
     }
 
-    return `Ya estoy cerrando la forma m\u00e1s \u00fatil de enfocar la propuesta para tu caso. ${buildAssistantGuidance(stage, summary)}`;
+    patch[key as keyof BriefSummary] = normalizedValue;
   }
 
-  if (!currentQuestion) {
-    return buildAssistantGuidance(stage, summary);
+  return patch;
+}
+
+function sanitizeBriefChatTurn(rawValue: unknown): { visibleReply: string; summaryPatch: Partial<BriefSummary> } | null {
+  if (!rawValue || typeof rawValue !== "object" || Array.isArray(rawValue)) {
+    return null;
   }
 
-  return currentQuestion.question;
+  const candidate = rawValue as { visibleReply?: unknown; summaryPatch?: unknown };
+  const visibleReply =
+    typeof candidate.visibleReply === "string" ? sanitizeAssistantReply(candidate.visibleReply) : "";
+  const summaryPatch = sanitizeSummaryPatch(candidate.summaryPatch);
+
+  if (!visibleReply) {
+    return null;
+  }
+
+  return {
+    visibleReply,
+    summaryPatch
+  };
 }
 
 export function buildBriefFinalJsonPrompt(input: GenerateBriefFinalJsonInput): string {
@@ -467,18 +437,13 @@ export function isBriefReadyForProposal(summary: BriefSummary): boolean {
 export async function generateBriefChatReply(
   input: GenerateBriefChatReplyInput
 ): Promise<BriefChatReply> {
-  const stageHasSufficientInfo = hasStageSufficientInfo(input.stage, input.summary);
-  const fallbackReply = buildBriefChatFallbackReply(input.stage, input.summary, input.clientMessage);
   const apiKey = process.env.GEMINI_API_KEY?.trim();
 
   if (!apiKey) {
-    return {
-      visibleReply: fallbackReply,
-      stageHasSufficientInfo
-    };
+    throw new Error("brief_chat_ai_unavailable");
   }
 
-  const systemPrompt = buildBriefChatSystemPrompt(input.stage, input.summary);
+  const systemPrompt = buildBriefChatTurnPrompt(input);
   const model = "gemini-2.5-flash";
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -501,42 +466,40 @@ export async function generateBriefChatReply(
         ],
         generationConfig: {
           temperature: 0.55,
-          maxOutputTokens: 220
+          maxOutputTokens: 1024,
+          responseMimeType: "application/json"
         }
       })
     });
 
     if (!response.ok) {
-      return {
-        visibleReply: fallbackReply,
-        stageHasSufficientInfo
-      };
+      throw new Error("brief_chat_ai_failed");
     }
 
     const payload = (await response.json()) as GeminiGenerateContentResponse;
     const candidate = payload.candidates?.[0];
     const candidateText = candidate?.content?.parts?.map((part) => part.text ?? "").join("\n").trim();
+    const jsonText = candidateText ? extractJsonObject(candidateText) ?? candidateText : null;
 
-    if (!candidateText) {
-      return {
-        visibleReply: fallbackReply,
-        stageHasSufficientInfo
-      };
+    if (!jsonText) {
+      throw new Error("brief_chat_ai_invalid_json");
     }
 
-    const visibleReply = isAcceptableAssistantVisibleReply(candidateText, candidate?.finishReason)
-      ? sanitizeAssistantReply(candidateText)
-      : fallbackReply;
+    const parsedTurn = sanitizeBriefChatTurn(JSON.parse(jsonText));
+
+    if (!parsedTurn || !isAcceptableAssistantVisibleReply(parsedTurn.visibleReply, candidate?.finishReason)) {
+      throw new Error("brief_chat_ai_invalid_visible_reply");
+    }
+
+    const nextSummary = mergeStructuredBriefSummary(input.summary, parsedTurn.summaryPatch);
 
     return {
-      visibleReply,
-      stageHasSufficientInfo
+      visibleReply: parsedTurn.visibleReply,
+      summaryPatch: parsedTurn.summaryPatch,
+      stageHasSufficientInfo: hasStageSufficientInfo(input.stage, nextSummary)
     };
   } catch {
-    return {
-      visibleReply: fallbackReply,
-      stageHasSufficientInfo
-    };
+    throw new Error("brief_chat_ai_unavailable");
   }
 }
 

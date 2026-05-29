@@ -12,20 +12,17 @@ import {
   getCriticalMissingFields,
   hasBackgroundStageSufficientInfo,
   hasMeaningfulSummaryValue,
-  inferBriefSummaryPatchFromClientMessage,
   mergeStructuredBriefSummary,
   nextStage,
   selectPreferredProject,
   statusFromStage
 } from "./briefing";
 import {
-  buildBriefChatFallbackReply,
   buildBriefChatSystemPrompt,
   buildDeterministicBriefFinalJson,
   generateBriefChatReply,
   generateBriefFinalJson,
   hasStageSufficientInfo,
-  isClarificationRequestForCurrentQuestion,
   isAcceptableAssistantVisibleReply,
   sanitizeAssistantReply
 } from "./briefing-assistant-ai";
@@ -94,37 +91,12 @@ describe("briefing", () => {
     expect(hasBackgroundStageSufficientInfo("discovery", summary)).toBe(true);
   });
 
-  it("permite inferir datos de precision desde discovery para sostener avance automatico", () => {
-    const patch = inferBriefSummaryPatchFromClientMessage(
-      "discovery",
-      emptyStructuredBriefSummary(),
-      "Quiero vender mi mentoria dirigido a duenos de negocio por Instagram con una landing para agendar"
-    );
-
-    expect(patch.mainOffer?.toLowerCase()).toContain("mentoria");
-    expect(patch.audience?.toLowerCase()).toContain("duenos de negocio");
-    expect(patch.platform).toBe("Instagram");
-    expect(patch.deliverable).toBe("landing page");
-    expect(patch.cta).toBe("agendar");
-  });
-
   it("traduce el faltante mainOffer a una pregunta visible natural", () => {
     const question = getCurrentVisibleStageQuestion("discovery", emptyStructuredBriefSummary());
 
     expect(question?.key).toBe("mainOffer");
     expect(question?.question).toBe("\u00bfCu\u00e1l es el servicio o producto principal que quieres mover primero?");
     expect(question?.question.toLowerCase()).not.toContain("oferta principal");
-  });
-
-  it("captura la respuesta literal del campo visible pendiente para no repetir la misma pregunta (FIX-20260529-03)", () => {
-    const summary = emptyStructuredBriefSummary();
-    const clientAnswer = "Principalmente queremos mover el servicio de cambio de aceite y mantenimiento preventivo";
-
-    const patch = inferBriefSummaryPatchFromClientMessage("discovery", summary, clientAnswer);
-    const nextSummary = mergeStructuredBriefSummary(summary, patch);
-
-    expect(patch.mainOffer?.toLowerCase()).toContain("cambio de aceite");
-    expect(getCurrentVisibleStageQuestion("discovery", nextSummary)?.key).not.toBe("mainOffer");
   });
 
   it("prioriza el project activo como contenedor operativo por encima de otros estados", () => {
@@ -149,33 +121,6 @@ describe("briefing-assistant-ai", () => {
     expect(prompt).toContain("Usa el resumen estructurado solo como contexto silencioso");
     expect(prompt).toContain("Nunca digas frases como 'mi objetivo es' o 'necesito entender'.");
     expect(prompt).toContain("evita sentirse robotica o demasiado ensayada");
-  });
-
-  it("genera fallback natural cuando el cliente solo saluda", () => {
-    const reply = buildBriefChatFallbackReply("discovery", emptyStructuredBriefSummary(), "Hola");
-
-    expect(reply).toContain("qu\u00e9 quieres mover con este proyecto");
-    expect(reply).toContain("qu\u00e9 te gustar\u00eda ver pasar si esto sale bien");
-  });
-
-  it("genera fallback natural cuando el cliente hace una pregunta meta", () => {
-    const reply = buildBriefChatFallbackReply("discovery", emptyStructuredBriefSummary(), "que vamos a hacer?");
-
-    expect(reply).toContain("propuesta salga alineada");
-    expect(reply).toContain("vali\u00f3 la pena");
-  });
-
-  it("detecta una repregunta de aclaracion sobre el faltante actual", () => {
-    expect(
-      isClarificationRequestForCurrentQuestion("discovery", emptyStructuredBriefSummary(), "Que oferta principal?")
-    ).toBe(true);
-  });
-
-  it("aclara en lenguaje natural cuando el cliente pregunta por el faltante actual", () => {
-    const reply = buildBriefChatFallbackReply("discovery", emptyStructuredBriefSummary(), "Que oferta principal?");
-
-    expect(reply.toLowerCase()).toContain("lo que quieres vender o impulsar primero");
-    expect(reply.toLowerCase()).not.toContain("oferta principal");
   });
 
   it("postprocesa salida visible para limitar desborde y limpiar lineas vacias repetidas", () => {
@@ -217,21 +162,21 @@ describe("briefing-assistant-ai", () => {
     ).toBe(true);
   });
 
-  it("devuelve fallback de chat natural cuando GEMINI_API_KEY no esta configurada", async () => {
+  it("falla cuando GEMINI_API_KEY no esta configurada", async () => {
     vi.stubEnv("GEMINI_API_KEY", "");
 
-    const result = await generateBriefChatReply({
-      stage: "discovery",
-      summary: emptyStructuredBriefSummary(),
-      clientMessage: "Necesito ayuda para definir mi oferta"
-    });
+    await expect(
+      generateBriefChatReply({
+        stage: "discovery",
+        summary: emptyStructuredBriefSummary(),
+        clientMessage: "Necesito ayuda para definir mi oferta"
+      })
+    ).rejects.toThrow("brief_chat_ai_unavailable");
 
-    expect(result.visibleReply.length).toBeGreaterThan(0);
-    expect(typeof result.stageHasSufficientInfo).toBe("boolean");
     vi.unstubAllEnvs();
   });
 
-  it("retorna una respuesta natural cuando Gemini responde texto valido", async () => {
+  it("retorna una respuesta natural y un summaryPatch cuando Gemini responde JSON valido", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -242,7 +187,13 @@ describe("briefing-assistant-ai", () => {
             content: {
               parts: [
                 {
-                  text: "Perfecto, ya tengo una base clara. Para afinarlo, cuentame cual es tu objetivo principal y a quien quieres atraer."
+                  text: JSON.stringify({
+                    visibleReply:
+                      "Entendido, el foco es cambio de aceite y mantenimiento preventivo. \u00bfQu\u00e9 los impulsa a mover esta l\u00ednea justo ahora?",
+                    summaryPatch: {
+                      mainOffer: "Cambio de aceite y mantenimiento preventivo"
+                    }
+                  })
                 }
               ]
             }
@@ -255,16 +206,17 @@ describe("briefing-assistant-ai", () => {
     const result = await generateBriefChatReply({
       stage: "discovery",
       summary: emptyStructuredBriefSummary(),
-      clientMessage: "Quiero captar leads en Instagram"
+      clientMessage: "Queremos mover cambio de aceite y mantenimiento preventivo"
     });
 
-    expect(result.visibleReply).toContain("Perfecto, ya tengo una base clara");
+    expect(result.visibleReply).toContain("cambio de aceite");
+    expect(result.summaryPatch.mainOffer).toContain("Cambio de aceite");
     expect(result.stageHasSufficientInfo).toBe(false);
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
-  it("cae a fallback cuando Gemini filtra etiquetas tecnicas", async () => {
+  it("falla cuando Gemini devuelve una respuesta visible tecnica", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -275,7 +227,10 @@ describe("briefing-assistant-ai", () => {
             content: {
               parts: [
                 {
-                  text: "FOCO: discovery"
+                  text: JSON.stringify({
+                    visibleReply: "FOCO: discovery",
+                    summaryPatch: {}
+                  })
                 }
               ]
             }
@@ -285,19 +240,19 @@ describe("briefing-assistant-ai", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await generateBriefChatReply({
-      stage: "discovery",
-      summary: emptyStructuredBriefSummary(),
-      clientMessage: "Quiero captar leads"
-    });
+    await expect(
+      generateBriefChatReply({
+        stage: "discovery",
+        summary: emptyStructuredBriefSummary(),
+        clientMessage: "Quiero captar leads"
+      })
+    ).rejects.toThrow("brief_chat_ai_unavailable");
 
-    expect(result.visibleReply.length).toBeGreaterThan(0);
-    expect(result.visibleReply.toLowerCase()).not.toContain("oferta principal");
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
-  it("cae a fallback cuando Gemini devuelve una frase truncada", async () => {
+  it("falla cuando Gemini devuelve una frase truncada", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -308,7 +263,10 @@ describe("briefing-assistant-ai", () => {
             content: {
               parts: [
                 {
-                  text: "Entendido. Para entender mejor"
+                  text: JSON.stringify({
+                    visibleReply: "Entendido. Para entender mejor",
+                    summaryPatch: {}
+                  })
                 }
               ]
             }
@@ -318,18 +276,19 @@ describe("briefing-assistant-ai", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await generateBriefChatReply({
-      stage: "discovery",
-      summary: emptyStructuredBriefSummary(),
-      clientMessage: "Quiero lanzar una campana"
-    });
+    await expect(
+      generateBriefChatReply({
+        stage: "discovery",
+        summary: emptyStructuredBriefSummary(),
+        clientMessage: "Quiero lanzar una campana"
+      })
+    ).rejects.toThrow("brief_chat_ai_unavailable");
 
-    expect(result.visibleReply).toBe(buildBriefChatFallbackReply("discovery", emptyStructuredBriefSummary(), "Quiero lanzar una campana"));
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
-  it("cae a fallback cuando Gemini corta la salida por maximo de tokens", async () => {
+  it("falla cuando Gemini corta la salida por maximo de tokens", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -340,7 +299,10 @@ describe("briefing-assistant-ai", () => {
             content: {
               parts: [
                 {
-                  text: "Perfecto, ya entiendo el contexto y te voy a ayudar con"
+                  text: JSON.stringify({
+                    visibleReply: "Perfecto, ya entiendo el contexto y te voy a ayudar con",
+                    summaryPatch: {}
+                  })
                 }
               ]
             }
@@ -350,31 +312,31 @@ describe("briefing-assistant-ai", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await generateBriefChatReply({
-      stage: "precision",
-      summary: emptyStructuredBriefSummary(),
-      clientMessage: "Necesito una landing para vender"
-    });
+    await expect(
+      generateBriefChatReply({
+        stage: "precision",
+        summary: emptyStructuredBriefSummary(),
+        clientMessage: "Necesito una landing para vender"
+      })
+    ).rejects.toThrow("brief_chat_ai_unavailable");
 
-    expect(result.visibleReply).toBe(
-      buildBriefChatFallbackReply("precision", emptyStructuredBriefSummary(), "Necesito una landing para vender")
-    );
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
-  it("cae a fallback cuando Gemini falla", async () => {
+  it("falla cuando Gemini falla", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await generateBriefChatReply({
-      stage: "precision",
-      summary: emptyStructuredBriefSummary(),
-      clientMessage: "Mi servicio es una mentoria"
-    });
+    await expect(
+      generateBriefChatReply({
+        stage: "precision",
+        summary: emptyStructuredBriefSummary(),
+        clientMessage: "Mi servicio es una mentoria"
+      })
+    ).rejects.toThrow("brief_chat_ai_unavailable");
 
-    expect(result.visibleReply.length).toBeGreaterThan(0);
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });

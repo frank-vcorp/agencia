@@ -13,7 +13,6 @@ import {
   appendBriefMessage,
   appendClientBriefMessage,
   getBriefByProjectId,
-  inferBriefSummaryPatchFromClientMessage,
   submitBriefForOperatorReview,
   updateBriefSummary
 } from "@/lib/briefing";
@@ -68,20 +67,15 @@ export async function sendClientMessageAction(
   const currentVersion = brief?.currentVersion;
 
   if (currentVersion) {
-    const inferredPatch = inferBriefSummaryPatchFromClientMessage(
-      currentVersion.stage,
-      currentVersion.structuredSummary,
-      normalizedText
-    );
-    const nextVersion = Object.keys(inferredPatch).length
-      ? await updateBriefSummary({ briefId, versionId }, inferredPatch)
-      : currentVersion;
-    const runtimeVersion = await syncBackgroundStages(briefId, versionId, nextVersion);
     const aiReply = await generateBriefChatReply({
-      stage: runtimeVersion.stage,
-      summary: runtimeVersion.structuredSummary,
+      stage: currentVersion.stage,
+      summary: currentVersion.structuredSummary,
       clientMessage: normalizedText
     });
+    const nextVersion = Object.keys(aiReply.summaryPatch).length
+      ? await updateBriefSummary({ briefId, versionId }, aiReply.summaryPatch)
+      : currentVersion;
+    const runtimeVersion = await syncBackgroundStages(briefId, versionId, nextVersion);
 
     await appendBriefMessage({
       briefId,
@@ -94,7 +88,7 @@ export async function sendClientMessageAction(
 
     if (
       runtimeVersion.stage === "commercial_fit" &&
-      aiReply.stageHasSufficientInfo &&
+      hasStageSufficientInfo(runtimeVersion.stage, runtimeVersion.structuredSummary) &&
       isBriefReadyForProposal(runtimeVersion.structuredSummary)
     ) {
       const finalBriefJson = await generateBriefFinalJson({
