@@ -154,6 +154,7 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 4. `ARCH-20260528-08` autorizado: brief cliente en capa IA real (Gemini) con fallback determinista y alcance tecnico acotado a 3 archivos.
 5. `ARCH-20260528-09` autorizado: hardening del prompt del asistente de brief por etapas con alcance acotado a 2 archivos.
 6. `ARCH-20260529-01` autorizado: brief cliente en doble capa conversacional, con respuesta natural visible y estructuracion invisible para Bridge, manteniendo alcance tecnico acotado a 3 archivos.
+7. `ARCH-20260529-02` autorizado: brief cliente con un solo prompt natural durante el chat y JSON final interno generado al cierre para consumo posterior por Vika en VS Code, con alcance tecnico acotado a 3 archivos.
 
 ### [ ] Pendiente
 

@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * IMPL-20260528-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260528-04_brief_chat_portal_cliente_v1.md
+ * IMPL-20260529-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-02_brief_cliente_chat_natural_y_json_final_v1.md
  * FIX-20260528-01: Envio con Enter y timestamp corto por mensaje.
  * FIX-20260528-03: Layout compacto para chat cliente.
  * FIX-20260528-04: Autoscroll al ultimo mensaje.
@@ -100,6 +100,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
   const isReviewStatus =
     status === "pending_operator_review" || status === "operator_review_in_progress";
   const isApprovedStatus = status === "approved_locked";
+  const hideConversationSurface = isReviewStatus || isApprovedStatus;
 
   const clientMessagesInCurrentStage = useMemo(
     () =>
@@ -167,26 +168,32 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
       </section>
 
       <section className="panel rounded-[22px] px-3 py-3 sm:px-4 sm:py-4">
-        <div ref={messageListRef} className="max-h-[42vh] space-y-2.5 overflow-y-auto pr-1">
-          {messages.length === 0 ? (
-            <p className="rounded-[14px] border border-dashed border-stone-300 p-2.5 text-xs text-stone-500 sm:text-sm">
-              Aun no hay mensajes en este brief.
-            </p>
-          ) : (
-            messages.map((message) => (
-              <article
-                key={message.id}
-                className={`max-w-[86%] rounded-[14px] px-3 py-2 text-xs leading-5 sm:text-sm sm:leading-6 ${messageBubbleClass(message.authorRole)}`}
-              >
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
-                  {messageAuthor(message.authorRole)}
-                </p>
-                <p className="whitespace-pre-wrap">{message.messageText}</p>
-                <p className="mt-1 text-[10px] opacity-70">{formatShortDateTime(message.createdAt)}</p>
-              </article>
-            ))
-          )}
-        </div>
+        {hideConversationSurface ? (
+          <div className="rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900 sm:px-4">
+            Ya capturamos la informacion necesaria para preparar tu propuesta. Nuestro equipo ya esta en la siguiente accion.
+          </div>
+        ) : (
+          <div ref={messageListRef} className="max-h-[42vh] space-y-2.5 overflow-y-auto pr-1">
+            {messages.length === 0 ? (
+              <p className="rounded-[14px] border border-dashed border-stone-300 p-2.5 text-xs text-stone-500 sm:text-sm">
+                Aun no hay mensajes en este brief.
+              </p>
+            ) : (
+              messages.map((message) => (
+                <article
+                  key={message.id}
+                  className={`max-w-[86%] rounded-[14px] px-3 py-2 text-xs leading-5 sm:text-sm sm:leading-6 ${messageBubbleClass(message.authorRole)}`}
+                >
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+                    {messageAuthor(message.authorRole)}
+                  </p>
+                  <p className="whitespace-pre-wrap">{message.messageText}</p>
+                  <p className="mt-1 text-[10px] opacity-70">{formatShortDateTime(message.createdAt)}</p>
+                </article>
+              ))
+            )}
+          </div>
+        )}
 
         <div className="mt-3 border-t border-[color:var(--line)] pt-3">
           <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
@@ -220,7 +227,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
               Enviar
             </button>
 
-            {showAdvanceButton && currentVersion && (
+            {showAdvanceButton && currentVersion && !hideConversationSurface && (
               <button
                 type="button"
                 onClick={() => {
@@ -235,7 +242,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
               </button>
             )}
 
-            {showSubmitButton && currentVersion && (
+            {showSubmitButton && currentVersion && !hideConversationSurface && (
               <button
                 type="button"
                 onClick={() => {

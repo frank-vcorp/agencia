@@ -2,11 +2,12 @@
 
 /**
  * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-01_brief_cliente_doble_capa_conversacional_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-02_brief_cliente_chat_natural_y_json_final_v1.md
  */
 import { revalidatePath } from "next/cache";
 
 import {
+  buildFinalSummaryText,
   advanceBriefStage,
   appendBriefMessage,
   appendClientBriefMessage,
@@ -16,7 +17,11 @@ import {
   submitBriefForOperatorReview,
   updateBriefSummary
 } from "@/lib/briefing";
-import { generateBriefAssistantTurn } from "@/lib/briefing-assistant-ai";
+import {
+  generateBriefChatReply,
+  generateBriefFinalJson,
+  isBriefReadyForProposal
+} from "@/lib/briefing-assistant-ai";
 
 /**
  * IMPL-20260529-01
@@ -50,17 +55,13 @@ export async function sendClientMessageAction(
       ...inferredPatch
     };
     const fallbackMessage = buildAssistantGuidance(currentVersion.stage, summaryForAssistant);
-    const aiTurn = await generateBriefAssistantTurn({
+    const aiReply = await generateBriefChatReply({
       stage: currentVersion.stage,
       summary: summaryForAssistant,
       clientMessage: normalizedText
     });
-    const combinedPatch = {
-      ...inferredPatch,
-      ...(aiTurn?.summaryPatch ?? {})
-    };
-    const nextVersion = Object.keys(combinedPatch).length
-      ? await updateBriefSummary({ briefId, versionId }, combinedPatch)
+    const nextVersion = Object.keys(inferredPatch).length
+      ? await updateBriefSummary({ briefId, versionId }, inferredPatch)
       : currentVersion;
 
     await appendBriefMessage({
@@ -68,9 +69,24 @@ export async function sendClientMessageAction(
       versionId,
       authorRole: "assistant",
       actorLabel: "Bridge briefing",
-      messageText: aiTurn?.visibleReply ?? fallbackMessage,
+      messageText: aiReply.visibleReply || fallbackMessage,
       stage: nextVersion.stage
     });
+
+    if (nextVersion.stage === "commercial_fit" && aiReply.stageHasSufficientInfo && isBriefReadyForProposal(nextVersion.structuredSummary)) {
+      const finalBriefJson = await generateBriefFinalJson({
+        stage: nextVersion.stage,
+        summary: nextVersion.structuredSummary,
+        messages: nextVersion.messages
+      });
+
+      const finalSummaryPatch = {
+        operatorReviewNote: JSON.stringify(finalBriefJson)
+      };
+
+      await updateBriefSummary({ briefId, versionId }, finalSummaryPatch);
+      await submitBriefForOperatorReview({ briefId, versionId });
+    }
   }
 
   revalidatePath(`/cliente/brief/${projectId}`);
@@ -92,6 +108,29 @@ export async function submitBriefAction(
   briefId: string,
   versionId: string
 ): Promise<void> {
+  const brief = await getBriefByProjectId(projectId);
+  const currentVersion = brief?.currentVersion;
+
+  if (currentVersion?.id === versionId) {
+    const finalBriefJson = await generateBriefFinalJson({
+      stage: currentVersion.stage,
+      summary: currentVersion.structuredSummary,
+      messages: currentVersion.messages
+    });
+
+    const finalSummaryText = buildFinalSummaryText(currentVersion.structuredSummary);
+
+    await updateBriefSummary(
+      { briefId, versionId },
+      {
+        operatorReviewNote: JSON.stringify(finalBriefJson),
+        commercialFitReason:
+          currentVersion.structuredSummary.commercialFitReason ||
+          `Cierre interno listo para propuesta. ${finalSummaryText}`
+      }
+    );
+  }
+
   await submitBriefForOperatorReview({ briefId, versionId });
   revalidatePath(`/cliente/brief/${projectId}`);
   revalidatePath(`/cliente/proyecto/${projectId}`);

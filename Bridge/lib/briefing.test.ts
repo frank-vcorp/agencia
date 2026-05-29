@@ -1,6 +1,6 @@
 /**
  * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-01_brief_cliente_doble_capa_conversacional_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-02_brief_cliente_chat_natural_y_json_final_v1.md
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -15,8 +15,11 @@ import {
   statusFromStage
 } from "./briefing";
 import {
-  buildBriefAssistantSystemPrompt,
-  generateBriefAssistantTurn,
+  buildBriefChatSystemPrompt,
+  buildDeterministicBriefFinalJson,
+  generateBriefChatReply,
+  generateBriefFinalJson,
+  hasStageSufficientInfo,
   sanitizeAssistantReply
 } from "./briefing-assistant-ai";
 
@@ -71,14 +74,13 @@ describe("briefing", () => {
 });
 
 describe("briefing-assistant-ai", () => {
-  it("incluye el contrato doble, la etapa y las reglas conversacionales en el system prompt", () => {
-    const prompt = buildBriefAssistantSystemPrompt("discovery", emptyStructuredBriefSummary());
+  it("incluye reglas de chat natural y etapa actual en el prompt de conversacion", () => {
+    const prompt = buildBriefChatSystemPrompt("discovery", emptyStructuredBriefSummary());
 
-    expect(prompt).toContain("Responde solo con JSON valido y sin markdown.");
+    expect(prompt).toContain("Responde solo con texto plano visible para el cliente.");
     expect(prompt).toContain("Etapa actual: discovery");
-    expect(prompt).toContain("Faltantes prioritarios de etapa: projectObjective (objetivo del proyecto), mainOffer (oferta principal), requestReason (motivo del pedido), businessContext (contexto del negocio)");
-    expect(prompt).toContain('"visibleReply":"string"');
-    expect(prompt).toContain("Formula maximo 2 preguntas concretas por turno");
+    expect(prompt).toContain("Aun falta: objetivo del proyecto, oferta principal, motivo del pedido, contexto del negocio");
+    expect(prompt).toContain("No devuelvas JSON");
   });
 
   it("postprocesa salida visible para limitar desborde y limpiar lineas vacias repetidas", () => {
@@ -98,20 +100,21 @@ describe("briefing-assistant-ai", () => {
     expect(sanitized.split(/\s+/).length).toBeLessThanOrEqual(121);
   });
 
-  it("devuelve null cuando GEMINI_API_KEY no esta configurada", async () => {
+  it("devuelve fallback de chat natural cuando GEMINI_API_KEY no esta configurada", async () => {
     vi.stubEnv("GEMINI_API_KEY", "");
 
-    const result = await generateBriefAssistantTurn({
+    const result = await generateBriefChatReply({
       stage: "discovery",
       summary: emptyStructuredBriefSummary(),
       clientMessage: "Necesito ayuda para definir mi oferta"
     });
 
-    expect(result).toBeNull();
+    expect(result.visibleReply.length).toBeGreaterThan(0);
+    expect(typeof result.stageHasSufficientInfo).toBe("boolean");
     vi.unstubAllEnvs();
   });
 
-  it("retorna la capa visible e invisible cuando Gemini responde un payload valido", async () => {
+  it("retorna una respuesta natural cuando Gemini responde texto valido", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -121,16 +124,7 @@ describe("briefing-assistant-ai", () => {
             content: {
               parts: [
                 {
-                  text: JSON.stringify({
-                    visibleReply: "Perfecto, ya tengo una base clara. Para afinarlo, cuentame cual es tu objetivo principal y a quien quieres atraer.",
-                    summaryPatch: {
-                      projectObjective: "Captar leads calificados",
-                      audience: "Negocios locales"
-                    },
-                    stageHasSufficientInfo: true,
-                    missingPriorityFields: ["mainOffer", "requestReason"],
-                    redirectNote: "Sin desvio"
-                  })
+                  text: "Perfecto, ya tengo una base clara. Para afinarlo, cuentame cual es tu objetivo principal y a quien quieres atraer."
                 }
               ]
             }
@@ -140,27 +134,19 @@ describe("briefing-assistant-ai", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await generateBriefAssistantTurn({
+    const result = await generateBriefChatReply({
       stage: "discovery",
       summary: emptyStructuredBriefSummary(),
       clientMessage: "Quiero captar leads en Instagram"
     });
 
-    expect(result).toEqual({
-      visibleReply: "Perfecto, ya tengo una base clara. Para afinarlo, cuentame cual es tu objetivo principal y a quien quieres atraer.",
-      summaryPatch: {
-        projectObjective: "Captar leads calificados",
-        audience: "Negocios locales"
-      },
-      stageHasSufficientInfo: true,
-      missingPriorityFields: ["mainOffer", "requestReason"],
-      redirectNote: "Sin desvio"
-    });
+    expect(result.visibleReply).toContain("Perfecto, ya tengo una base clara");
+    expect(result.stageHasSufficientInfo).toBe(false);
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
-  it("devuelve null cuando Gemini filtra etiquetas tecnicas en la capa visible", async () => {
+  it("cae a fallback cuando Gemini filtra etiquetas tecnicas", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -170,13 +156,7 @@ describe("briefing-assistant-ai", () => {
             content: {
               parts: [
                 {
-                  text: JSON.stringify({
-                    visibleReply: "FOCO: discovery",
-                    summaryPatch: { projectObjective: "Captar leads" },
-                    stageHasSufficientInfo: false,
-                    missingPriorityFields: ["mainOffer"],
-                    redirectNote: ""
-                  })
+                  text: "FOCO: discovery"
                 }
               ]
             }
@@ -186,30 +166,81 @@ describe("briefing-assistant-ai", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await generateBriefAssistantTurn({
+    const result = await generateBriefChatReply({
       stage: "discovery",
       summary: emptyStructuredBriefSummary(),
       clientMessage: "Quiero captar leads"
     });
 
-    expect(result).toBeNull();
+    expect(result.visibleReply.length).toBeGreaterThan(0);
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
-  it("devuelve null cuando Gemini falla", async () => {
+  it("cae a fallback cuando Gemini falla", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await generateBriefAssistantTurn({
+    const result = await generateBriefChatReply({
       stage: "precision",
       summary: emptyStructuredBriefSummary(),
       clientMessage: "Mi servicio es una mentoria"
     });
 
-    expect(result).toBeNull();
+    expect(result.visibleReply.length).toBeGreaterThan(0);
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("detecta suficiencia de etapa discovery cuando los campos prioritarios existen", () => {
+    const summary = {
+      ...emptyStructuredBriefSummary(),
+      projectObjective: "Captar 30 leads",
+      mainOffer: "Programa de consultoria",
+      requestReason: "Necesito pipeline estable",
+      businessContext: "Negocio local en crecimiento"
+    };
+
+    expect(hasStageSufficientInfo("discovery", summary)).toBe(true);
+  });
+
+  it("genera JSON final deterministico con readiness y faltantes", () => {
+    const summary = {
+      ...emptyStructuredBriefSummary(),
+      projectObjective: "Captar leads",
+      mainOffer: "Mentoria",
+      audience: "Pymes",
+      platform: "Instagram",
+      deliverable: "Landing",
+      cta: "Agendar llamada",
+      commercialFitReason: "Hay encaje con oferta de lanzamiento",
+      recommendedProductSlotKey: "slot_lanzamiento"
+    };
+
+    const finalJson = buildDeterministicBriefFinalJson(summary);
+
+    expect(finalJson.proposalReadiness).toBe("high");
+    expect(finalJson.missingCriticalData).toEqual([]);
+    expect(finalJson.recommendedProductSlotKey).toBe("slot_lanzamiento");
+  });
+
+  it("usa fallback deterministico para JSON final cuando GEMINI_API_KEY no existe", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "");
+
+    const summary = {
+      ...emptyStructuredBriefSummary(),
+      projectObjective: "Captar leads"
+    };
+
+    const result = await generateBriefFinalJson({
+      stage: "discovery",
+      summary,
+      messages: [{ authorRole: "client", messageText: "Quiero vender mas" }]
+    });
+
+    expect(result.projectObjective).toBe("Captar leads");
+    expect(result.proposalReadiness).toBe("low");
     vi.unstubAllEnvs();
   });
 });

@@ -1,24 +1,22 @@
 /**
  * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-01_brief_cliente_doble_capa_conversacional_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-02_brief_cliente_chat_natural_y_json_final_v1.md
  */
-import { emptyStructuredBriefSummary, type BriefingStage, type StructuredBriefSummary } from "./briefing";
+import {
+  buildAssistantGuidance,
+  emptyStructuredBriefSummary,
+  getCriticalMissingFields,
+  type BriefMessage,
+  type BriefingStage,
+  type StructuredBriefSummary
+} from "./briefing";
 
 type BriefStage = BriefingStage;
 type BriefSummary = StructuredBriefSummary;
 
-type GenerateBriefAssistantTurnInput = {
-  stage: BriefStage;
-  summary: BriefSummary;
-  clientMessage: string;
-};
-
-export type BriefAssistantTurn = {
-  visibleReply: string;
-  summaryPatch: Partial<BriefSummary>;
-  stageHasSufficientInfo: boolean;
-  missingPriorityFields: string[];
-  redirectNote: string;
+type StagePriorityField = {
+  key: keyof BriefSummary;
+  label: string;
 };
 
 type GeminiGenerateContentResponse = {
@@ -31,9 +29,43 @@ type GeminiGenerateContentResponse = {
   }>;
 };
 
-type StagePriorityField = {
-  key: keyof BriefSummary;
-  label: string;
+export type GenerateBriefChatReplyInput = {
+  stage: BriefStage;
+  summary: BriefSummary;
+  clientMessage: string;
+};
+
+export type BriefChatReply = {
+  visibleReply: string;
+  stageHasSufficientInfo: boolean;
+};
+
+export type FinalBriefMessageInput = Pick<BriefMessage, "authorRole" | "messageText">;
+
+export type GenerateBriefFinalJsonInput = {
+  stage: BriefStage;
+  summary: BriefSummary;
+  messages: FinalBriefMessageInput[];
+};
+
+export type BriefFinalJson = {
+  projectObjective: string;
+  mainOffer: string;
+  businessContext: string;
+  requestReason: string;
+  audience: string;
+  platform: string;
+  deliverable: string;
+  cta: string;
+  tone: string;
+  restrictions: string;
+  references: string;
+  urgency: string;
+  commercialFitReason: string;
+  recommendedProductSlotKey: string;
+  operatorReviewNote: string;
+  proposalReadiness: "low" | "medium" | "high";
+  missingCriticalData: string[];
 };
 
 const PRIORITY_FIELDS_BY_STAGE: Record<BriefStage, StagePriorityField[]> = {
@@ -55,95 +87,30 @@ const PRIORITY_FIELDS_BY_STAGE: Record<BriefStage, StagePriorityField[]> = {
   ]
 };
 
-const MAX_ASSISTANT_REPLY_WORDS = 120;
-const ALLOWED_SUMMARY_KEYS = new Set<keyof BriefSummary>(Object.keys(emptyStructuredBriefSummary()) as Array<keyof BriefSummary>);
+const MAX_CHAT_REPLY_WORDS = 110;
 const TECHNICAL_LEAK_PATTERN =
   /(^|\s)(FOCO|CAPTURADO|PREGUNTAS|SIGUIENTE_ACCION|summaryPatch|missingPriorityFields|stageHasSufficientInfo|redirectNote)\s*:/i;
+const FINAL_JSON_KEYS = new Set<keyof BriefFinalJson>([
+  "projectObjective",
+  "mainOffer",
+  "businessContext",
+  "requestReason",
+  "audience",
+  "platform",
+  "deliverable",
+  "cta",
+  "tone",
+  "restrictions",
+  "references",
+  "urgency",
+  "commercialFitReason",
+  "recommendedProductSlotKey",
+  "operatorReviewNote",
+  "proposalReadiness",
+  "missingCriticalData"
+]);
 
 const readSummaryValue = (summary: BriefSummary, key: keyof BriefSummary): string => summary[key].trim();
-
-const buildPrioritizedStageStatus = (stage: BriefStage, summary: BriefSummary) => {
-  const stageFields = PRIORITY_FIELDS_BY_STAGE[stage];
-  const captured = stageFields.filter((field) => readSummaryValue(summary, field.key).length > 0);
-  const missing = stageFields.filter((field) => readSummaryValue(summary, field.key).length === 0);
-
-  return {
-    stageFields,
-    captured,
-    missing
-  };
-};
-
-export function sanitizeAssistantReply(rawReply: string): string {
-  const trimmed = rawReply
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .split("\n")
-    .map((line) => line.trimEnd())
-    .join("\n")
-    .trim();
-
-  if (!trimmed) {
-    return "";
-  }
-
-  if (TECHNICAL_LEAK_PATTERN.test(trimmed) || (/^[\[{]/.test(trimmed) && /[\]}]$/.test(trimmed))) {
-    return "";
-  }
-
-  const words = trimmed.split(/\s+/).filter(Boolean);
-  if (words.length <= MAX_ASSISTANT_REPLY_WORDS) {
-    return trimmed;
-  }
-
-  return `${words.slice(0, MAX_ASSISTANT_REPLY_WORDS).join(" ")}...`;
-}
-
-export function buildBriefAssistantSystemPrompt(stage: BriefStage, summary: BriefSummary): string {
-  const prioritizedStatus = buildPrioritizedStageStatus(stage, summary);
-  const stageFieldList = prioritizedStatus.stageFields.map((field) => `${field.key} (${field.label})`).join(", ");
-  const capturedFieldList =
-    prioritizedStatus.captured.length > 0
-      ? prioritizedStatus.captured
-          .map((field) => `${field.key}="${readSummaryValue(summary, field.key)}"`)
-          .join("; ")
-      : "ninguno";
-  const missingFieldList =
-    prioritizedStatus.missing.length > 0
-      ? prioritizedStatus.missing.map((field) => `${field.key} (${field.label})`).join(", ")
-      : "ninguno";
-
-  return [
-    "Eres Vika, estratega comercial de Bridge, conversando con un cliente real.",
-    "Objetivo unico: responder con lenguaje natural al cliente y, al mismo tiempo, producir una capa estructurada invisible para Bridge.",
-    "Responde solo con JSON valido y sin markdown.",
-    "Contrato exacto de salida:",
-    '{"visibleReply":"string","summaryPatch":{},"stageHasSufficientInfo":false,"missingPriorityFields":[],"redirectNote":""}',
-    "Reglas para visibleReply:",
-    "- Debe sonar natural, humana, breve, comercial y contextual.",
-    "- Nunca debe incluir etiquetas tecnicas, listas de formulario, markdown ni JSON visible.",
-    "- Formula maximo 2 preguntas concretas por turno y solo si realmente faltan datos prioritarios.",
-    "- Si el cliente se desvia, reconduce con suavidad y vuelve al objetivo del brief.",
-    "- Si la etapa ya tiene informacion suficiente, dilo con naturalidad y orienta a continuar con la siguiente etapa o revision humana.",
-    "Reglas para summaryPatch:",
-    "- Incluye solo campos de StructuredBriefSummary con evidencia suficiente en el mensaje del cliente.",
-    "- No inventes datos ni sobrescribas con texto vacio.",
-    "Reglas para stageHasSufficientInfo:",
-    "- true cuando los datos actuales ya permiten cerrar la etapa con criterio practico aunque no este todo perfecto.",
-    "Reglas para missingPriorityFields:",
-    "- Lista interna con keys faltantes de la etapa actual, sin inventar campos nuevos.",
-    "Reglas para redirectNote:",
-    "- Resume internamente si hubo desvio y como lo recondujiste. Si no hubo desvio, usa cadena vacia.",
-    `Etapa actual: ${stage}`,
-    `Campos prioritarios de etapa: ${stageFieldList}`,
-    `Capturado en etapa: ${capturedFieldList}`,
-    `Faltantes prioritarios de etapa: ${missingFieldList}`,
-    "Resumen estructurado actual (JSON):",
-    JSON.stringify(summary)
-  ].join("\n");
-}
 
 function extractJsonObject(rawText: string): string | null {
   const fencedMatch = rawText.match(/```json\s*([\s\S]*?)```/i);
@@ -204,73 +171,185 @@ function extractJsonObject(rawText: string): string | null {
   return null;
 }
 
-function sanitizeSummaryPatch(rawPatch: unknown): Partial<BriefSummary> {
-  if (!rawPatch || typeof rawPatch !== "object" || Array.isArray(rawPatch)) {
-    return {};
+export function sanitizeAssistantReply(rawReply: string): string {
+  const trimmed = rawReply
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+
+  if (!trimmed) {
+    return "";
   }
 
-  const sanitizedEntries = Object.entries(rawPatch).flatMap(([key, value]) => {
-    if (!ALLOWED_SUMMARY_KEYS.has(key as keyof BriefSummary) || typeof value !== "string") {
-      return [];
+  if (TECHNICAL_LEAK_PATTERN.test(trimmed) || (/^[\[{]/.test(trimmed) && /[\]}]$/.test(trimmed))) {
+    return "";
+  }
+
+  const words = trimmed.split(/\s+/).filter(Boolean);
+
+  if (words.length <= MAX_CHAT_REPLY_WORDS) {
+    return trimmed;
+  }
+
+  return `${words.slice(0, MAX_CHAT_REPLY_WORDS).join(" ")}...`;
+}
+
+function buildPrioritizedStageStatus(stage: BriefStage, summary: BriefSummary) {
+  const stageFields = PRIORITY_FIELDS_BY_STAGE[stage];
+  const captured = stageFields.filter((field) => readSummaryValue(summary, field.key).length > 0);
+  const missing = stageFields.filter((field) => readSummaryValue(summary, field.key).length === 0);
+
+  return {
+    captured,
+    missing
+  };
+}
+
+export function hasStageSufficientInfo(stage: BriefStage, summary: BriefSummary): boolean {
+  const stageStatus = buildPrioritizedStageStatus(stage, summary);
+
+  if (stage === "commercial_fit") {
+    return stageStatus.missing.length === 0 && getCriticalMissingFields(summary).length === 0;
+  }
+
+  return stageStatus.missing.length === 0;
+}
+
+export function buildBriefChatSystemPrompt(stage: BriefStage, summary: BriefSummary): string {
+  const stageStatus = buildPrioritizedStageStatus(stage, summary);
+  const capturedFieldList =
+    stageStatus.captured.length > 0
+      ? stageStatus.captured.map((field) => `${field.label}: ${readSummaryValue(summary, field.key)}`).join("; ")
+      : "ninguno";
+  const missingFieldList =
+    stageStatus.missing.length > 0
+      ? stageStatus.missing.map((field) => field.label).join(", ")
+      : "ninguno";
+
+  return [
+    "Eres Vika, estratega comercial de Bridge, conversando con un cliente real.",
+    "Tu unica tarea en este turno es responder con texto natural para seguir madurando el brief.",
+    "Responde solo con texto plano visible para el cliente.",
+    "No devuelvas JSON, etiquetas internas, markdown ni listas tecnicas.",
+    "Haz como maximo dos preguntas concretas si todavia falta informacion prioritaria.",
+    "Si el cliente se desvia, reconduce con suavidad hacia la solicitud comercial.",
+    "Si ya hay informacion suficiente para esta etapa, confirma brevemente y orienta al siguiente paso sin mostrar estructura interna.",
+    `Etapa actual: ${stage}`,
+    `Ya capturado: ${capturedFieldList}`,
+    `Aun falta: ${missingFieldList}`,
+    "Resumen estructurado actual:",
+    JSON.stringify(summary)
+  ].join("\n");
+}
+
+export function buildBriefFinalJsonPrompt(input: GenerateBriefFinalJsonInput): string {
+  const conversation = input.messages
+    .map((message) => `${message.authorRole === "client" ? "Cliente" : message.authorRole === "assistant" ? "Vika" : "Operador"}: ${message.messageText}`)
+    .join("\n");
+
+  return [
+    "Eres el estructurador interno de Bridge.",
+    "Debes convertir la conversacion completa del brief en un JSON final interno para propuesta.",
+    "Responde solo con JSON valido y sin markdown.",
+    "No inventes datos: si falta informacion critica, dejala vacia y repórtala en missingCriticalData.",
+    "Usa exactamente este contrato:",
+    '{"projectObjective":"","mainOffer":"","businessContext":"","requestReason":"","audience":"","platform":"","deliverable":"","cta":"","tone":"","restrictions":"","references":"","urgency":"","commercialFitReason":"","recommendedProductSlotKey":"","operatorReviewNote":"","proposalReadiness":"low","missingCriticalData":[]}',
+    `Etapa de cierre: ${input.stage}`,
+    "Resumen estructurado actual:",
+    JSON.stringify(input.summary),
+    "Conversacion completa:",
+    conversation
+  ].join("\n");
+}
+
+function sanitizeFinalBriefJson(rawValue: unknown, fallback: BriefFinalJson): BriefFinalJson {
+  if (!rawValue || typeof rawValue !== "object" || Array.isArray(rawValue)) {
+    return fallback;
+  }
+
+  const output = { ...fallback };
+
+  for (const [key, value] of Object.entries(rawValue)) {
+    if (!FINAL_JSON_KEYS.has(key as keyof BriefFinalJson)) {
+      continue;
     }
 
-    const normalizedValue = value.trim();
-    return normalizedValue ? [[key, normalizedValue] as [keyof BriefSummary, string]] : [];
-  });
-
-  return Object.fromEntries(sanitizedEntries) as Partial<BriefSummary>;
-}
-
-function sanitizeMissingPriorityFields(rawFields: unknown, stage: BriefStage): string[] {
-  if (!Array.isArray(rawFields)) {
-    return [];
-  }
-
-  const allowedStageFields = new Set(PRIORITY_FIELDS_BY_STAGE[stage].map((field) => field.key));
-
-  return rawFields
-    .filter((field): field is string => typeof field === "string")
-    .map((field) => field.trim())
-    .filter((field) => field.length > 0 && allowedStageFields.has(field as keyof BriefSummary));
-}
-
-function parseBriefAssistantTurn(rawText: string, stage: BriefStage): BriefAssistantTurn | null {
-  const jsonText = extractJsonObject(rawText);
-
-  if (!jsonText) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(jsonText) as Partial<BriefAssistantTurn> & { summaryPatch?: unknown };
-    const visibleReply = typeof parsed.visibleReply === "string" ? sanitizeAssistantReply(parsed.visibleReply) : "";
-
-    if (!visibleReply) {
-      return null;
+    if (key === "proposalReadiness") {
+      if (value === "low" || value === "medium" || value === "high") {
+        output.proposalReadiness = value;
+      }
+      continue;
     }
 
-    return {
-      visibleReply,
-      summaryPatch: sanitizeSummaryPatch(parsed.summaryPatch),
-      stageHasSufficientInfo: parsed.stageHasSufficientInfo === true,
-      missingPriorityFields: sanitizeMissingPriorityFields(parsed.missingPriorityFields, stage),
-      redirectNote: typeof parsed.redirectNote === "string" ? parsed.redirectNote.trim() : ""
-    };
-  } catch {
-    return null;
+    if (key === "missingCriticalData") {
+      if (Array.isArray(value)) {
+        output.missingCriticalData = value
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => item.trim())
+          .filter(Boolean);
+      }
+      continue;
+    }
+
+    if (typeof value === "string") {
+      output[key as Exclude<keyof BriefFinalJson, "proposalReadiness" | "missingCriticalData">] = value.trim();
+    }
   }
+
+  return output;
 }
 
-export async function generateBriefAssistantTurn(
-  input: GenerateBriefAssistantTurnInput
-): Promise<BriefAssistantTurn | null> {
+export function buildDeterministicBriefFinalJson(summary: BriefSummary): BriefFinalJson {
+  const missingCriticalData = getCriticalMissingFields(summary);
+  const proposalReadiness: BriefFinalJson["proposalReadiness"] =
+    missingCriticalData.length === 0 ? "high" : missingCriticalData.length <= 2 ? "medium" : "low";
+
+  return {
+    projectObjective: summary.projectObjective,
+    mainOffer: summary.mainOffer,
+    businessContext: summary.businessContext,
+    requestReason: summary.requestReason,
+    audience: summary.audience,
+    platform: summary.platform,
+    deliverable: summary.deliverable,
+    cta: summary.cta,
+    tone: summary.tone,
+    restrictions: summary.restrictions,
+    references: summary.references,
+    urgency: summary.urgency,
+    commercialFitReason: summary.commercialFitReason,
+    recommendedProductSlotKey: summary.recommendedProductSlotKey,
+    operatorReviewNote: summary.operatorReviewNote || summary.commercialFitReason,
+    proposalReadiness,
+    missingCriticalData
+  };
+}
+
+export function isBriefReadyForProposal(summary: BriefSummary): boolean {
+  return getCriticalMissingFields(summary).length === 0;
+}
+
+export async function generateBriefChatReply(
+  input: GenerateBriefChatReplyInput
+): Promise<BriefChatReply> {
+  const stageHasSufficientInfo = hasStageSufficientInfo(input.stage, input.summary);
+  const fallbackReply = buildAssistantGuidance(input.stage, input.summary);
   const apiKey = process.env.GEMINI_API_KEY?.trim();
 
   if (!apiKey) {
-    return null;
+    return {
+      visibleReply: fallbackReply,
+      stageHasSufficientInfo
+    };
   }
 
-  const systemPrompt = buildBriefAssistantSystemPrompt(input.stage, input.summary);
+  const systemPrompt = buildBriefChatSystemPrompt(input.stage, input.summary);
   const model = "gemini-2.5-flash";
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -292,50 +371,95 @@ export async function generateBriefAssistantTurn(
           }
         ],
         generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 220,
-          responseMimeType: "application/json"
+          temperature: 0.55,
+          maxOutputTokens: 180
         }
       })
     });
 
     if (!response.ok) {
-      return null;
+      return {
+        visibleReply: fallbackReply,
+        stageHasSufficientInfo
+      };
     }
 
     const payload = (await response.json()) as GeminiGenerateContentResponse;
     const candidateText = payload.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("\n").trim();
 
     if (!candidateText) {
-      return null;
-    }
-
-    const parsedTurn = parseBriefAssistantTurn(candidateText, input.stage);
-    if (parsedTurn) {
-      return parsedTurn;
+      return {
+        visibleReply: fallbackReply,
+        stageHasSufficientInfo
+      };
     }
 
     const visibleReply = sanitizeAssistantReply(candidateText);
-    if (!visibleReply) {
-      return null;
-    }
-
     return {
-      visibleReply,
-      summaryPatch: {},
-      stageHasSufficientInfo: false,
-      missingPriorityFields: [],
-      redirectNote: "fallback_plain_text_reply"
+      visibleReply: visibleReply || fallbackReply,
+      stageHasSufficientInfo
     };
   } catch {
-    return null;
+    return {
+      visibleReply: fallbackReply,
+      stageHasSufficientInfo
+    };
   }
 }
 
-export async function generateBriefAssistantReply(
-  input: GenerateBriefAssistantTurnInput
-): Promise<string | null> {
-  const turn = await generateBriefAssistantTurn(input);
+export async function generateBriefFinalJson(
+  input: GenerateBriefFinalJsonInput
+): Promise<BriefFinalJson> {
+  const fallbackJson = buildDeterministicBriefFinalJson(input.summary);
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
 
-  return turn?.visibleReply ?? null;
+  if (!apiKey) {
+    return fallbackJson;
+  }
+
+  const systemPrompt = buildBriefFinalJsonPrompt(input);
+  const model = "gemini-2.5-flash";
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: systemPrompt
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 700,
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!response.ok) {
+      return fallbackJson;
+    }
+
+    const payload = (await response.json()) as GeminiGenerateContentResponse;
+    const candidateText = payload.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("\n").trim();
+    const jsonText = candidateText ? extractJsonObject(candidateText) : null;
+
+    if (!jsonText) {
+      return fallbackJson;
+    }
+
+    return sanitizeFinalBriefJson(JSON.parse(jsonText), fallbackJson);
+  } catch {
+    return fallbackJson;
+  }
 }
