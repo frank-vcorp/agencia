@@ -1,6 +1,6 @@
 /**
  * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-02_brief_cliente_chat_natural_y_json_final_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-05_hardening_respuesta_truncada_chat_brief_v1.md
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -21,6 +21,7 @@ import {
   generateBriefChatReply,
   generateBriefFinalJson,
   hasStageSufficientInfo,
+  isAcceptableAssistantVisibleReply,
   sanitizeAssistantReply
 } from "./briefing-assistant-ai";
 
@@ -116,6 +117,28 @@ describe("briefing-assistant-ai", () => {
     expect(sanitized.split(/\s+/).length).toBeLessThanOrEqual(121);
   });
 
+  it("rechaza una respuesta visible si Gemini la corta con finishReason no confiable", () => {
+    expect(
+      isAcceptableAssistantVisibleReply(
+        "Perfecto, ya entiendo el contexto y puedo ayudarte con el siguiente paso.",
+        "MAX_TOKENS"
+      )
+    ).toBe(false);
+  });
+
+  it("rechaza una respuesta visible si termina en una idea abierta", () => {
+    expect(isAcceptableAssistantVisibleReply("Entendido. Para entender mejor", "STOP")).toBe(false);
+  });
+
+  it("acepta una respuesta visible completa y natural", () => {
+    expect(
+      isAcceptableAssistantVisibleReply(
+        "Perfecto, ya entendí el contexto. Para avanzar bien, cuéntame cuál es tu objetivo principal con este proyecto.",
+        "STOP"
+      )
+    ).toBe(true);
+  });
+
   it("devuelve fallback de chat natural cuando GEMINI_API_KEY no esta configurada", async () => {
     vi.stubEnv("GEMINI_API_KEY", "");
 
@@ -137,6 +160,7 @@ describe("briefing-assistant-ai", () => {
       json: async () => ({
         candidates: [
           {
+            finishReason: "STOP",
             content: {
               parts: [
                 {
@@ -169,6 +193,7 @@ describe("briefing-assistant-ai", () => {
       json: async () => ({
         candidates: [
           {
+            finishReason: "STOP",
             content: {
               parts: [
                 {
@@ -189,6 +214,72 @@ describe("briefing-assistant-ai", () => {
     });
 
     expect(result.visibleReply.length).toBeGreaterThan(0);
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("cae a fallback cuando Gemini devuelve una frase truncada", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "fake-key");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            finishReason: "STOP",
+            content: {
+              parts: [
+                {
+                  text: "Entendido. Para entender mejor"
+                }
+              ]
+            }
+          }
+        ]
+      })
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateBriefChatReply({
+      stage: "discovery",
+      summary: emptyStructuredBriefSummary(),
+      clientMessage: "Quiero lanzar una campana"
+    });
+
+    expect(result.visibleReply).toBe(buildBriefChatFallbackReply("discovery", emptyStructuredBriefSummary(), "Quiero lanzar una campana"));
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("cae a fallback cuando Gemini corta la salida por maximo de tokens", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "fake-key");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            finishReason: "MAX_TOKENS",
+            content: {
+              parts: [
+                {
+                  text: "Perfecto, ya entiendo el contexto y te voy a ayudar con"
+                }
+              ]
+            }
+          }
+        ]
+      })
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateBriefChatReply({
+      stage: "precision",
+      summary: emptyStructuredBriefSummary(),
+      clientMessage: "Necesito una landing para vender"
+    });
+
+    expect(result.visibleReply).toBe(
+      buildBriefChatFallbackReply("precision", emptyStructuredBriefSummary(), "Necesito una landing para vender")
+    );
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });

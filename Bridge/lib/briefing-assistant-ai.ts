@@ -1,6 +1,6 @@
 /**
  * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-02_brief_cliente_chat_natural_y_json_final_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-05_hardening_respuesta_truncada_chat_brief_v1.md
  */
 import {
   buildAssistantGuidance,
@@ -21,6 +21,7 @@ type StagePriorityField = {
 
 type GeminiGenerateContentResponse = {
   candidates?: Array<{
+    finishReason?: string;
     content?: {
       parts?: Array<{
         text?: string;
@@ -90,6 +91,10 @@ const PRIORITY_FIELDS_BY_STAGE: Record<BriefStage, StagePriorityField[]> = {
 const MAX_CHAT_REPLY_WORDS = 110;
 const TECHNICAL_LEAK_PATTERN =
   /(^|\s)(FOCO|CAPTURADO|PREGUNTAS|SIGUIENTE_ACCION|summaryPatch|missingPriorityFields|stageHasSufficientInfo|redirectNote)\s*:/i;
+const RELIABLE_VISIBLE_FINISH_REASONS = new Set(["", "STOP"]);
+const OPEN_REPLY_ENDING_PATTERN =
+  /(para entender mejor|para seguir|necesito entender|ahora necesito|con esto|para avanzar bien|para avanzar|para afinarlo|para poder|quiero entender|necesito confirmar)\s*[.!?]*$/i;
+const DANGLING_REPLY_ENDING_PATTERN = /(?:\.{3}|…|[,;:\-\/(])\s*$/;
 const FINAL_JSON_KEYS = new Set<keyof BriefFinalJson>([
   "projectObjective",
   "mainOffer",
@@ -200,6 +205,34 @@ export function sanitizeAssistantReply(rawReply: string): string {
   }
 
   return `${words.slice(0, MAX_CHAT_REPLY_WORDS).join(" ")}...`;
+}
+
+/**
+ * IMPL-20260529-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-05_hardening_respuesta_truncada_chat_brief_v1.md
+ */
+export function isAcceptableAssistantVisibleReply(rawReply: string, finishReason?: string): boolean {
+  const visibleReply = sanitizeAssistantReply(rawReply);
+  const normalizedFinishReason = finishReason?.trim().toUpperCase() ?? "";
+  const lastVisibleLine = visibleReply.split("\n").at(-1)?.trim() ?? visibleReply;
+
+  if (!visibleReply) {
+    return false;
+  }
+
+  if (!RELIABLE_VISIBLE_FINISH_REASONS.has(normalizedFinishReason)) {
+    return false;
+  }
+
+  if (DANGLING_REPLY_ENDING_PATTERN.test(lastVisibleLine)) {
+    return false;
+  }
+
+  if (OPEN_REPLY_ENDING_PATTERN.test(lastVisibleLine)) {
+    return false;
+  }
+
+  return true;
 }
 
 function buildPrioritizedStageStatus(stage: BriefStage, summary: BriefSummary) {
@@ -423,7 +456,7 @@ export async function generateBriefChatReply(
         ],
         generationConfig: {
           temperature: 0.55,
-          maxOutputTokens: 180
+          maxOutputTokens: 220
         }
       })
     });
@@ -436,7 +469,8 @@ export async function generateBriefChatReply(
     }
 
     const payload = (await response.json()) as GeminiGenerateContentResponse;
-    const candidateText = payload.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("\n").trim();
+    const candidate = payload.candidates?.[0];
+    const candidateText = candidate?.content?.parts?.map((part) => part.text ?? "").join("\n").trim();
 
     if (!candidateText) {
       return {
@@ -445,9 +479,12 @@ export async function generateBriefChatReply(
       };
     }
 
-    const visibleReply = sanitizeAssistantReply(candidateText);
+    const visibleReply = isAcceptableAssistantVisibleReply(candidateText, candidate?.finishReason)
+      ? sanitizeAssistantReply(candidateText)
+      : fallbackReply;
+
     return {
-      visibleReply: visibleReply || fallbackReply,
+      visibleReply,
       stageHasSufficientInfo
     };
   } catch {

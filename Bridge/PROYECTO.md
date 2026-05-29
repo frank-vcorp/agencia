@@ -157,6 +157,7 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 7. `ARCH-20260529-02` autorizado: brief cliente con un solo prompt natural durante el chat y JSON final interno generado al cierre para consumo posterior por Vika en VS Code, con alcance tecnico acotado a 3 archivos.
 8. `ARCH-20260529-03` autorizado: brief cliente con chat natural persistido, cierre por itinerario y JSON final independiente post-cierre, con alcance tecnico acotado a 4 archivos.
 9. `ARCH-20260529-04` autorizado: refinamiento visual del chat cliente a estilo mensajeria compacta, sin recuadros pesados y con timestamp corto numerico, con alcance tecnico acotado a 1 archivo.
+10. `ARCH-20260529-05` autorizado: hardening del runtime del brief cliente para bloquear respuestas truncadas de Gemini y degradar a fallback natural, con alcance tecnico acotado a 2 archivos.
 
 ### [ ] Pendiente
 
