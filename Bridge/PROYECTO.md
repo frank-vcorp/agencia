@@ -155,6 +155,8 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 5. `ARCH-20260528-09` autorizado: hardening del prompt del asistente de brief por etapas con alcance acotado a 2 archivos.
 6. `ARCH-20260529-01` autorizado: brief cliente en doble capa conversacional, con respuesta natural visible y estructuracion invisible para Bridge, manteniendo alcance tecnico acotado a 3 archivos.
 7. `ARCH-20260529-02` autorizado: brief cliente con un solo prompt natural durante el chat y JSON final interno generado al cierre para consumo posterior por Vika en VS Code, con alcance tecnico acotado a 3 archivos.
+8. `ARCH-20260529-03` autorizado: brief cliente con chat natural persistido, cierre por itinerario y JSON final independiente post-cierre, con alcance tecnico acotado a 4 archivos.
+9. `ARCH-20260529-04` autorizado: refinamiento visual del chat cliente a estilo mensajeria compacta, sin recuadros pesados y con timestamp corto numerico, con alcance tecnico acotado a 1 archivo.
 
 ### [ ] Pendiente
 

@@ -2,7 +2,7 @@
 
 /**
  * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-02_brief_cliente_chat_natural_y_json_final_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-04_chat_cliente_estilo_whatsapp_compacto_v1.md
  * FIX-20260528-01: Envio con Enter y timestamp corto por mensaje.
  * FIX-20260528-03: Layout compacto para chat cliente.
  * FIX-20260528-04: Autoscroll al ultimo mensaje.
@@ -36,14 +36,14 @@ function stageCopy(stage: BriefRecord["status"]): string {
 
 function messageBubbleClass(authorRole: BriefMessage["authorRole"]): string {
   if (authorRole === "client") {
-    return "ml-auto bg-stone-800 text-white";
+    return "ml-auto rounded-[18px] rounded-br-[6px] bg-[#d9fdd3] text-stone-900 shadow-[0_1px_0_rgba(15,23,42,0.08)]";
   }
 
   if (authorRole === "operator") {
-    return "mr-auto border border-blue-200 bg-blue-50 text-blue-900";
+    return "mr-auto rounded-[18px] rounded-bl-[6px] bg-[#e0f2fe] text-sky-950 shadow-[0_1px_0_rgba(15,23,42,0.08)]";
   }
 
-  return "mr-auto border border-stone-200 bg-white text-stone-800";
+  return "mr-auto rounded-[18px] rounded-bl-[6px] bg-white text-stone-800 shadow-[0_1px_0_rgba(15,23,42,0.08)]";
 }
 
 function messageAuthor(authorRole: BriefMessage["authorRole"]): string {
@@ -54,14 +54,23 @@ function messageAuthor(authorRole: BriefMessage["authorRole"]): string {
 
 function formatShortDateTime(iso: string): string {
   try {
-    return new Intl.DateTimeFormat("es-MX", {
+    const parts = new Intl.DateTimeFormat("en-GB", {
       day: "2-digit",
-      month: "short",
+      month: "2-digit",
+      year: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
       timeZone: "America/Mexico_City"
-    }).format(new Date(iso));
+    }).formatToParts(new Date(iso));
+
+    const lookup = Object.fromEntries(
+      parts
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, part.value])
+    );
+
+    return `${lookup.day ?? "00"}${lookup.month ?? "00"}${lookup.year ?? "00"}|${lookup.hour ?? "00"}:${lookup.minute ?? "00"}`;
   } catch {
     return iso;
   }
@@ -173,7 +182,10 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
             Ya capturamos la informacion necesaria para preparar tu propuesta. Nuestro equipo ya esta en la siguiente accion.
           </div>
         ) : (
-          <div ref={messageListRef} className="min-h-[48vh] max-h-[68vh] space-y-2.5 overflow-y-auto pr-1">
+          <div
+            ref={messageListRef}
+            className="min-h-[48vh] max-h-[68vh] space-y-1.5 overflow-y-auto rounded-[18px] bg-[#efeae2] px-2 py-2 pr-1 sm:px-3"
+          >
             {messages.length === 0 ? (
               <p className="rounded-[14px] border border-dashed border-stone-300 p-2.5 text-xs text-stone-500 sm:text-sm">
                 Aun no hay mensajes en este brief.
@@ -182,13 +194,17 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
               messages.map((message) => (
                 <article
                   key={message.id}
-                  className={`max-w-[86%] rounded-[14px] px-3 py-2 text-xs leading-5 sm:text-sm sm:leading-6 ${messageBubbleClass(message.authorRole)}`}
+                  className={`max-w-[84%] px-3 py-2 text-[13px] leading-5 sm:text-sm sm:leading-5 ${messageBubbleClass(message.authorRole)}`}
                 >
-                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
-                    {messageAuthor(message.authorRole)}
+                  <div className="mb-1 flex items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-[0.12em] opacity-65">
+                    <span>{messageAuthor(message.authorRole)}</span>
+                    <span className="font-medium normal-case tracking-normal opacity-80">
+                      {formatShortDateTime(message.createdAt)}
+                    </span>
+                  </div>
+                  <p className="whitespace-pre-wrap break-words text-[13px] leading-5 sm:text-sm">
+                    {message.messageText}
                   </p>
-                  <p className="whitespace-pre-wrap">{message.messageText}</p>
-                  <p className="mt-1 text-[10px] opacity-70">{formatShortDateTime(message.createdAt)}</p>
                 </article>
               ))
             )}
