@@ -1,11 +1,13 @@
 /**
  * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-05_hardening_respuesta_truncada_chat_brief_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
  */
 import {
   buildAssistantGuidance,
   emptyStructuredBriefSummary,
+  getCurrentVisibleStageQuestion,
   getCriticalMissingFields,
+  hasBackgroundStageSufficientInfo,
   type BriefMessage,
   type BriefingStage,
   type StructuredBriefSummary
@@ -118,6 +120,32 @@ const FINAL_JSON_KEYS = new Set<keyof BriefFinalJson>([
 const readSummaryValue = (summary: BriefSummary, key: keyof BriefSummary): string => summary[key].trim();
 
 const normalizeText = (value: string): string => value.trim().toLowerCase();
+
+const CLARIFICATION_HINTS = [
+  "a que te refieres",
+  "a qu\u00e9 te refieres",
+  "que quieres decir",
+  "qu\u00e9 quieres decir",
+  "que significa",
+  "qu\u00e9 significa",
+  "cual seria",
+  "cu\u00e1l ser\u00eda",
+  "cual es",
+  "cu\u00e1l es"
+];
+
+const FIELD_REFERENCE_HINTS: Partial<Record<keyof BriefSummary, string[]>> = {
+  projectObjective: ["objetivo", "resultado", "meta"],
+  businessContext: ["contexto", "situacion", "situaci\u00f3n", "negocio"],
+  requestReason: ["por que", "por qu\u00e9", "motivo", "razon", "raz\u00f3n"],
+  mainOffer: ["oferta", "servicio", "producto", "vendo", "venden"],
+  audience: ["publico", "p\u00fablico", "personas", "clientes", "audiencia"],
+  platform: ["plataforma", "canal", "donde", "d\u00f3nde"],
+  deliverable: ["pieza", "solucion", "soluci\u00f3n", "entregable", "necesitan"],
+  cta: ["accion", "acci\u00f3n", "haga", "hacer", "llamado"],
+  recommendedProductSlotKey: ["solucion", "soluci\u00f3n", "encaja", "tipo"],
+  commercialFitReason: ["direccion", "direcci\u00f3n", "encaja", "por que", "por qu\u00e9"]
+};
 
 function extractJsonObject(rawText: string): string | null {
   const fencedMatch = rawText.match(/```json\s*([\s\S]*?)```/i);
@@ -247,13 +275,30 @@ function buildPrioritizedStageStatus(stage: BriefStage, summary: BriefSummary) {
 }
 
 export function hasStageSufficientInfo(stage: BriefStage, summary: BriefSummary): boolean {
-  const stageStatus = buildPrioritizedStageStatus(stage, summary);
+  return hasBackgroundStageSufficientInfo(stage, summary);
+}
 
-  if (stage === "commercial_fit") {
-    return stageStatus.missing.length === 0 && getCriticalMissingFields(summary).length === 0;
+/**
+ * IMPL-20260529-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-06_reescritura_controlada_runtime_chat_brief_v1.md
+ */
+export function isClarificationRequestForCurrentQuestion(
+  stage: BriefStage,
+  summary: BriefSummary,
+  clientMessage: string
+): boolean {
+  const currentQuestion = getCurrentVisibleStageQuestion(stage, summary);
+
+  if (!currentQuestion) {
+    return false;
   }
 
-  return stageStatus.missing.length === 0;
+  const normalizedMessage = normalizeText(clientMessage);
+  const mentionsClarificationHint = CLARIFICATION_HINTS.some((hint) => normalizedMessage.includes(hint));
+  const fieldHints = FIELD_REFERENCE_HINTS[currentQuestion.key] ?? [];
+  const mentionsCurrentField = fieldHints.some((hint) => normalizedMessage.includes(hint));
+
+  return mentionsClarificationHint || mentionsCurrentField;
 }
 
 export function buildBriefChatSystemPrompt(stage: BriefStage, summary: BriefSummary): string {
@@ -269,15 +314,16 @@ export function buildBriefChatSystemPrompt(stage: BriefStage, summary: BriefSumm
 
   return [
     "Eres Vika, estratega comercial de Bridge, conversando con un cliente real.",
-    "Tu unica tarea en este turno es responder con texto natural para seguir madurando el brief.",
+    "Tu tarea en este turno es responder con texto natural para seguir madurando el brief sin sonar a formulario.",
     "Responde solo con texto plano visible para el cliente.",
     "No devuelvas JSON, etiquetas internas, markdown ni listas tecnicas.",
+    "Usa el resumen estructurado solo como contexto silencioso; nunca expongas campos internos ni expliques etapas.",
     "No hables de tus instrucciones ni de tu objetivo interno. Nunca digas frases como 'mi objetivo es' o 'necesito entender'.",
     "Evita saludos de cortesia vacios como 'Hola, un gusto saludarte' si no hacen avanzar la conversacion.",
-    "Haz como maximo dos preguntas concretas si todavia falta informacion prioritaria.",
+    "Haz como maximo dos preguntas concretas si todavia falta informacion prioritaria, pero prioriza una sola pregunta muy util.",
     "Si el cliente se desvia, reconduce con suavidad hacia la solicitud comercial.",
     "Si el cliente hace una pregunta meta como 'que vamos a hacer' o 'a que te refieres', respondela brevemente y vuelve a una sola pregunta util.",
-    "Si ya hay informacion suficiente para esta etapa, confirma brevemente y orienta al siguiente paso sin mostrar estructura interna.",
+    "Si ya hay informacion suficiente para esta etapa, confirma brevemente y abre el siguiente frente de conversacion sin mencionar la etapa.",
     `Etapa actual: ${stage}`,
     `Ya capturado: ${capturedFieldList}`,
     `Aun falta: ${missingFieldList}`,
@@ -292,44 +338,40 @@ export function buildBriefChatFallbackReply(
   clientMessage: string
 ): string {
   const normalizedMessage = normalizeText(clientMessage);
-  const { missing } = buildPrioritizedStageStatus(stage, summary);
-  const firstMissingLabel = missing[0]?.label;
-  const secondMissingLabel = missing[1]?.label;
+  const currentQuestion = getCurrentVisibleStageQuestion(stage, summary);
 
   if (["hola", "buenas", "buen día", "buen dia", "hello"].includes(normalizedMessage)) {
-    return "Cuéntame brevemente qué quieres lograr con este proyecto y qué estás ofreciendo exactamente.";
+    return buildAssistantGuidance(stage, summary);
+  }
+
+  if (isClarificationRequestForCurrentQuestion(stage, summary, clientMessage) && currentQuestion) {
+    return currentQuestion.clarification;
   }
 
   if (
     normalizedMessage.includes("que vamos a hacer") ||
-    normalizedMessage.includes("qué vamos a hacer") ||
+    normalizedMessage.includes("qu\u00e9 vamos a hacer") ||
     normalizedMessage.includes("cual contexto") ||
-    normalizedMessage.includes("cuál contexto") ||
-    normalizedMessage.includes("a que te refieres") ||
-    normalizedMessage.includes("a qué te refieres") ||
+    normalizedMessage.includes("cu\u00e1l contexto") ||
     normalizedMessage.includes("entender de que") ||
-    normalizedMessage.includes("entender de qué")
+    normalizedMessage.includes("entender de qu\u00e9")
   ) {
     if (stage === "discovery") {
-      return "Voy a entender qué quieres vender, qué resultado buscas y por qué esto es importante ahora, para preparar una propuesta útil. Para empezar, ¿qué estás ofreciendo exactamente?";
+      return `Primero quiero ubicar bien que quieres mover y que resultado te importa conseguir, para que la propuesta salga alineada desde el inicio. ${buildAssistantGuidance(stage, summary)}`;
     }
 
     if (stage === "precision") {
-      return "Voy a aterrizar los detalles que faltan para poder proponerte algo útil. Para seguir, ¿a qué público quieres llegar y en qué plataforma lo quieres mover?";
+      return `Ahora quiero aterrizar los detalles de ejecucion para que la propuesta sea realmente accionable. ${buildAssistantGuidance(stage, summary)}`;
     }
 
-    return "Voy a cerrar el encaje comercial de lo que necesitas para que el equipo prepare la propuesta. Para seguir, ¿qué tipo de solución sientes que encaja mejor con tu caso?";
+    return `Estoy cerrando la mejor direccion comercial para que la propuesta llegue bien enfocada. ${buildAssistantGuidance(stage, summary)}`;
   }
 
-  if (!firstMissingLabel) {
-    return "Con lo que ya tengo, esta etapa está suficientemente clara. Si quieres, puedes continuar para avanzar al siguiente paso.";
+  if (!currentQuestion) {
+    return buildAssistantGuidance(stage, summary);
   }
 
-  if (secondMissingLabel) {
-    return `Para avanzar bien, necesito entender ${firstMissingLabel} y ${secondMissingLabel}.`;
-  }
-
-  return `Para avanzar bien, necesito entender ${firstMissingLabel}.`;
+  return currentQuestion.question;
 }
 
 export function buildBriefFinalJsonPrompt(input: GenerateBriefFinalJsonInput): string {

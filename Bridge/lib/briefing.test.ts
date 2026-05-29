@@ -1,6 +1,6 @@
 /**
  * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-05_hardening_respuesta_truncada_chat_brief_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -8,7 +8,11 @@ import {
   buildAssistantGuidance,
   buildFinalSummaryText,
   emptyStructuredBriefSummary,
+  getCurrentVisibleStageQuestion,
   getCriticalMissingFields,
+  hasBackgroundStageSufficientInfo,
+  hasMeaningfulSummaryValue,
+  inferBriefSummaryPatchFromClientMessage,
   mergeStructuredBriefSummary,
   nextStage,
   selectPreferredProject,
@@ -21,6 +25,7 @@ import {
   generateBriefChatReply,
   generateBriefFinalJson,
   hasStageSufficientInfo,
+  isClarificationRequestForCurrentQuestion,
   isAcceptableAssistantVisibleReply,
   sanitizeAssistantReply
 } from "./briefing-assistant-ai";
@@ -61,7 +66,41 @@ describe("briefing", () => {
     });
 
     expect(buildFinalSummaryText(summary)).toContain("Slot comercial sugerido: slot_lanzamiento_conversacional.");
-    expect(buildAssistantGuidance("commercial_fit", summary)).toContain("slot_lanzamiento_conversacional");
+    expect(buildAssistantGuidance("commercial_fit", summary)).toContain("ruta comercial clara");
+  });
+
+  it("valida suficiencia en background con contenido significativo y no por texto vacio", () => {
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      projectObjective: "Captar leads calificados para una preventa",
+      mainOffer: "Mentoria premium",
+      requestReason: "Necesitamos activar ventas este mes",
+      businessContext: "Ya vendemos por referidos pero no tenemos sistema comercial continuo"
+    });
+
+    expect(hasMeaningfulSummaryValue("projectObjective", "si")).toBe(false);
+    expect(hasBackgroundStageSufficientInfo("discovery", summary)).toBe(true);
+  });
+
+  it("permite inferir datos de precision desde discovery para sostener avance automatico", () => {
+    const patch = inferBriefSummaryPatchFromClientMessage(
+      "discovery",
+      emptyStructuredBriefSummary(),
+      "Quiero vender mi mentoria a duenos de negocio por Instagram con una landing para agendar"
+    );
+
+    expect(patch.mainOffer?.toLowerCase()).toContain("mentoria");
+    expect(patch.audience?.toLowerCase()).toContain("duenos de negocio");
+    expect(patch.platform).toBe("Instagram");
+    expect(patch.deliverable).toBe("landing page");
+    expect(patch.cta).toBe("agendar");
+  });
+
+  it("traduce el faltante mainOffer a una pregunta visible natural", () => {
+    const question = getCurrentVisibleStageQuestion("discovery", emptyStructuredBriefSummary());
+
+    expect(question?.key).toBe("mainOffer");
+    expect(question?.question).toBe("\u00bfCu\u00e1l es el servicio o producto principal que quieres mover primero?");
+    expect(question?.question.toLowerCase()).not.toContain("oferta principal");
   });
 
   it("prioriza el project activo como contenedor operativo por encima de otros estados", () => {
@@ -83,21 +122,35 @@ describe("briefing-assistant-ai", () => {
     expect(prompt).toContain("Etapa actual: discovery");
     expect(prompt).toContain("Aun falta: objetivo del proyecto, oferta principal, motivo del pedido, contexto del negocio");
     expect(prompt).toContain("No devuelvas JSON");
+    expect(prompt).toContain("Usa el resumen estructurado solo como contexto silencioso");
     expect(prompt).toContain("Nunca digas frases como 'mi objetivo es' o 'necesito entender'.");
   });
 
   it("genera fallback natural cuando el cliente solo saluda", () => {
     const reply = buildBriefChatFallbackReply("discovery", emptyStructuredBriefSummary(), "Hola");
 
-    expect(reply).toContain("qué quieres lograr");
-    expect(reply).toContain("qué estás ofreciendo");
+    expect(reply).toContain("que estas buscando mover");
+    expect(reply).toContain("resultado te gustar\u00eda conseguir");
   });
 
   it("genera fallback natural cuando el cliente hace una pregunta meta", () => {
     const reply = buildBriefChatFallbackReply("discovery", emptyStructuredBriefSummary(), "que vamos a hacer?");
 
-    expect(reply).toContain("qué quieres vender");
-    expect(reply).toContain("propuesta útil");
+    expect(reply).toContain("propuesta salga alineada");
+    expect(reply).toContain("que estas buscando mover");
+  });
+
+  it("detecta una repregunta de aclaracion sobre el faltante actual", () => {
+    expect(
+      isClarificationRequestForCurrentQuestion("discovery", emptyStructuredBriefSummary(), "Que oferta principal?")
+    ).toBe(true);
+  });
+
+  it("aclara en lenguaje natural cuando el cliente pregunta por el faltante actual", () => {
+    const reply = buildBriefChatFallbackReply("discovery", emptyStructuredBriefSummary(), "Que oferta principal?");
+
+    expect(reply.toLowerCase()).toContain("lo que quieres vender o impulsar primero");
+    expect(reply.toLowerCase()).not.toContain("oferta principal");
   });
 
   it("postprocesa salida visible para limitar desborde y limpiar lineas vacias repetidas", () => {
@@ -214,6 +267,7 @@ describe("briefing-assistant-ai", () => {
     });
 
     expect(result.visibleReply.length).toBeGreaterThan(0);
+    expect(result.visibleReply.toLowerCase()).not.toContain("oferta principal");
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });

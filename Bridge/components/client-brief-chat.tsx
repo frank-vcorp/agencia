@@ -2,20 +2,16 @@
 
 /**
  * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-04_chat_cliente_estilo_whatsapp_compacto_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
  * FIX-20260528-01: Envio con Enter y timestamp corto por mensaje.
  * FIX-20260528-03: Layout compacto para chat cliente.
  * FIX-20260528-04: Autoscroll al ultimo mensaje.
  */
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
-import type { BriefMessage, BriefRecord, StructuredBriefSummary } from "@/lib/briefing";
+import type { BriefMessage, BriefRecord } from "@/lib/briefing";
 
-import {
-  advanceStageAction,
-  sendClientMessageAction,
-  submitBriefAction
-} from "@/app/cliente/brief/[projectId]/actions";
+import { sendClientMessageAction } from "@/app/cliente/brief/[projectId]/actions";
 
 type ClientBriefChatViewProps = {
   brief: BriefRecord;
@@ -23,15 +19,15 @@ type ClientBriefChatViewProps = {
 };
 
 function stageCopy(stage: BriefRecord["status"]): string {
-  if (stage === "stage_1_discovery") return "Etapa 1 de 3 - Cuentanos que necesitas";
-  if (stage === "stage_2_precision") return "Etapa 2 de 3 - Vamos a los detalles";
-  if (stage === "stage_3_commercial_fit") return "Etapa 3 de 3 - Cerramos el encaje";
+  if (stage === "stage_1_discovery") return "Cuentanos que quieres mover y te iremos guiando en la conversacion.";
+  if (stage === "stage_2_precision") return "Ya tenemos contexto. Ahora estamos aterrizando los detalles clave de la propuesta.";
+  if (stage === "stage_3_commercial_fit") return "Estamos cerrando el mejor encaje para que tu propuesta salga bien enfocada.";
   if (stage === "pending_operator_review" || stage === "operator_review_in_progress") {
-    return "Brief enviado - Tu asesor lo esta revisando";
+    return "Tu propuesta ya entro en revision con nuestro equipo.";
   }
-  if (stage === "approved_locked") return "Brief aprobado";
-  if (stage === "returned_for_rework") return "Tu asesor pidio ajustes";
-  return "Etapa 1 de 3 - Cuentanos que necesitas";
+  if (stage === "approved_locked") return "Tu brief ya fue validado y quedo listo para ejecucion.";
+  if (stage === "returned_for_rework") return "Necesitamos un ajuste adicional para dejar la propuesta alineada.";
+  return "Cuentanos que necesitas y te acompanamos paso a paso.";
 }
 
 function messageBubbleClass(authorRole: BriefMessage["authorRole"]): string {
@@ -76,26 +72,6 @@ function formatShortDateTime(iso: string): string {
   }
 }
 
-function hasValue(value: unknown): boolean {
-  if (typeof value === "string") {
-    return value.trim().length > 0;
-  }
-
-  return false;
-}
-
-function summaryEntries(summary: StructuredBriefSummary): Array<{ label: string; value: string }> {
-  return Object.entries(summary)
-    .filter(([, value]) => hasValue(value))
-    .map(([key, value]) => ({
-      label: key
-        .replace(/([A-Z])/g, " $1")
-        .replace(/^./, (c) => c.toUpperCase())
-        .trim(),
-      value: String(value)
-    }));
-}
-
 export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewProps) {
   const [messageText, setMessageText] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -110,27 +86,6 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
     status === "pending_operator_review" || status === "operator_review_in_progress";
   const isApprovedStatus = status === "approved_locked";
   const hideConversationSurface = isReviewStatus || isApprovedStatus;
-
-  const clientMessagesInCurrentStage = useMemo(
-    () =>
-      messages.filter(
-        (message) =>
-          message.authorRole === "client" && message.stage === (currentVersion?.stage ?? "discovery")
-      ).length,
-    [messages, currentVersion?.stage]
-  );
-
-  const showAdvanceButton =
-    editable &&
-    currentVersion?.stage !== "commercial_fit" &&
-    clientMessagesInCurrentStage > 0;
-
-  const showSubmitButton =
-    editable &&
-    currentVersion?.stage === "commercial_fit" &&
-    clientMessagesInCurrentStage > 0;
-
-  const summaryItems = currentVersion ? summaryEntries(currentVersion.structuredSummary) : [];
 
   const disabledReason = isReviewStatus
     ? "En revision"
@@ -213,7 +168,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
 
         <div className="mt-3 border-t border-[color:var(--line)] pt-3">
           <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-            Tu respuesta
+            Tu mensaje
           </label>
           <textarea
             value={messageText}
@@ -242,63 +197,15 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
             >
               Enviar
             </button>
-
-            {showAdvanceButton && currentVersion && !hideConversationSurface && (
-              <button
-                type="button"
-                onClick={() => {
-                  startTransition(async () => {
-                    await advanceStageAction(projectId, brief.id, currentVersion.id);
-                  });
-                }}
-                disabled={isPending}
-                className="rounded-[12px] border border-[color:var(--line-strong)] px-3.5 py-1.5 text-xs font-semibold text-[color:var(--muted)] transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Continuar a etapa siguiente -&gt;
-              </button>
-            )}
-
-            {showSubmitButton && currentVersion && !hideConversationSurface && (
-              <button
-                type="button"
-                onClick={() => {
-                  startTransition(async () => {
-                    await submitBriefAction(projectId, brief.id, currentVersion.id);
-                  });
-                }}
-                disabled={isPending}
-                className="rounded-[12px] border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Enviar brief para revision
-              </button>
-            )}
           </div>
         </div>
       </section>
 
       <section className="panel rounded-[22px] px-4 py-3">
-        <details>
-          <summary className="cursor-pointer text-sm font-semibold text-[color:var(--ink)]">
-            Resumen de lo que capturamos hasta aqui
-          </summary>
-          <div className="mt-2.5 space-y-2">
-            {summaryItems.length === 0 ? (
-              <p className="text-sm text-[color:var(--muted)]">Aun no hay datos resumidos.</p>
-            ) : (
-              summaryItems.map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-[14px] border border-[color:var(--line)] bg-white px-3 py-2"
-                >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                    {item.label}
-                  </p>
-                  <p className="mt-1 text-sm text-[color:var(--ink)]">{item.value}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </details>
+        <p className="text-sm font-semibold text-[color:var(--ink)]">Como trabajamos esta conversacion</p>
+        <p className="mt-2 text-sm text-[color:var(--muted)]">
+          Tu conversacion se va estructurando en segundo plano para que el equipo prepare una propuesta clara, sin obligarte a llenar un formulario paso a paso.
+        </p>
       </section>
     </div>
   );

@@ -2,16 +2,16 @@
 
 /**
  * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-02_brief_cliente_chat_natural_y_json_final_v1.md
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
  */
 import { revalidatePath } from "next/cache";
 
 import {
   buildFinalSummaryText,
   advanceBriefStage,
+  advanceBriefStageInBackground,
   appendBriefMessage,
   appendClientBriefMessage,
-  buildAssistantGuidance,
   getBriefByProjectId,
   inferBriefSummaryPatchFromClientMessage,
   submitBriefForOperatorReview,
@@ -20,8 +20,31 @@ import {
 import {
   generateBriefChatReply,
   generateBriefFinalJson,
+  hasStageSufficientInfo,
   isBriefReadyForProposal
 } from "@/lib/briefing-assistant-ai";
+
+/**
+ * IMPL-20260529-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
+ */
+async function syncBackgroundStages(
+  briefId: string,
+  versionId: string,
+  stageVersion: Awaited<ReturnType<typeof updateBriefSummary>>
+) {
+  let currentVersion = stageVersion;
+
+  while (hasStageSufficientInfo(currentVersion.stage, currentVersion.structuredSummary)) {
+    if (currentVersion.stage === "commercial_fit") {
+      return currentVersion;
+    }
+
+    currentVersion = await advanceBriefStageInBackground({ briefId, versionId });
+  }
+
+  return currentVersion;
+}
 
 /**
  * IMPL-20260529-01
@@ -50,34 +73,34 @@ export async function sendClientMessageAction(
       currentVersion.structuredSummary,
       normalizedText
     );
-    const summaryForAssistant = {
-      ...currentVersion.structuredSummary,
-      ...inferredPatch
-    };
-    const fallbackMessage = buildAssistantGuidance(currentVersion.stage, summaryForAssistant);
-    const aiReply = await generateBriefChatReply({
-      stage: currentVersion.stage,
-      summary: summaryForAssistant,
-      clientMessage: normalizedText
-    });
     const nextVersion = Object.keys(inferredPatch).length
       ? await updateBriefSummary({ briefId, versionId }, inferredPatch)
       : currentVersion;
+    const runtimeVersion = await syncBackgroundStages(briefId, versionId, nextVersion);
+    const aiReply = await generateBriefChatReply({
+      stage: runtimeVersion.stage,
+      summary: runtimeVersion.structuredSummary,
+      clientMessage: normalizedText
+    });
 
     await appendBriefMessage({
       briefId,
       versionId,
       authorRole: "assistant",
       actorLabel: "Bridge briefing",
-      messageText: aiReply.visibleReply || fallbackMessage,
-      stage: nextVersion.stage
+      messageText: aiReply.visibleReply,
+      stage: runtimeVersion.stage
     });
 
-    if (nextVersion.stage === "commercial_fit" && aiReply.stageHasSufficientInfo && isBriefReadyForProposal(nextVersion.structuredSummary)) {
+    if (
+      runtimeVersion.stage === "commercial_fit" &&
+      aiReply.stageHasSufficientInfo &&
+      isBriefReadyForProposal(runtimeVersion.structuredSummary)
+    ) {
       const finalBriefJson = await generateBriefFinalJson({
-        stage: nextVersion.stage,
-        summary: nextVersion.structuredSummary,
-        messages: nextVersion.messages
+        stage: runtimeVersion.stage,
+        summary: runtimeVersion.structuredSummary,
+        messages: runtimeVersion.messages
       });
 
       const finalSummaryPatch = {

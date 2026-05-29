@@ -158,6 +158,8 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 8. `ARCH-20260529-03` autorizado: brief cliente con chat natural persistido, cierre por itinerario y JSON final independiente post-cierre, con alcance tecnico acotado a 4 archivos.
 9. `ARCH-20260529-04` autorizado: refinamiento visual del chat cliente a estilo mensajeria compacta, sin recuadros pesados y con timestamp corto numerico, con alcance tecnico acotado a 1 archivo.
 10. `ARCH-20260529-05` autorizado: hardening del runtime del brief cliente para bloquear respuestas truncadas de Gemini y degradar a fallback natural, con alcance tecnico acotado a 2 archivos.
+11. `ARCH-20260529-06` autorizado: reescritura controlada del runtime del chat brief cliente para eliminar loops de aclaración, unificar apertura y ocultar labels internas al cliente, con alcance tecnico acotado a 4 archivos.
+12. `ARCH-20260529-07` autorizado: redefinir el brief cliente como conversación adaptativa guiada por prompt con etapas en background y sin dependencia visible de heurística ni cambio manual de etapa, con alcance tecnico acotado a 5 archivos.
 
 ### [ ] Pendiente
 

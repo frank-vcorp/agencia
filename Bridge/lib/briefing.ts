@@ -1,6 +1,6 @@
 /**
- * IMPL-20260505-22
- * Respaldo: context/CLIENTS_Y_PROJECTS_V1.md, context/SPECs/SPEC_ARCH-20260505-22_clients_y_projects_v1.md, context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md, context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, context/MODELO_DATOS_MULTITENANT_V1.md, context/CONTRATOS_AGENTES_Y_VSCODE_V1.md
+ * IMPL-20260529-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 import { getTenantIdentityContextByTenantId, resolveActorTrace } from "./identity";
@@ -450,183 +450,360 @@ export function inferBriefSummaryPatchFromClientMessage(
   const normalizedText = normalizeHeuristicText(normalizedMessage);
   const patch: Partial<StructuredBriefSummary> = {};
 
-  if (stage === "discovery") {
-    const projectObjective = extractFirstMatch(normalizedMessage, [
-      /(?:quiero|queremos|necesito|necesitamos|busco|buscamos|el objetivo es|objetivo)\s+([^.!?]+)/i,
-      /(?:para|con el fin de)\s+([^.!?]+)/i
-    ]);
-    const mainOffer = extractFirstMatch(normalizedMessage, [
-      /(?:ofrezco|ofrecemos|vendo|vendemos|brindo|brindamos)\s+([^.!?]+)/i,
-      /(?:nuestro|nuestra)\s+(?:producto|servicio|solucion|marca)\s+([^.!?]+)/i
-    ]);
-    const requestReason = extractFirstMatch(normalizedMessage, [
-      /(?:porque|por que|ya que|debido a que)\s+([^.!?]+)/i,
-      /(?:ahora|urgente|cuanto antes)\s+([^.!?]+)/i
-    ]);
-    const expectedResult = extractFirstMatch(normalizedMessage, [/(?:para|con la idea de|buscando)\s+([^.!?]+)/i]);
+  const projectObjective = extractFirstMatch(normalizedMessage, [
+    /(?:quiero|queremos|necesito|necesitamos|busco|buscamos|el objetivo es|objetivo)\s+([^.!?]+)/i,
+    /(?:para|con el fin de|buscando)\s+([^.!?]+)/i
+  ]);
+  const mainOffer = extractFirstMatch(normalizedMessage, [
+    /(?:ofrezco|ofrecemos|vendo|vendemos|brindo|brindamos)\s+([^.!?]+)/i,
+    /(?:mi|nuestro|nuestra)\s+(?:producto|servicio|solucion|marca|negocio)\s+(?:es|principal es)?\s*([^.!?]+)/i
+  ]);
+  const requestReason = extractFirstMatch(normalizedMessage, [
+    /(?:porque|por que|ya que|debido a que)\s+([^.!?]+)/i,
+    /(?:ahora|urgente|cuanto antes|esta semana|este mes)\s+([^.!?]+)/i
+  ]);
+  const expectedResult = extractFirstMatch(normalizedMessage, [/(?:para|con la idea de|buscando)\s+([^.!?]+)/i]);
+  const audience = extractFirstMatch(normalizedMessage, [
+    /(?:para|dirigido a|enfocado en|orientado a)\s+([^.!?]+)/i,
+    /(?:nuestro publico|mi publico|cliente ideal|audiencia)\s+([^.!?]+)/i
+  ]);
+  const deliverable = detectKeywordValue(normalizedText, [
+    { value: "landing page", keywords: ["landing", "landing page"] },
+    { value: "sitio web", keywords: ["sitio web", "pagina web", "web"] },
+    { value: "campana de anuncios", keywords: ["anuncio", "anuncios", "ads", "campana"] },
+    { value: "carrusel", keywords: ["carrusel"] },
+    { value: "video corto", keywords: ["video", "reel", "short"] },
+    { value: "brochure", keywords: ["brochure", "catalogo"] },
+    { value: "secuencia de mensajes", keywords: ["mensajes", "follow up"] }
+  ]);
+  const platform = detectKeywordValue(normalizedText, [
+    { value: "Instagram", keywords: ["instagram"] },
+    { value: "Facebook", keywords: ["facebook"] },
+    { value: "TikTok", keywords: ["tiktok"] },
+    { value: "WhatsApp", keywords: ["whatsapp"] },
+    { value: "Google Ads", keywords: ["google ads", "google"] },
+    { value: "LinkedIn", keywords: ["linkedin"] },
+    { value: "Sitio web", keywords: ["sitio web", "pagina web", "web"] },
+    { value: "Email", keywords: ["email", "correo"] }
+  ]);
+  const cta = detectKeywordValue(normalizedText, [
+    { value: "agendar", keywords: ["agendar", "agenda", "reservar", "reserva"] },
+    { value: "comprar", keywords: ["comprar", "compra", "venta"] },
+    { value: "cotizar", keywords: ["cotizar", "cotizacion"] },
+    { value: "escribir por WhatsApp", keywords: ["whatsapp", "escribir"] },
+    { value: "registrarse", keywords: ["registrar", "registrarse", "inscribirse"] },
+    { value: "descargar", keywords: ["descargar"] }
+  ]);
+  const tone = detectKeywordValue(normalizedText, [
+    { value: "formal", keywords: ["formal", "sobrio"] },
+    { value: "cercano", keywords: ["cercano", "amigable"] },
+    { value: "tecnico", keywords: ["tecnico", "profesional"] },
+    { value: "premium", keywords: ["premium", "elegante"] },
+    { value: "urgente", keywords: ["urgente", "directo"] }
+  ]);
+  const urgency = detectKeywordValue(normalizedText, [
+    { value: "alta", keywords: ["urgente", "cuanto antes", "ya", "esta semana"] },
+    { value: "media", keywords: ["este mes", "pronto"] },
+    { value: "baja", keywords: ["sin apuro", "sin prisa", "luego"] }
+  ]);
+  const references = normalizedText.includes("referen") || normalizedText.includes("como ") ? normalizedMessage : "";
+  const restrictions =
+    normalizedText.includes("sin ") || normalizedText.includes("no ") || normalizedText.includes("evitar")
+      ? normalizedMessage
+      : "";
+  const recommendedProductSlotKey = detectKeywordValue(normalizedText, [
+    { value: "campana", keywords: ["campana", "ads", "anuncios"] },
+    { value: "presencia", keywords: ["sitio web", "pagina web", "presencia"] },
+    { value: "contenido", keywords: ["contenido", "reels", "carrusel", "video"] },
+    { value: "lanzamiento", keywords: ["lanzamiento", "lanzar"] }
+  ]);
 
-    if (projectObjective) {
-      patch.projectObjective = projectObjective;
-    } else if (!currentSummary.projectObjective) {
-      patch.projectObjective = normalizedMessage;
-    }
-
-    if (mainOffer) {
-      patch.mainOffer = mainOffer;
-    }
-
-    if (requestReason) {
-      patch.requestReason = requestReason;
-    }
-
-    if (expectedResult) {
-      patch.expectedResult = expectedResult;
-    }
-
-    if (!currentSummary.businessContext) {
-      patch.businessContext = normalizedMessage;
-    }
+  if (projectObjective) {
+    patch.projectObjective = projectObjective;
+  } else if (!currentSummary.projectObjective && stage === "discovery") {
+    patch.projectObjective = normalizedMessage;
   }
 
-  if (stage === "precision") {
-    const audience = extractFirstMatch(normalizedMessage, [
-      /(?:para|dirigido a|enfocado en|orientado a)\s+([^.!?]+)/i,
-      /(?:nuestro publico|mi publico|cliente ideal)\s+([^.!?]+)/i
-    ]);
-    const deliverable = detectKeywordValue(normalizedText, [
-      { value: "landing page", keywords: ["landing", "landing page"] },
-      { value: "sitio web", keywords: ["sitio web", "pagina web", "web"] },
-      { value: "campana de anuncios", keywords: ["anuncio", "anuncios", "ads", "campana"] },
-      { value: "carrusel", keywords: ["carrusel"] },
-      { value: "video corto", keywords: ["video", "reel", "short"] },
-      { value: "brochure", keywords: ["brochure", "catalogo"] }
-    ]);
-    const platform = detectKeywordValue(normalizedText, [
-      { value: "Instagram", keywords: ["instagram"] },
-      { value: "Facebook", keywords: ["facebook"] },
-      { value: "TikTok", keywords: ["tiktok"] },
-      { value: "WhatsApp", keywords: ["whatsapp"] },
-      { value: "Google Ads", keywords: ["google ads", "google"] },
-      { value: "LinkedIn", keywords: ["linkedin"] },
-      { value: "Sitio web", keywords: ["sitio web", "pagina web", "web"] },
-      { value: "Email", keywords: ["email", "correo"] }
-    ]);
-    const cta = detectKeywordValue(normalizedText, [
-      { value: "agendar", keywords: ["agendar", "agenda", "reservar", "reserva"] },
-      { value: "comprar", keywords: ["comprar", "compra", "venta"] },
-      { value: "cotizar", keywords: ["cotizar", "cotizacion"] },
-      { value: "escribir por WhatsApp", keywords: ["whatsapp", "escribir"] },
-      { value: "registrarse", keywords: ["registrar", "registrarse", "inscribirse"] },
-      { value: "descargar", keywords: ["descargar"] }
-    ]);
-    const tone = detectKeywordValue(normalizedText, [
-      { value: "formal", keywords: ["formal", "sobrio"] },
-      { value: "cercano", keywords: ["cercano", "amigable"] },
-      { value: "tecnico", keywords: ["tecnico", "profesional"] },
-      { value: "premium", keywords: ["premium", "elegante"] },
-      { value: "urgente", keywords: ["urgente", "directo"] }
-    ]);
-    const urgency = detectKeywordValue(normalizedText, [
-      { value: "alta", keywords: ["urgente", "cuanto antes", "ya", "esta semana"] },
-      { value: "media", keywords: ["este mes", "pronto"] },
-      { value: "baja", keywords: ["sin apuro", "sin prisa", "luego"] }
-    ]);
-    const references = normalizedText.includes("referen") || normalizedText.includes("como ") ? normalizedMessage : "";
-    const restrictions =
-      normalizedText.includes("sin ") || normalizedText.includes("no ") || normalizedText.includes("evitar")
-        ? normalizedMessage
-        : "";
-
-    if (audience) {
-      patch.audience = audience;
-    }
-
-    if (platform) {
-      patch.platform = platform;
-    }
-
-    if (deliverable) {
-      patch.deliverable = deliverable;
-    }
-
-    if (cta) {
-      patch.cta = cta;
-    }
-
-    if (tone) {
-      patch.tone = tone;
-    }
-
-    if (urgency) {
-      patch.urgency = urgency;
-    }
-
-    if (references && !currentSummary.references) {
-      patch.references = references;
-    }
-
-    if (restrictions && !currentSummary.restrictions) {
-      patch.restrictions = restrictions;
-    }
+  if (mainOffer) {
+    patch.mainOffer = mainOffer;
   }
 
-  if (stage === "commercial_fit") {
-    const recommendedProductSlotKey = detectKeywordValue(normalizedText, [
-      { value: "campana", keywords: ["campana", "ads", "anuncios"] },
-      { value: "presencia", keywords: ["sitio web", "pagina web", "presencia"] },
-      { value: "contenido", keywords: ["contenido", "reels", "carrusel", "video"] },
-      { value: "lanzamiento", keywords: ["lanzamiento", "lanzar"] }
-    ]);
+  if (requestReason) {
+    patch.requestReason = requestReason;
+  }
 
-    if (recommendedProductSlotKey) {
-      patch.recommendedProductSlotKey = recommendedProductSlotKey;
-    }
+  if (expectedResult) {
+    patch.expectedResult = expectedResult;
+  }
 
-    if (!currentSummary.commercialFitReason) {
-      patch.commercialFitReason = normalizedMessage;
-    }
+  if (!currentSummary.businessContext && normalizedMessage.length >= 24) {
+    patch.businessContext = normalizedMessage;
+  }
 
-    if (normalizedText.includes("revis") || normalizedText.includes("validar")) {
-      patch.operatorReviewNote = normalizedMessage;
-    }
+  if (audience) {
+    patch.audience = audience;
+  }
+
+  if (platform) {
+    patch.platform = platform;
+  }
+
+  if (deliverable) {
+    patch.deliverable = deliverable;
+  }
+
+  if (cta) {
+    patch.cta = cta;
+  }
+
+  if (tone) {
+    patch.tone = tone;
+  }
+
+  if (urgency) {
+    patch.urgency = urgency;
+  }
+
+  if (references && !currentSummary.references) {
+    patch.references = references;
+  }
+
+  if (restrictions && !currentSummary.restrictions) {
+    patch.restrictions = restrictions;
+  }
+
+  if (recommendedProductSlotKey) {
+    patch.recommendedProductSlotKey = recommendedProductSlotKey;
+  }
+
+  if (!currentSummary.commercialFitReason && stage === "commercial_fit" && normalizedMessage.length >= 16) {
+    patch.commercialFitReason = normalizedMessage;
+  }
+
+  if (normalizedText.includes("revis") || normalizedText.includes("validar")) {
+    patch.operatorReviewNote = normalizedMessage;
   }
 
   return patch;
 }
 
+type StageQuestionConfig = {
+  key: keyof StructuredBriefSummary;
+  question: string;
+  clarification: string;
+};
+
+const VISIBLE_QUESTION_BY_FIELD: Record<keyof StructuredBriefSummary, StageQuestionConfig | null> = {
+  projectObjective: {
+    key: "projectObjective",
+    question: "\u00bfQu\u00e9 resultado concreto te gustar\u00eda conseguir con este proyecto?",
+    clarification:
+      "Me refiero al cambio que te gustar\u00eda lograr con esta iniciativa: por ejemplo vender m\u00e1s, generar m\u00e1s leads, conseguir reuniones o lanzar una nueva oferta. \u00bfQu\u00e9 resultado quieres mover primero?"
+  },
+  expectedResult: null,
+  businessContext: {
+    key: "businessContext",
+    question: "\u00bfC\u00f3mo est\u00e1 hoy tu negocio o esta l\u00ednea de servicio, y qu\u00e9 contexto deber\u00edamos considerar?",
+    clarification:
+      "Aqu\u00ed me ayuda entender el punto de partida: por ejemplo si ya vendes esto, si es algo nuevo, si tienes audiencia activa o si vienes de una baja en ventas. \u00bfC\u00f3mo est\u00e1 hoy ese frente del negocio?"
+  },
+  requestReason: {
+    key: "requestReason",
+    question: "\u00bfPor qu\u00e9 te importa mover esto ahora y qu\u00e9 dispar\u00f3 esta necesidad?",
+    clarification:
+      "Busco entender qu\u00e9 activ\u00f3 este pedido ahora: por ejemplo una meta comercial, una ca\u00edda en resultados, una campa\u00f1a que viene o una oportunidad puntual. \u00bfQu\u00e9 lo deton\u00f3?"
+  },
+  mainOffer: {
+    key: "mainOffer",
+    question: "\u00bfCu\u00e1l es el servicio o producto principal que quieres mover primero?",
+    clarification:
+      "Me refiero a lo que quieres vender o impulsar primero en esta conversaci\u00f3n. Puede ser un servicio, un producto, una promoci\u00f3n, una membres\u00eda o una oferta puntual. \u00bfQu\u00e9 quieres mover exactamente?"
+  },
+  audience: {
+    key: "audience",
+    question: "\u00bfA qu\u00e9 tipo de personas o empresas quieres llegar primero?",
+    clarification:
+      "Aqu\u00ed me sirve ubicar a qui\u00e9n quieres atraer: por ejemplo due\u00f1os de negocio, madres j\u00f3venes, pacientes, equipos comerciales o empresas de cierto tama\u00f1o. \u00bfQui\u00e9n es ese p\u00fablico principal?"
+  },
+  platform: {
+    key: "platform",
+    question: "\u00bfEn qu\u00e9 canal o plataforma quieres mover esta acci\u00f3n primero?",
+    clarification:
+      "Me refiero al lugar donde quieres activar esto primero: por ejemplo Instagram, WhatsApp, landing, sitio web, email o anuncios. \u00bfD\u00f3nde quieres moverlo?"
+  },
+  deliverable: {
+    key: "deliverable",
+    question: "\u00bfQu\u00e9 pieza o soluci\u00f3n necesitas que preparemos para mover esa acci\u00f3n?",
+    clarification:
+      "Aqu\u00ed quiero entender qu\u00e9 necesitas producir: por ejemplo una landing, anuncios, una secuencia de mensajes, un video, piezas gr\u00e1ficas o una campa\u00f1a completa. \u00bfQu\u00e9 necesitas exactamente?"
+  },
+  cta: {
+    key: "cta",
+    question: "\u00bfQu\u00e9 acci\u00f3n te gustar\u00eda que haga la persona al ver esta pieza?",
+    clarification:
+      "Me refiero a la respuesta que esperas provocar: por ejemplo escribirte, agendar, comprar, pedir cotizaci\u00f3n o registrarse. \u00bfQu\u00e9 acci\u00f3n quieres empujar?"
+  },
+  tone: null,
+  restrictions: null,
+  references: null,
+  urgency: null,
+  messageCore: null,
+  gaps: null,
+  contradictions: null,
+  structuringConfidence: null,
+  recommendedProductSlotKey: {
+    key: "recommendedProductSlotKey",
+    question: "Con lo que hemos hablado, \u00bfqu\u00e9 tipo de soluci\u00f3n sientes que encaja mejor con lo que necesitas ahora?",
+    clarification:
+      "Estoy buscando confirmar qu\u00e9 clase de soluci\u00f3n te har\u00eda m\u00e1s sentido hoy: por ejemplo campa\u00f1a, presencia digital, contenido o lanzamiento. Si prefieres, tambi\u00e9n puedes decirme qu\u00e9 esperas que resolvamos primero."
+  },
+  recommendedProductConfidence: null,
+  commercialFitReason: {
+    key: "commercialFitReason",
+    question: "\u00bfQu\u00e9 te hace pensar que esta es la direcci\u00f3n correcta para resolver tu caso?",
+    clarification:
+      "Aqu\u00ed me ayuda entender por qu\u00e9 esta v\u00eda te hace sentido: por ejemplo por velocidad, presupuesto, complejidad del caso o porque ya intentaste otra cosa. \u00bfQu\u00e9 te hace pensar que esta es la mejor direcci\u00f3n?"
+  },
+  upsellSignal: null,
+  operatorReviewNote: null
+};
+
+const STAGE_FIELD_PRIORITY: Record<BriefingStage, Array<keyof StructuredBriefSummary>> = {
+  discovery: ["mainOffer", "projectObjective", "requestReason", "businessContext"],
+  precision: ["audience", "platform", "deliverable", "cta"],
+  commercial_fit: ["recommendedProductSlotKey", "commercialFitReason"]
+};
+
+const FIELD_COMPLETION_RULES: Partial<
+  Record<keyof StructuredBriefSummary, { minLength: number; minWords?: number }>
+> = {
+  projectObjective: { minLength: 12, minWords: 3 },
+  businessContext: { minLength: 18, minWords: 4 },
+  requestReason: { minLength: 12, minWords: 3 },
+  mainOffer: { minLength: 6, minWords: 1 },
+  audience: { minLength: 6, minWords: 1 },
+  platform: { minLength: 3, minWords: 1 },
+  deliverable: { minLength: 4, minWords: 1 },
+  cta: { minLength: 4, minWords: 1 },
+  recommendedProductSlotKey: { minLength: 4, minWords: 1 },
+  commercialFitReason: { minLength: 12, minWords: 3 }
+};
+
+const GENERIC_SUMMARY_VALUES = new Set(["hola", "buenas", "gracias", "si", "no", "ok", "dale", "listo"]);
+
+function countWords(value: string): number {
+  return value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
+/**
+ * IMPL-20260529-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
+ */
+export function hasMeaningfulSummaryValue(
+  field: keyof StructuredBriefSummary,
+  value: string
+): boolean {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    return false;
+  }
+
+  if (GENERIC_SUMMARY_VALUES.has(normalizedValue.toLowerCase())) {
+    return false;
+  }
+
+  const rule = FIELD_COMPLETION_RULES[field];
+
+  if (!rule) {
+    return normalizedValue.length > 0;
+  }
+
+  if (normalizedValue.length < rule.minLength) {
+    return false;
+  }
+
+  if (rule.minWords && countWords(normalizedValue) < rule.minWords) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * IMPL-20260529-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
+ */
+export function hasBackgroundStageSufficientInfo(
+  stage: BriefingStage,
+  summary: StructuredBriefSummary
+): boolean {
+  const hasAllStageFields = STAGE_FIELD_PRIORITY[stage].every((field) =>
+    hasMeaningfulSummaryValue(field, summary[field])
+  );
+
+  if (!hasAllStageFields) {
+    return false;
+  }
+
+  if (stage !== "commercial_fit") {
+    return true;
+  }
+
+  return getCriticalMissingFields(summary).length === 0;
+}
+
+/**
+ * IMPL-20260529-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-06_reescritura_controlada_runtime_chat_brief_v1.md
+ */
+export function getCurrentVisibleStageQuestion(
+  stage: BriefingStage,
+  summary: StructuredBriefSummary
+): StageQuestionConfig | null {
+  for (const fieldKey of STAGE_FIELD_PRIORITY[stage]) {
+    if (summary[fieldKey].trim()) {
+      continue;
+    }
+
+    const questionConfig = VISIBLE_QUESTION_BY_FIELD[fieldKey];
+
+    if (questionConfig) {
+      return questionConfig;
+    }
+  }
+
+  return null;
+}
+
 export function buildAssistantGuidance(stage: BriefingStage, summary: StructuredBriefSummary): string {
+  const currentQuestion = getCurrentVisibleStageQuestion(stage, summary);
+
   if (stage === "discovery") {
-    const openPoints = [
-      summary.projectObjective ? "" : "que quieres lograr con este proyecto",
-      summary.mainOffer ? "" : "que estas ofreciendo exactamente",
-      summary.requestReason ? "" : "por que ahora es importante moverlo",
-      summary.businessContext ? "" : "el contexto actual del negocio"
-    ].filter(Boolean);
-
-    if (openPoints.length === 4) {
-      return "Cuentame que quieres lograr con este proyecto, que estas ofreciendo y por que ahora es importante moverlo.";
+    if (!summary.mainOffer && !summary.projectObjective && !summary.requestReason && !summary.businessContext) {
+      return "Cu\u00e9ntame qu\u00e9 est\u00e1s buscando mover con este proyecto y qu\u00e9 resultado te gustar\u00eda conseguir primero.";
     }
 
-    if (openPoints.length === 0) {
-      return "Ya tengo la base del proyecto. Si quieres, agrega un matiz mas o continua a la siguiente etapa para aterrizar publico, canal y entregable.";
+    if (!currentQuestion) {
+      return "Perfecto, ya tengo una base clara del proyecto. Ahora quiero aterrizar a qui\u00e9n quieres llegar primero y en qu\u00e9 canal conviene moverlo.";
     }
 
-    return `Ya capte parte del contexto. Ahora necesito ${joinNaturalList(openPoints)}.`;
+    return currentQuestion.question;
   }
 
   if (stage === "precision") {
-    const openPoints = [summary.audience ? "" : "publico", summary.platform ? "" : "plataforma", summary.deliverable ? "" : "entregable", summary.cta ? "" : "CTA"]
-      .filter(Boolean)
-      ;
-
-    return openPoints.length
-      ? `Ya tengo la base. Ahora necesito aterrizar ${joinNaturalList(openPoints)} para que el brief quede utilizable por produccion y cotizacion.`
-      : "Ya tenemos base suficiente. Precisa tono, restricciones, referencias y tiempos para consolidar esta etapa.";
+    return currentQuestion?.question
+      ? currentQuestion.question
+      : "Ya tengo claro el frente de ejecuci\u00f3n. Si hay un matiz clave sobre tono, tiempos o limites que deba cuidar, cuentamelo y lo dejo contemplado.";
   }
 
   return summary.recommendedProductSlotKey
-    ? `Voy cerrando el encaje comercial sobre el slot ${summary.recommendedProductSlotKey}. Confirma si el resumen refleja bien la necesidad o si debemos reconducir algo antes de enviarlo a revision humana.`
-    : "Necesito cerrar el encaje comercial. Si aun no hay un slot claro, deja una nota explicita de revision comercial para que el operador lo tome.";
+    ? "Ya veo una ruta comercial clara para tu caso. Si hay algo importante que la propuesta deba respetar, cuentamelo y cierro el encaje final."
+    : currentQuestion?.question ||
+        "Antes de cerrar la propuesta, quiero confirmar que tipo de solucion sientes que encaja mejor con lo que necesitas ahora.";
 }
 
 export function selectPreferredProject<T extends { status: BriefProjectContainer["status"] }>(projects: T[]): T | null {
@@ -1205,7 +1382,10 @@ export async function updateBriefSummary(
   return serializeVersion(current);
 }
 
-export async function advanceBriefStage(context: MutationContext): Promise<BriefVersion> {
+async function updateBriefStage(
+  context: MutationContext,
+  options?: { appendAssistantMessage?: boolean }
+): Promise<BriefVersion> {
   const version = await getBriefVersionRow(context.versionId);
 
   if (!version || !isVersionEditable(version.status)) {
@@ -1233,19 +1413,21 @@ export async function advanceBriefStage(context: MutationContext): Promise<Brief
   await updateBriefStatus(context.briefId, statusFromStage(upcomingStage));
 
   const currentSummary = normalizeSummary(version.structured_summary_json);
-  await appendBriefMessage({
-    briefId: context.briefId,
-    versionId: context.versionId,
-    authorRole: "assistant",
-    actorLabel: assistantTrace.actorLabel,
-    actorUserId: assistantTrace.actorUserId,
-    actorMembershipId: assistantTrace.actorMembershipId,
-    actorAgentId: assistantTrace.actorAgentId,
-    effectiveUserId: assistantTrace.effectiveUserId,
-    effectiveMembershipId: assistantTrace.effectiveMembershipId,
-    messageText: buildAssistantGuidance(upcomingStage, currentSummary),
-    stage: upcomingStage
-  });
+  if (options?.appendAssistantMessage !== false) {
+    await appendBriefMessage({
+      briefId: context.briefId,
+      versionId: context.versionId,
+      authorRole: "assistant",
+      actorLabel: assistantTrace.actorLabel,
+      actorUserId: assistantTrace.actorUserId,
+      actorMembershipId: assistantTrace.actorMembershipId,
+      actorAgentId: assistantTrace.actorAgentId,
+      effectiveUserId: assistantTrace.effectiveUserId,
+      effectiveMembershipId: assistantTrace.effectiveMembershipId,
+      messageText: buildAssistantGuidance(upcomingStage, currentSummary),
+      stage: upcomingStage
+    });
+  }
 
   const current = await getBriefVersionRow(context.versionId);
 
@@ -1254,6 +1436,22 @@ export async function advanceBriefStage(context: MutationContext): Promise<Brief
   }
 
   return serializeVersion(current);
+}
+
+/**
+ * IMPL-20260529-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
+ */
+export async function advanceBriefStage(context: MutationContext): Promise<BriefVersion> {
+  return updateBriefStage(context, { appendAssistantMessage: true });
+}
+
+/**
+ * IMPL-20260529-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
+ */
+export async function advanceBriefStageInBackground(context: MutationContext): Promise<BriefVersion> {
+  return updateBriefStage(context, { appendAssistantMessage: false });
 }
 
 export async function submitBriefForOperatorReview(context: MutationContext): Promise<BriefVersion> {
