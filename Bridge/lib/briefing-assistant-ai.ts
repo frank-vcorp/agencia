@@ -2,7 +2,7 @@
  * IMPL-20260529-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260529-01_brief_cliente_doble_capa_conversacional_v1.md
  */
-import { emptyStructuredBriefSummary, type BriefingStage, type StructuredBriefSummary } from "@/lib/briefing";
+import { emptyStructuredBriefSummary, type BriefingStage, type StructuredBriefSummary } from "./briefing";
 
 type BriefStage = BriefingStage;
 type BriefSummary = StructuredBriefSummary;
@@ -293,7 +293,8 @@ export async function generateBriefAssistantTurn(
         ],
         generationConfig: {
           temperature: 0.4,
-          maxOutputTokens: 220
+          maxOutputTokens: 220,
+          responseMimeType: "application/json"
         }
       })
     });
@@ -305,7 +306,27 @@ export async function generateBriefAssistantTurn(
     const payload = (await response.json()) as GeminiGenerateContentResponse;
     const candidateText = payload.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("\n").trim();
 
-    return candidateText ? parseBriefAssistantTurn(candidateText, input.stage) : null;
+    if (!candidateText) {
+      return null;
+    }
+
+    const parsedTurn = parseBriefAssistantTurn(candidateText, input.stage);
+    if (parsedTurn) {
+      return parsedTurn;
+    }
+
+    const visibleReply = sanitizeAssistantReply(candidateText);
+    if (!visibleReply) {
+      return null;
+    }
+
+    return {
+      visibleReply,
+      summaryPatch: {},
+      stageHasSufficientInfo: false,
+      missingPriorityFields: [],
+      redirectNote: "fallback_plain_text_reply"
+    };
   } catch {
     return null;
   }
