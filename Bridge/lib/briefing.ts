@@ -611,6 +611,33 @@ async function getLatestBriefVersionRow(briefId: string): Promise<BriefVersionRo
   return rows[0] ?? null;
 }
 
+/**
+ * IMPL-20260528-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260528-06_hardening_rehidratacion_brief_cliente_v1.md
+ */
+async function hydrateBriefRecord(briefRow: BriefRow, tenant: TenantRecord): Promise<BriefRecord> {
+  const currentVersionRow = briefRow.active_version_id
+    ? await getBriefVersionRow(briefRow.active_version_id)
+    : await getLatestBriefVersionRow(briefRow.id);
+  const container = await resolveBriefOperationalContainer(briefRow);
+  const currentVersion = currentVersionRow ? await serializeVersion(currentVersionRow) : null;
+
+  return {
+    id: briefRow.id,
+    tenantId: briefRow.tenant_id,
+    tenantSlug: tenant.slug,
+    clientId: briefRow.client_id,
+    projectId: briefRow.project_id,
+    status: briefRow.status,
+    sourceChannel: briefRow.source_channel,
+    currentVersionNumber: briefRow.current_version_number,
+    createdAt: briefRow.created_at,
+    updatedAt: briefRow.updated_at,
+    container,
+    currentVersion
+  };
+}
+
 async function getBriefMessages(versionId: string): Promise<BriefMessage[]> {
   const params = new URLSearchParams({
     select: "id,brief_version_id,stage_key,author_role,actor_label,actor_user_id,actor_membership_id,actor_agent_id,effective_user_id,effective_membership_id,message_text,created_at",
@@ -1379,26 +1406,7 @@ export async function getBriefByProjectId(projectId: string, tenantSlug = supaba
     return null;
   }
 
-  const currentVersionRow = briefRow.active_version_id
-    ? await getBriefVersionRow(briefRow.active_version_id)
-    : await getLatestBriefVersionRow(briefRow.id);
-  const container = await resolveBriefOperationalContainer(briefRow);
-  const currentVersion = currentVersionRow ? await serializeVersion(currentVersionRow) : null;
-
-  return {
-    id: briefRow.id,
-    tenantId: briefRow.tenant_id,
-    tenantSlug: tenant.slug,
-    clientId: briefRow.client_id,
-    projectId: briefRow.project_id,
-    status: briefRow.status,
-    sourceChannel: briefRow.source_channel,
-    currentVersionNumber: briefRow.current_version_number,
-    createdAt: briefRow.created_at,
-    updatedAt: briefRow.updated_at,
-    container,
-    currentVersion
-  };
+  return hydrateBriefRecord(briefRow, tenant);
 }
 
 /**
@@ -1464,7 +1472,13 @@ export async function createBriefForProject(projectId: string, tenantSlug = supa
     stage: "discovery"
   });
 
-  const workspace = await getBriefByProjectId(projectId, tenantSlug);
+  const hydratedBriefRow: BriefRow = {
+    ...briefRow,
+    status: "stage_1_discovery",
+    active_version_id: versionRow.id,
+    current_version_number: 1
+  };
+  const workspace = await hydrateBriefRecord(hydratedBriefRow, tenant);
 
   if (!workspace) {
     throw new Error("brief_creation_failed");

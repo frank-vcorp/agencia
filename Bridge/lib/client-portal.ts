@@ -90,6 +90,8 @@ export type InstallabilityState = {
 export type ClientPortal = {
   tenantSlug: string;
   generatedAt: string;
+  activeProjectId: string | null;
+  briefEntryState: "start" | "continue" | "view";
   nextClientAction: NextClientAction;
   projectStatusSummary: ProjectStatusSummary;
   reviewItems: ReviewItem[];
@@ -272,6 +274,7 @@ type ProjectRow = {
   name: string;
   client_id: string;
   status: string;
+  updated_at: string;
 };
 
 type ClientRow = {
@@ -352,9 +355,20 @@ async function fetchMostRecentBrief(tenantId: string): Promise<BriefRow | null> 
 
 async function fetchProjectById(tenantId: string, projectId: string): Promise<ProjectRow | null> {
   const params = new URLSearchParams({
-    select: "id,name,client_id,status",
+    select: "id,name,client_id,status,updated_at",
     tenant_id: `eq.${tenantId}`,
     id: `eq.${projectId}`,
+    limit: "1"
+  });
+  const rows = await postgrest<ProjectRow[]>(`projects?${params.toString()}`);
+  return rows[0] ?? null;
+}
+
+async function fetchMostRecentProject(tenantId: string): Promise<ProjectRow | null> {
+  const params = new URLSearchParams({
+    select: "id,name,client_id,status,updated_at",
+    tenant_id: `eq.${tenantId}`,
+    order: "updated_at.desc",
     limit: "1"
   });
   const rows = await postgrest<ProjectRow[]>(`projects?${params.toString()}`);
@@ -459,6 +473,8 @@ export async function getClientPortal(
   const emptyPortal: ClientPortal = {
     tenantSlug,
     generatedAt,
+    activeProjectId: null,
+    briefEntryState: "start",
     nextClientAction: {
       type: "none",
       label: "No necesitamos nada de tu parte por ahora",
@@ -502,6 +518,14 @@ export async function getClientPortal(
   refs.push("signal:briefs", "signal:quotations", "signal:assets", "signal:leads");
 
   // ─── Proyecto y cliente ─────────────────────────────────────────────────────
+  const fallbackProject = brief?.project_id ? null : await fetchMostRecentProject(tenantId);
+  const activeProjectId = brief?.project_id ?? fallbackProject?.id ?? null;
+  const briefEntryState: ClientPortal["briefEntryState"] = !activeProjectId || !brief?.project_id
+    ? "start"
+    : brief.status === "approved_locked"
+      ? "view"
+      : "continue";
+
   let projectName: string | null = null;
   let clientName: string | null = null;
 
@@ -635,6 +659,8 @@ export async function getClientPortal(
   return {
     tenantSlug,
     generatedAt,
+    activeProjectId,
+    briefEntryState,
     nextClientAction,
     projectStatusSummary: {
       projectName,

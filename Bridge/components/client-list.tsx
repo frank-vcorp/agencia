@@ -3,6 +3,8 @@
 /**
  * IMPL-ARCH-20260528-02
  * Respaldo: context/SPECs/SPEC_ARCH-20260528-05_directorio_clientes_operador_v1.md
+ * IMPL-20260528-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260528-07_portal_cliente_por_proyecto_brief_first_v1.md
  */
 import { useState } from "react";
 
@@ -82,7 +84,7 @@ export function ClientListView({
             ? toWhatsappHandle(client.primaryContactWhatsapp)
             : null;
           const briefUrl = client.recentProjectId
-            ? `${portalBaseUrl}/cliente/brief/${client.recentProjectId}`
+            ? `${portalBaseUrl}/cliente/proyecto/${client.recentProjectId}`
             : null;
 
           return (

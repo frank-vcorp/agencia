@@ -2,7 +2,7 @@
 
 **Proyecto:** Bridge  
 **ID activo:** ARCH-20260510-11  
-**Fecha de actualizacion:** 2026-05-13  
+**Fecha de actualizacion:** 2026-05-28  
 **Estado general:** Bridge mantiene `ARCH-20260510-11` como corte paraguas de refinamiento operativo. Los slices `ARCH-20260513-01`, `ARCH-20260513-02`, `ARCH-20260513-03`, `ARCH-20260513-04`, `ARCH-20260513-05`, `ARCH-20260513-15` y `ARCH-20260513-16` ya quedaron implementados. La migración de contacto estructurado y la migración de configuración SendGrid ya fueron aplicadas en producción. El siguiente slice técnico recomendado ahora es **ARCH-20260513-19**, enfocado en limpieza técnica antes del refinamiento UX/UI final del piloto. `ARCH-20260513-06` queda absorbido por `ARCH-20260513-15` y no debe ejecutarse por separado.
 
 ## MICRO-SPRINT COMPLETADO (MCP + MCT + Caso Demostración)
@@ -150,6 +150,7 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 
 1. Cierre operativo final del corte `ARCH-20260510-11`: corrida e2e final de punta a punta y trazabilidad Jira del cierre tecnico `20260526-06..09`.
 2. Slices posteriores del corte paraguas `ARCH-20260510-11`, una vez liberado el bloqueador operativo.
+3. `ARCH-20260528-07` autorizado: portal cliente por proyecto con brief conversacional como entrada principal; la capa informativa posterior al brief queda fuera de alcance y se tratara en un slice independiente.
 
 ### [ ] Pendiente
 
