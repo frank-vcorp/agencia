@@ -179,29 +179,46 @@ describe("briefing-assistant-ai", () => {
 
   it("retorna una respuesta natural y un summaryPatch cuando Gemini responde JSON valido", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        candidates: [
-          {
-            finishReason: "STOP",
-            content: {
-              parts: [
-                {
-                  text: JSON.stringify({
-                    visibleReply:
-                      "Entendido, el foco es cambio de aceite y mantenimiento preventivo. \u00bfQu\u00e9 los impulsa a mover esta l\u00ednea justo ahora?",
-                    summaryPatch: {
-                      mainOffer: "Cambio de aceite y mantenimiento preventivo"
-                    }
-                  })
-                }
-              ]
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              finishReason: "STOP",
+              content: {
+                parts: [
+                  {
+                    text: "Entendido, el foco es cambio de aceite y mantenimiento preventivo. ¿Qué los impulsa a mover esta línea justo ahora?"
+                  }
+                ]
+              }
             }
-          }
-        ]
+          ]
+        })
       })
-    });
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              finishReason: "STOP",
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      summaryPatch: {
+                        mainOffer: "Cambio de aceite y mantenimiento preventivo"
+                      }
+                    })
+                  }
+                ]
+              }
+            }
+          ]
+        })
+      });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await generateBriefChatReply({

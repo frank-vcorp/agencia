@@ -294,12 +294,23 @@ export function buildBriefChatSystemPrompt(stage: BriefStage, summary: BriefSumm
 function buildBriefChatTurnPrompt(input: GenerateBriefChatReplyInput): string {
   return [
     buildBriefChatSystemPrompt(input.stage, input.summary),
-    "Devuelve solo JSON valido y sin markdown con este contrato:",
-    '{"visibleReply":"","summaryPatch":{}}',
-    "visibleReply: texto natural visible para el cliente, breve, claro y comercial.",
-    "summaryPatch: solo los campos del resumen que el ultimo mensaje del cliente deja mas claros o confirma con suficiente sustancia.",
-    "No inventes datos. Si un campo no cambio o no quedo claro, omitelo del summaryPatch.",
-    "Puedes usar solo claves validas del resumen estructurado de Bridge.",
+    "Ultimo mensaje del cliente:",
+    input.clientMessage
+  ].join("\n");
+}
+
+function buildBriefChatSummaryPatchPrompt(input: GenerateBriefChatReplyInput): string {
+  return [
+    "Eres el extractor interno del brief conversacional de Bridge.",
+    "Debes actualizar solo los campos del resumen estructurado que el ultimo mensaje del cliente deja mas claros.",
+    "No redactes respuesta visible para el cliente.",
+    "No inventes datos. Si un campo no quedo claro, omitelo.",
+    "Responde solo con JSON valido y sin markdown usando exactamente este contrato:",
+    '{"summaryPatch":{}}',
+    "summaryPatch puede incluir solo claves validas del resumen estructurado de Bridge.",
+    `Etapa actual: ${input.stage}`,
+    "Resumen estructurado actual:",
+    JSON.stringify(input.summary),
     "Ultimo mensaje del cliente:",
     input.clientMessage
   ].join("\n");
@@ -349,6 +360,20 @@ function sanitizeBriefChatTurn(rawValue: unknown): { visibleReply: string; summa
   };
 }
 
+function sanitizeSummaryPatchEnvelope(rawValue: unknown): Partial<BriefSummary> {
+  if (!rawValue || typeof rawValue !== "object" || Array.isArray(rawValue)) {
+    return {};
+  }
+
+  const candidate = rawValue as { summaryPatch?: unknown };
+
+  if (candidate.summaryPatch !== undefined) {
+    return sanitizeSummaryPatch(candidate.summaryPatch);
+  }
+
+  return sanitizeSummaryPatch(candidate);
+}
+
 function buildPlainTextChatTurn(
   rawReply: string,
   finishReason?: string
@@ -362,6 +387,47 @@ function buildPlainTextChatTurn(
   return {
     visibleReply,
     summaryPatch: {}
+  };
+}
+
+async function requestGeminiContent(prompt: string, apiKey: string, responseMimeType?: "application/json") {
+  const model = "gemini-2.5-flash";
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: prompt
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.55,
+        maxOutputTokens: responseMimeType === "application/json" ? 512 : 1024,
+        ...(responseMimeType ? { responseMimeType } : {})
+      }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error("brief_chat_ai_failed");
+  }
+
+  const payload = (await response.json()) as GeminiGenerateContentResponse;
+  const candidate = payload.candidates?.[0];
+  const candidateText = candidate?.content?.parts?.map((part) => part.text ?? "").join("\n").trim() ?? "";
+
+  return {
+    candidate,
+    candidateText
   };
 }
 
@@ -466,82 +532,40 @@ export async function generateBriefChatReply(
     };
   }
 
-  const systemPrompt = buildBriefChatTurnPrompt(input);
-  const model = "gemini-2.5-flash";
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const visiblePrompt = buildBriefChatTurnPrompt(input);
+  const summaryPatchPrompt = buildBriefChatSummaryPatchPrompt(input);
 
   try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: `${systemPrompt}\n\nUltimo mensaje del cliente:\n${input.clientMessage}`
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.55,
-          maxOutputTokens: 1024,
-          responseMimeType: "application/json"
-        }
-      })
-    });
+    const visibleResult = await requestGeminiContent(visiblePrompt, apiKey);
+    const plainTextTurn = buildPlainTextChatTurn(visibleResult.candidateText, visibleResult.candidate?.finishReason);
 
-    if (!response.ok) {
-      throw new Error("brief_chat_ai_failed");
-    }
-
-    const payload = (await response.json()) as GeminiGenerateContentResponse;
-    const candidate = payload.candidates?.[0];
-    const candidateText = candidate?.content?.parts?.map((part) => part.text ?? "").join("\n").trim();
-    const jsonText = candidateText ? extractJsonObject(candidateText) ?? candidateText : null;
-
-    if (!jsonText) {
-      throw new Error("brief_chat_ai_invalid_json");
-    }
-
-    let parsedTurn: ReturnType<typeof sanitizeBriefChatTurn> = null;
-
-    try {
-      parsedTurn = sanitizeBriefChatTurn(JSON.parse(jsonText));
-    } catch {
-      parsedTurn = null;
-    }
-
-    if (!parsedTurn) {
-      const plainTextTurn = candidateText ? buildPlainTextChatTurn(candidateText, candidate?.finishReason) : null;
-
-      if (!plainTextTurn) {
-        throw new Error("brief_chat_ai_invalid_visible_reply");
-      }
-
-      return {
-        visibleReply: plainTextTurn.visibleReply,
-        summaryPatch: plainTextTurn.summaryPatch,
-        stageHasSufficientInfo: hasStageSufficientInfo(input.stage, input.summary)
-      };
-    }
-
-    if (!isAcceptableAssistantVisibleReply(parsedTurn.visibleReply, candidate?.finishReason)) {
+    if (!plainTextTurn) {
       throw new Error("brief_chat_ai_invalid_visible_reply");
     }
 
-    const nextSummary = mergeStructuredBriefSummary(input.summary, parsedTurn.summaryPatch);
+    let summaryPatch: Partial<BriefSummary> = {};
+
+    try {
+      const summaryResult = await requestGeminiContent(summaryPatchPrompt, apiKey, "application/json");
+      const jsonText = summaryResult.candidateText
+        ? extractJsonObject(summaryResult.candidateText) ?? summaryResult.candidateText
+        : null;
+
+      if (jsonText) {
+        summaryPatch = sanitizeSummaryPatchEnvelope(JSON.parse(jsonText));
+      }
+    } catch {
+      summaryPatch = {};
+    }
+
+    const nextSummary = mergeStructuredBriefSummary(input.summary, summaryPatch);
 
     return {
-      visibleReply: parsedTurn.visibleReply,
-      summaryPatch: parsedTurn.summaryPatch,
+      visibleReply: plainTextTurn.visibleReply,
+      summaryPatch,
       stageHasSufficientInfo: hasStageSufficientInfo(input.stage, nextSummary)
     };
-  } catch (error) {
+  } catch {
     return {
       visibleReply: BRIEF_CHAT_RECOVERY_REPLY,
       summaryPatch: {},
