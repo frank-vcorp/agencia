@@ -4,6 +4,7 @@
  * IMPL-20260528-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260528-04_brief_chat_portal_cliente_v1.md
  * FIX-20260528-01: Envio con Enter y timestamp corto por mensaje.
+ * FIX-20260528-03: Layout compacto para chat cliente.
  */
 import { useMemo, useState, useTransition } from "react";
 
@@ -139,28 +140,28 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
   }
 
   return (
-    <div className="space-y-4 pb-8">
-      <section className="panel rounded-[28px] px-5 py-5">
+    <div className="space-y-3 pb-6">
+      <section className="panel rounded-[22px] px-4 py-4">
         <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
           Brief conversacional
         </p>
-        <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight">
+        <h1 className="mt-1.5 font-[family-name:var(--font-heading)] text-xl font-bold tracking-tight sm:text-2xl">
           {brief.container.project?.name ?? "Tu proyecto"}
         </h1>
-        <p className="mt-2 text-sm text-[color:var(--muted)]">{stageCopy(status)}</p>
+        <p className="mt-1.5 text-xs text-[color:var(--muted)] sm:text-sm">{stageCopy(status)}</p>
       </section>
 
-      <section className="panel rounded-[28px] px-4 py-4">
-        <div className="max-h-[52vh] space-y-3 overflow-y-auto pr-1">
+      <section className="panel rounded-[22px] px-3 py-3 sm:px-4 sm:py-4">
+        <div className="max-h-[42vh] space-y-2.5 overflow-y-auto pr-1">
           {messages.length === 0 ? (
-            <p className="rounded-[16px] border border-dashed border-stone-300 p-3 text-sm text-stone-500">
+            <p className="rounded-[14px] border border-dashed border-stone-300 p-2.5 text-xs text-stone-500 sm:text-sm">
               Aun no hay mensajes en este brief.
             </p>
           ) : (
             messages.map((message) => (
               <article
                 key={message.id}
-                className={`max-w-[92%] rounded-[16px] px-3.5 py-2.5 text-sm leading-6 ${messageBubbleClass(message.authorRole)}`}
+                className={`max-w-[86%] rounded-[14px] px-3 py-2 text-xs leading-5 sm:text-sm sm:leading-6 ${messageBubbleClass(message.authorRole)}`}
               >
                 <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
                   {messageAuthor(message.authorRole)}
@@ -172,7 +173,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
           )}
         </div>
 
-        <div className="mt-4 border-t border-[color:var(--line)] pt-4">
+        <div className="mt-3 border-t border-[color:var(--line)] pt-3">
           <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
             Tu respuesta
           </label>
@@ -185,21 +186,21 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
                 handleSendMessage();
               }
             }}
-            rows={4}
+            rows={3}
             disabled={!canSend || isPending}
-            className="w-full rounded-[14px] border border-[color:var(--line)] bg-white px-3 py-2 text-sm outline-none transition focus:border-[color:var(--line-strong)]"
+            className="w-full rounded-[12px] border border-[color:var(--line)] bg-white px-3 py-2 text-sm outline-none transition focus:border-[color:var(--line-strong)]"
             placeholder="Escribe aqui lo que necesitas para tu proyecto"
           />
           {disabledReason && (
             <p className="mt-2 text-xs font-medium text-amber-700">{disabledReason}</p>
           )}
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-2.5 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={handleSendMessage}
               disabled={!canSend || isPending || !messageText.trim()}
-              className="rounded-[14px] bg-[color:var(--accent)] px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-[12px] bg-[color:var(--accent)] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Enviar
             </button>
@@ -213,7 +214,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
                   });
                 }}
                 disabled={isPending}
-                className="rounded-[14px] border border-[color:var(--line-strong)] px-4 py-2 text-xs font-semibold text-[color:var(--muted)] transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-[12px] border border-[color:var(--line-strong)] px-3.5 py-1.5 text-xs font-semibold text-[color:var(--muted)] transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Continuar a etapa siguiente -&gt;
               </button>
@@ -228,7 +229,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
                   });
                 }}
                 disabled={isPending}
-                className="rounded-[14px] border border-emerald-300 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-[12px] border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Enviar brief para revision
               </button>
@@ -237,12 +238,12 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
         </div>
       </section>
 
-      <section className="panel rounded-[28px] px-5 py-4">
+      <section className="panel rounded-[22px] px-4 py-3">
         <details>
           <summary className="cursor-pointer text-sm font-semibold text-[color:var(--ink)]">
             Resumen de lo que capturamos hasta aqui
           </summary>
-          <div className="mt-3 space-y-2">
+          <div className="mt-2.5 space-y-2">
             {summaryItems.length === 0 ? (
               <p className="text-sm text-[color:var(--muted)]">Aun no hay datos resumidos.</p>
             ) : (
