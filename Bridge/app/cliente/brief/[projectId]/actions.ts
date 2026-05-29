@@ -1,8 +1,8 @@
 "use server";
 
 /**
- * IMPL-20260528-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260528-07_portal_cliente_por_proyecto_brief_first_v1.md
+ * IMPL-20260529-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-01_brief_cliente_doble_capa_conversacional_v1.md
  */
 import { revalidatePath } from "next/cache";
 
@@ -16,11 +16,11 @@ import {
   submitBriefForOperatorReview,
   updateBriefSummary
 } from "@/lib/briefing";
-import { generateBriefAssistantReply } from "@/lib/briefing-assistant-ai";
+import { generateBriefAssistantTurn } from "@/lib/briefing-assistant-ai";
 
 /**
- * IMPL-20260528-08
- * Respaldo: context/SPECs/SPEC_ARCH-20260528-08_brief_cliente_ia_real_gemini_v1.md
+ * IMPL-20260529-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-01_brief_cliente_doble_capa_conversacional_v1.md
  */
 export async function sendClientMessageAction(
   projectId: string,
@@ -45,22 +45,30 @@ export async function sendClientMessageAction(
       currentVersion.structuredSummary,
       normalizedText
     );
-    const nextVersion = Object.keys(inferredPatch).length
-      ? await updateBriefSummary({ briefId, versionId }, inferredPatch)
-      : currentVersion;
-    const fallbackMessage = buildAssistantGuidance(nextVersion.stage, nextVersion.structuredSummary);
-    const aiReply = await generateBriefAssistantReply({
-      stage: nextVersion.stage,
-      summary: nextVersion.structuredSummary,
+    const summaryForAssistant = {
+      ...currentVersion.structuredSummary,
+      ...inferredPatch
+    };
+    const fallbackMessage = buildAssistantGuidance(currentVersion.stage, summaryForAssistant);
+    const aiTurn = await generateBriefAssistantTurn({
+      stage: currentVersion.stage,
+      summary: summaryForAssistant,
       clientMessage: normalizedText
     });
+    const combinedPatch = {
+      ...inferredPatch,
+      ...(aiTurn?.summaryPatch ?? {})
+    };
+    const nextVersion = Object.keys(combinedPatch).length
+      ? await updateBriefSummary({ briefId, versionId }, combinedPatch)
+      : currentVersion;
 
     await appendBriefMessage({
       briefId,
       versionId,
       authorRole: "assistant",
       actorLabel: "Bridge briefing",
-      messageText: aiReply ?? fallbackMessage,
+      messageText: aiTurn?.visibleReply ?? fallbackMessage,
       stage: nextVersion.stage
     });
   }

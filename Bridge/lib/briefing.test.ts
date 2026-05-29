@@ -1,6 +1,6 @@
 /**
- * IMPL-20260528-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260528-09_hardening_prompt_brief_cliente_por_etapas_v1.md
+ * IMPL-20260529-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-01_brief_cliente_doble_capa_conversacional_v1.md
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,7 +16,7 @@ import {
 } from "./briefing";
 import {
   buildBriefAssistantSystemPrompt,
-  generateBriefAssistantReply,
+  generateBriefAssistantTurn,
   sanitizeAssistantReply
 } from "./briefing-assistant-ai";
 
@@ -71,21 +71,29 @@ describe("briefing", () => {
 });
 
 describe("briefing-assistant-ai", () => {
-  it("incluye etapa, faltantes prioritarios y reglas estrictas en el system prompt", () => {
+  it("incluye el contrato doble, la etapa y las reglas conversacionales en el system prompt", () => {
     const prompt = buildBriefAssistantSystemPrompt("discovery", emptyStructuredBriefSummary());
 
+    expect(prompt).toContain("Responde solo con JSON valido y sin markdown.");
     expect(prompt).toContain("Etapa actual: discovery");
     expect(prompt).toContain("Faltantes prioritarios de etapa: projectObjective (objetivo del proyecto), mainOffer (oferta principal), requestReason (motivo del pedido), businessContext (contexto del negocio)");
-    expect(prompt).toContain("Prohibe saludo, agradecimiento o relleno social cuando existan faltantes.");
-    expect(prompt).toContain("Formula maximo 2 preguntas concretas por turno.");
+    expect(prompt).toContain('"visibleReply":"string"');
+    expect(prompt).toContain("Formula maximo 2 preguntas concretas por turno");
   });
 
-  it("postprocesa salida para limitar desborde y limpiar lineas vacias repetidas", () => {
+  it("postprocesa salida visible para limitar desborde y limpiar lineas vacias repetidas", () => {
     const noisyReply = `FOCO: discovery\n\n\n${"dato ".repeat(160)}`;
 
     const sanitized = sanitizeAssistantReply(noisyReply);
 
-    expect(sanitized).not.toContain("\n\n\n");
+    expect(sanitized).toBe("");
+  });
+
+  it("postprocesa salida visible natural sin exceder el limite de palabras", () => {
+    const noisyReply = `Perfecto. ${"dato ".repeat(160)}`;
+
+    const sanitized = sanitizeAssistantReply(noisyReply);
+
     expect(sanitized.endsWith("...")).toBe(true);
     expect(sanitized.split(/\s+/).length).toBeLessThanOrEqual(121);
   });
@@ -93,7 +101,7 @@ describe("briefing-assistant-ai", () => {
   it("devuelve null cuando GEMINI_API_KEY no esta configurada", async () => {
     vi.stubEnv("GEMINI_API_KEY", "");
 
-    const result = await generateBriefAssistantReply({
+    const result = await generateBriefAssistantTurn({
       stage: "discovery",
       summary: emptyStructuredBriefSummary(),
       clientMessage: "Necesito ayuda para definir mi oferta"
@@ -103,7 +111,7 @@ describe("briefing-assistant-ai", () => {
     vi.unstubAllEnvs();
   });
 
-  it("devuelve texto cuando Gemini responde contenido valido", async () => {
+  it("retorna la capa visible e invisible cuando Gemini responde un payload valido", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -111,7 +119,20 @@ describe("briefing-assistant-ai", () => {
         candidates: [
           {
             content: {
-              parts: [{ text: "Perfecto, avancemos con objetivo y audiencia." }]
+              parts: [
+                {
+                  text: JSON.stringify({
+                    visibleReply: "Perfecto, ya tengo una base clara. Para afinarlo, cuentame cual es tu objetivo principal y a quien quieres atraer.",
+                    summaryPatch: {
+                      projectObjective: "Captar leads calificados",
+                      audience: "Negocios locales"
+                    },
+                    stageHasSufficientInfo: true,
+                    missingPriorityFields: ["mainOffer", "requestReason"],
+                    redirectNote: "Sin desvio"
+                  })
+                }
+              ]
             }
           }
         ]
@@ -119,13 +140,59 @@ describe("briefing-assistant-ai", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await generateBriefAssistantReply({
+    const result = await generateBriefAssistantTurn({
       stage: "discovery",
       summary: emptyStructuredBriefSummary(),
       clientMessage: "Quiero captar leads en Instagram"
     });
 
-    expect(result).toBe("Perfecto, avancemos con objetivo y audiencia.");
+    expect(result).toEqual({
+      visibleReply: "Perfecto, ya tengo una base clara. Para afinarlo, cuentame cual es tu objetivo principal y a quien quieres atraer.",
+      summaryPatch: {
+        projectObjective: "Captar leads calificados",
+        audience: "Negocios locales"
+      },
+      stageHasSufficientInfo: true,
+      missingPriorityFields: ["mainOffer", "requestReason"],
+      redirectNote: "Sin desvio"
+    });
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("devuelve null cuando Gemini filtra etiquetas tecnicas en la capa visible", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "fake-key");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    visibleReply: "FOCO: discovery",
+                    summaryPatch: { projectObjective: "Captar leads" },
+                    stageHasSufficientInfo: false,
+                    missingPriorityFields: ["mainOffer"],
+                    redirectNote: ""
+                  })
+                }
+              ]
+            }
+          }
+        ]
+      })
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateBriefAssistantTurn({
+      stage: "discovery",
+      summary: emptyStructuredBriefSummary(),
+      clientMessage: "Quiero captar leads"
+    });
+
+    expect(result).toBeNull();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
@@ -135,7 +202,7 @@ describe("briefing-assistant-ai", () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await generateBriefAssistantReply({
+    const result = await generateBriefAssistantTurn({
       stage: "precision",
       summary: emptyStructuredBriefSummary(),
       clientMessage: "Mi servicio es una mentoria"

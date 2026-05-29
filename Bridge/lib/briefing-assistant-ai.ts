@@ -1,16 +1,24 @@
 /**
- * IMPL-20260528-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260528-09_hardening_prompt_brief_cliente_por_etapas_v1.md
+ * IMPL-20260529-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260529-01_brief_cliente_doble_capa_conversacional_v1.md
  */
-import { buildAssistantGuidance } from "@/lib/briefing";
+import { emptyStructuredBriefSummary, type BriefingStage, type StructuredBriefSummary } from "@/lib/briefing";
 
-type BriefStage = Parameters<typeof buildAssistantGuidance>[0];
-type BriefSummary = Parameters<typeof buildAssistantGuidance>[1];
+type BriefStage = BriefingStage;
+type BriefSummary = StructuredBriefSummary;
 
-type GenerateBriefAssistantReplyInput = {
+type GenerateBriefAssistantTurnInput = {
   stage: BriefStage;
   summary: BriefSummary;
   clientMessage: string;
+};
+
+export type BriefAssistantTurn = {
+  visibleReply: string;
+  summaryPatch: Partial<BriefSummary>;
+  stageHasSufficientInfo: boolean;
+  missingPriorityFields: string[];
+  redirectNote: string;
 };
 
 type GeminiGenerateContentResponse = {
@@ -48,6 +56,9 @@ const PRIORITY_FIELDS_BY_STAGE: Record<BriefStage, StagePriorityField[]> = {
 };
 
 const MAX_ASSISTANT_REPLY_WORDS = 120;
+const ALLOWED_SUMMARY_KEYS = new Set<keyof BriefSummary>(Object.keys(emptyStructuredBriefSummary()) as Array<keyof BriefSummary>);
+const TECHNICAL_LEAK_PATTERN =
+  /(^|\s)(FOCO|CAPTURADO|PREGUNTAS|SIGUIENTE_ACCION|summaryPatch|missingPriorityFields|stageHasSufficientInfo|redirectNote)\s*:/i;
 
 const readSummaryValue = (summary: BriefSummary, key: keyof BriefSummary): string => summary[key].trim();
 
@@ -65,6 +76,8 @@ const buildPrioritizedStageStatus = (stage: BriefStage, summary: BriefSummary) =
 
 export function sanitizeAssistantReply(rawReply: string): string {
   const trimmed = rawReply
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
     .replace(/\r\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .split("\n")
@@ -73,6 +86,10 @@ export function sanitizeAssistantReply(rawReply: string): string {
     .trim();
 
   if (!trimmed) {
+    return "";
+  }
+
+  if (TECHNICAL_LEAK_PATTERN.test(trimmed) || (/^[\[{]/.test(trimmed) && /[\]}]$/.test(trimmed))) {
     return "";
   }
 
@@ -99,22 +116,26 @@ export function buildBriefAssistantSystemPrompt(stage: BriefStage, summary: Brie
       : "ninguno";
 
   return [
-    "Eres Bridge briefing en modo entrevistador comercial estricto.",
-    "Objetivo unico: capturar faltantes prioritarios de la etapa actual con salida breve y accionable.",
-    "Reglas duras:",
-    "- Responde en espanol neutro y tecnico.",
-    "- Mantente solo en la etapa actual; no saltes a etapas futuras.",
-    "- Prohibe saludo, agradecimiento o relleno social cuando existan faltantes.",
-    "- Formula maximo 2 preguntas concretas por turno.",
-    "- Cada pregunta debe apuntar a un faltante prioritario actual.",
-    "- Si el mensaje del cliente es ambiguo o breve, reconduce con una pregunta y ejemplo de respuesta.",
-    "- No inventes informacion del cliente ni cierres la etapa sin datos minimos.",
-    "- Limite de extension: maximo 110 palabras.",
-    "Formato de salida obligatorio (sin markdown):",
-    "FOCO: <una frase de enfoque de etapa>",
-    "CAPTURADO: <campos ya capturados de esta etapa o 'ninguno'>",
-    "PREGUNTAS: 1) <pregunta 1> 2) <pregunta 2 opcional>",
-    "SIGUIENTE_ACCION: <microaccion concreta para continuar>",
+    "Eres Vika, estratega comercial de Bridge, conversando con un cliente real.",
+    "Objetivo unico: responder con lenguaje natural al cliente y, al mismo tiempo, producir una capa estructurada invisible para Bridge.",
+    "Responde solo con JSON valido y sin markdown.",
+    "Contrato exacto de salida:",
+    '{"visibleReply":"string","summaryPatch":{},"stageHasSufficientInfo":false,"missingPriorityFields":[],"redirectNote":""}',
+    "Reglas para visibleReply:",
+    "- Debe sonar natural, humana, breve, comercial y contextual.",
+    "- Nunca debe incluir etiquetas tecnicas, listas de formulario, markdown ni JSON visible.",
+    "- Formula maximo 2 preguntas concretas por turno y solo si realmente faltan datos prioritarios.",
+    "- Si el cliente se desvia, reconduce con suavidad y vuelve al objetivo del brief.",
+    "- Si la etapa ya tiene informacion suficiente, dilo con naturalidad y orienta a continuar con la siguiente etapa o revision humana.",
+    "Reglas para summaryPatch:",
+    "- Incluye solo campos de StructuredBriefSummary con evidencia suficiente en el mensaje del cliente.",
+    "- No inventes datos ni sobrescribas con texto vacio.",
+    "Reglas para stageHasSufficientInfo:",
+    "- true cuando los datos actuales ya permiten cerrar la etapa con criterio practico aunque no este todo perfecto.",
+    "Reglas para missingPriorityFields:",
+    "- Lista interna con keys faltantes de la etapa actual, sin inventar campos nuevos.",
+    "Reglas para redirectNote:",
+    "- Resume internamente si hubo desvio y como lo recondujiste. Si no hubo desvio, usa cadena vacia.",
     `Etapa actual: ${stage}`,
     `Campos prioritarios de etapa: ${stageFieldList}`,
     `Capturado en etapa: ${capturedFieldList}`,
@@ -124,9 +145,125 @@ export function buildBriefAssistantSystemPrompt(stage: BriefStage, summary: Brie
   ].join("\n");
 }
 
-export async function generateBriefAssistantReply(
-  input: GenerateBriefAssistantReplyInput
-): Promise<string | null> {
+function extractJsonObject(rawText: string): string | null {
+  const fencedMatch = rawText.match(/```json\s*([\s\S]*?)```/i);
+
+  if (fencedMatch?.[1]) {
+    return fencedMatch[1].trim();
+  }
+
+  const firstBraceIndex = rawText.indexOf("{");
+  if (firstBraceIndex === -1) {
+    return null;
+  }
+
+  let depth = 0;
+  let inString = false;
+  let isEscaped = false;
+
+  for (let index = firstBraceIndex; index < rawText.length; index += 1) {
+    const character = rawText[index];
+
+    if (inString) {
+      if (isEscaped) {
+        isEscaped = false;
+        continue;
+      }
+
+      if (character === "\\") {
+        isEscaped = true;
+        continue;
+      }
+
+      if (character === '"') {
+        inString = false;
+      }
+
+      continue;
+    }
+
+    if (character === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (character === "{") {
+      depth += 1;
+      continue;
+    }
+
+    if (character === "}") {
+      depth -= 1;
+
+      if (depth === 0) {
+        return rawText.slice(firstBraceIndex, index + 1).trim();
+      }
+    }
+  }
+
+  return null;
+}
+
+function sanitizeSummaryPatch(rawPatch: unknown): Partial<BriefSummary> {
+  if (!rawPatch || typeof rawPatch !== "object" || Array.isArray(rawPatch)) {
+    return {};
+  }
+
+  const sanitizedEntries = Object.entries(rawPatch).flatMap(([key, value]) => {
+    if (!ALLOWED_SUMMARY_KEYS.has(key as keyof BriefSummary) || typeof value !== "string") {
+      return [];
+    }
+
+    const normalizedValue = value.trim();
+    return normalizedValue ? [[key, normalizedValue] as [keyof BriefSummary, string]] : [];
+  });
+
+  return Object.fromEntries(sanitizedEntries) as Partial<BriefSummary>;
+}
+
+function sanitizeMissingPriorityFields(rawFields: unknown, stage: BriefStage): string[] {
+  if (!Array.isArray(rawFields)) {
+    return [];
+  }
+
+  const allowedStageFields = new Set(PRIORITY_FIELDS_BY_STAGE[stage].map((field) => field.key));
+
+  return rawFields
+    .filter((field): field is string => typeof field === "string")
+    .map((field) => field.trim())
+    .filter((field) => field.length > 0 && allowedStageFields.has(field as keyof BriefSummary));
+}
+
+function parseBriefAssistantTurn(rawText: string, stage: BriefStage): BriefAssistantTurn | null {
+  const jsonText = extractJsonObject(rawText);
+
+  if (!jsonText) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(jsonText) as Partial<BriefAssistantTurn> & { summaryPatch?: unknown };
+    const visibleReply = typeof parsed.visibleReply === "string" ? sanitizeAssistantReply(parsed.visibleReply) : "";
+
+    if (!visibleReply) {
+      return null;
+    }
+
+    return {
+      visibleReply,
+      summaryPatch: sanitizeSummaryPatch(parsed.summaryPatch),
+      stageHasSufficientInfo: parsed.stageHasSufficientInfo === true,
+      missingPriorityFields: sanitizeMissingPriorityFields(parsed.missingPriorityFields, stage),
+      redirectNote: typeof parsed.redirectNote === "string" ? parsed.redirectNote.trim() : ""
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function generateBriefAssistantTurn(
+  input: GenerateBriefAssistantTurnInput
+): Promise<BriefAssistantTurn | null> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
 
   if (!apiKey) {
@@ -167,10 +304,17 @@ export async function generateBriefAssistantReply(
 
     const payload = (await response.json()) as GeminiGenerateContentResponse;
     const candidateText = payload.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("\n").trim();
-    const sanitizedText = candidateText ? sanitizeAssistantReply(candidateText) : "";
 
-    return sanitizedText ? sanitizedText : null;
+    return candidateText ? parseBriefAssistantTurn(candidateText, input.stage) : null;
   } catch {
     return null;
   }
+}
+
+export async function generateBriefAssistantReply(
+  input: GenerateBriefAssistantTurnInput
+): Promise<string | null> {
+  const turn = await generateBriefAssistantTurn(input);
+
+  return turn?.visibleReply ?? null;
 }
