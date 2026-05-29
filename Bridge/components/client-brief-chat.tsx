@@ -3,6 +3,7 @@
 /**
  * IMPL-20260528-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260528-04_brief_chat_portal_cliente_v1.md
+ * FIX-20260528-01: Envio con Enter y timestamp corto por mensaje.
  */
 import { useMemo, useState, useTransition } from "react";
 
@@ -46,7 +47,22 @@ function messageBubbleClass(authorRole: BriefMessage["authorRole"]): string {
 function messageAuthor(authorRole: BriefMessage["authorRole"]): string {
   if (authorRole === "client") return "Tu";
   if (authorRole === "operator") return "Tu asesor";
-  return "Asistente";
+  return "Vika";
+}
+
+function formatShortDateTime(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat("es-MX", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "America/Mexico_City"
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
 }
 
 function hasValue(value: unknown): boolean {
@@ -111,6 +127,17 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
 
   const canSend = editable && !disabledReason;
 
+  function handleSendMessage() {
+    if (!currentVersion || !canSend || !messageText.trim()) {
+      return;
+    }
+
+    startTransition(async () => {
+      await sendClientMessageAction(projectId, brief.id, currentVersion.id, messageText);
+      setMessageText("");
+    });
+  }
+
   return (
     <div className="space-y-4 pb-8">
       <section className="panel rounded-[28px] px-5 py-5">
@@ -139,6 +166,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
                   {messageAuthor(message.authorRole)}
                 </p>
                 <p className="whitespace-pre-wrap">{message.messageText}</p>
+                <p className="mt-1 text-[10px] opacity-70">{formatShortDateTime(message.createdAt)}</p>
               </article>
             ))
           )}
@@ -151,6 +179,12 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
           <textarea
             value={messageText}
             onChange={(event) => setMessageText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                handleSendMessage();
+              }
+            }}
             rows={4}
             disabled={!canSend || isPending}
             className="w-full rounded-[14px] border border-[color:var(--line)] bg-white px-3 py-2 text-sm outline-none transition focus:border-[color:var(--line-strong)]"
@@ -163,21 +197,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => {
-                if (!currentVersion || !canSend || !messageText.trim()) {
-                  return;
-                }
-
-                startTransition(async () => {
-                  await sendClientMessageAction(
-                    projectId,
-                    brief.id,
-                    currentVersion.id,
-                    messageText
-                  );
-                  setMessageText("");
-                });
-              }}
+              onClick={handleSendMessage}
               disabled={!canSend || isPending || !messageText.trim()}
               className="rounded-[14px] bg-[color:var(--accent)] px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
