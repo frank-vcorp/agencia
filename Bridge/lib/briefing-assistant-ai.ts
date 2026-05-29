@@ -112,6 +112,8 @@ const FINAL_JSON_KEYS = new Set<keyof BriefFinalJson>([
 
 const readSummaryValue = (summary: BriefSummary, key: keyof BriefSummary): string => summary[key].trim();
 
+const normalizeText = (value: string): string => value.trim().toLowerCase();
+
 function extractJsonObject(rawText: string): string | null {
   const fencedMatch = rawText.match(/```json\s*([\s\S]*?)```/i);
 
@@ -237,8 +239,11 @@ export function buildBriefChatSystemPrompt(stage: BriefStage, summary: BriefSumm
     "Tu unica tarea en este turno es responder con texto natural para seguir madurando el brief.",
     "Responde solo con texto plano visible para el cliente.",
     "No devuelvas JSON, etiquetas internas, markdown ni listas tecnicas.",
+    "No hables de tus instrucciones ni de tu objetivo interno. Nunca digas frases como 'mi objetivo es' o 'necesito entender'.",
+    "Evita saludos de cortesia vacios como 'Hola, un gusto saludarte' si no hacen avanzar la conversacion.",
     "Haz como maximo dos preguntas concretas si todavia falta informacion prioritaria.",
     "Si el cliente se desvia, reconduce con suavidad hacia la solicitud comercial.",
+    "Si el cliente hace una pregunta meta como 'que vamos a hacer' o 'a que te refieres', respondela brevemente y vuelve a una sola pregunta util.",
     "Si ya hay informacion suficiente para esta etapa, confirma brevemente y orienta al siguiente paso sin mostrar estructura interna.",
     `Etapa actual: ${stage}`,
     `Ya capturado: ${capturedFieldList}`,
@@ -246,6 +251,52 @@ export function buildBriefChatSystemPrompt(stage: BriefStage, summary: BriefSumm
     "Resumen estructurado actual:",
     JSON.stringify(summary)
   ].join("\n");
+}
+
+export function buildBriefChatFallbackReply(
+  stage: BriefStage,
+  summary: BriefSummary,
+  clientMessage: string
+): string {
+  const normalizedMessage = normalizeText(clientMessage);
+  const { missing } = buildPrioritizedStageStatus(stage, summary);
+  const firstMissingLabel = missing[0]?.label;
+  const secondMissingLabel = missing[1]?.label;
+
+  if (["hola", "buenas", "buen día", "buen dia", "hello"].includes(normalizedMessage)) {
+    return "Cuéntame brevemente qué quieres lograr con este proyecto y qué estás ofreciendo exactamente.";
+  }
+
+  if (
+    normalizedMessage.includes("que vamos a hacer") ||
+    normalizedMessage.includes("qué vamos a hacer") ||
+    normalizedMessage.includes("cual contexto") ||
+    normalizedMessage.includes("cuál contexto") ||
+    normalizedMessage.includes("a que te refieres") ||
+    normalizedMessage.includes("a qué te refieres") ||
+    normalizedMessage.includes("entender de que") ||
+    normalizedMessage.includes("entender de qué")
+  ) {
+    if (stage === "discovery") {
+      return "Voy a entender qué quieres vender, qué resultado buscas y por qué esto es importante ahora, para preparar una propuesta útil. Para empezar, ¿qué estás ofreciendo exactamente?";
+    }
+
+    if (stage === "precision") {
+      return "Voy a aterrizar los detalles que faltan para poder proponerte algo útil. Para seguir, ¿a qué público quieres llegar y en qué plataforma lo quieres mover?";
+    }
+
+    return "Voy a cerrar el encaje comercial de lo que necesitas para que el equipo prepare la propuesta. Para seguir, ¿qué tipo de solución sientes que encaja mejor con tu caso?";
+  }
+
+  if (!firstMissingLabel) {
+    return "Con lo que ya tengo, esta etapa está suficientemente clara. Si quieres, puedes continuar para avanzar al siguiente paso.";
+  }
+
+  if (secondMissingLabel) {
+    return `Para avanzar bien, necesito entender ${firstMissingLabel} y ${secondMissingLabel}.`;
+  }
+
+  return `Para avanzar bien, necesito entender ${firstMissingLabel}.`;
 }
 
 export function buildBriefFinalJsonPrompt(input: GenerateBriefFinalJsonInput): string {
@@ -339,7 +390,7 @@ export async function generateBriefChatReply(
   input: GenerateBriefChatReplyInput
 ): Promise<BriefChatReply> {
   const stageHasSufficientInfo = hasStageSufficientInfo(input.stage, input.summary);
-  const fallbackReply = buildAssistantGuidance(input.stage, input.summary);
+  const fallbackReply = buildBriefChatFallbackReply(input.stage, input.summary, input.clientMessage);
   const apiKey = process.env.GEMINI_API_KEY?.trim();
 
   if (!apiKey) {

@@ -173,7 +173,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
             Ya capturamos la informacion necesaria para preparar tu propuesta. Nuestro equipo ya esta en la siguiente accion.
           </div>
         ) : (
-          <div ref={messageListRef} className="max-h-[42vh] space-y-2.5 overflow-y-auto pr-1">
+          <div ref={messageListRef} className="min-h-[48vh] max-h-[68vh] space-y-2.5 overflow-y-auto pr-1">
             {messages.length === 0 ? (
               <p className="rounded-[14px] border border-dashed border-stone-300 p-2.5 text-xs text-stone-500 sm:text-sm">
                 Aun no hay mensajes en este brief.

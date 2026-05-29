@@ -15,6 +15,7 @@ import {
   statusFromStage
 } from "./briefing";
 import {
+  buildBriefChatFallbackReply,
   buildBriefChatSystemPrompt,
   buildDeterministicBriefFinalJson,
   generateBriefChatReply,
@@ -81,6 +82,21 @@ describe("briefing-assistant-ai", () => {
     expect(prompt).toContain("Etapa actual: discovery");
     expect(prompt).toContain("Aun falta: objetivo del proyecto, oferta principal, motivo del pedido, contexto del negocio");
     expect(prompt).toContain("No devuelvas JSON");
+    expect(prompt).toContain("Nunca digas frases como 'mi objetivo es' o 'necesito entender'.");
+  });
+
+  it("genera fallback natural cuando el cliente solo saluda", () => {
+    const reply = buildBriefChatFallbackReply("discovery", emptyStructuredBriefSummary(), "Hola");
+
+    expect(reply).toContain("qué quieres lograr");
+    expect(reply).toContain("qué estás ofreciendo");
+  });
+
+  it("genera fallback natural cuando el cliente hace una pregunta meta", () => {
+    const reply = buildBriefChatFallbackReply("discovery", emptyStructuredBriefSummary(), "que vamos a hacer?");
+
+    expect(reply).toContain("qué quieres vender");
+    expect(reply).toContain("propuesta útil");
   });
 
   it("postprocesa salida visible para limitar desborde y limpiar lineas vacias repetidas", () => {
