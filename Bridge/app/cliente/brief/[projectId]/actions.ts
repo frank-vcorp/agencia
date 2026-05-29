@@ -12,9 +12,15 @@ import {
   appendClientBriefMessage,
   buildAssistantGuidance,
   getBriefByProjectId,
-  submitBriefForOperatorReview
+  inferBriefSummaryPatchFromClientMessage,
+  submitBriefForOperatorReview,
+  updateBriefSummary
 } from "@/lib/briefing";
 
+/**
+ * IMPL-20260528-02
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260528-04_brief_chat_portal_cliente_v1.md
+ */
 export async function sendClientMessageAction(
   projectId: string,
   briefId: string,
@@ -33,16 +39,26 @@ export async function sendClientMessageAction(
   const currentVersion = brief?.currentVersion;
 
   if (currentVersion) {
+    const inferredPatch = inferBriefSummaryPatchFromClientMessage(
+      currentVersion.stage,
+      currentVersion.structuredSummary,
+      normalizedText
+    );
+    const nextVersion = Object.keys(inferredPatch).length
+      ? await updateBriefSummary({ briefId, versionId }, inferredPatch)
+      : currentVersion;
+
     await appendBriefMessage({
       briefId,
       versionId,
       authorRole: "assistant",
       actorLabel: "Bridge briefing",
-      messageText: buildAssistantGuidance(currentVersion.stage, currentVersion.structuredSummary),
-      stage: currentVersion.stage
+      messageText: buildAssistantGuidance(nextVersion.stage, nextVersion.structuredSummary),
+      stage: nextVersion.stage
     });
   }
 
+  revalidatePath(`/cliente/brief/${projectId}`);
   revalidatePath(`/cliente/proyecto/${projectId}`);
 }
 
@@ -52,6 +68,7 @@ export async function advanceStageAction(
   versionId: string
 ): Promise<void> {
   await advanceBriefStage({ briefId, versionId });
+  revalidatePath(`/cliente/brief/${projectId}`);
   revalidatePath(`/cliente/proyecto/${projectId}`);
 }
 
@@ -61,5 +78,6 @@ export async function submitBriefAction(
   versionId: string
 ): Promise<void> {
   await submitBriefForOperatorReview({ briefId, versionId });
+  revalidatePath(`/cliente/brief/${projectId}`);
   revalidatePath(`/cliente/proyecto/${projectId}`);
 }

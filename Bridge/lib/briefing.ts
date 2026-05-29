@@ -376,18 +376,251 @@ export function buildFinalSummaryText(summary: StructuredBriefSummary): string {
   return lines.join(" ");
 }
 
+/**
+ * IMPL-20260528-02
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260528-04_brief_chat_portal_cliente_v1.md
+ */
+function cleanHeuristicValue(value: string): string {
+  return value.replace(/\s+/g, " ").trim().replace(/^[,.:;\-\s]+/, "").replace(/[.?!\s]+$/, "");
+}
+
+function normalizeHeuristicText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractFirstMatch(messageText: string, patterns: RegExp[]): string {
+  for (const pattern of patterns) {
+    const match = messageText.match(pattern);
+    const candidate = cleanHeuristicValue(match?.[1] ?? "");
+
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return "";
+}
+
+function detectKeywordValue(
+  normalizedText: string,
+  options: Array<{ value: string; keywords: string[] }>
+): string {
+  for (const option of options) {
+    if (option.keywords.some((keyword) => normalizedText.includes(keyword))) {
+      return option.value;
+    }
+  }
+
+  return "";
+}
+
+function joinNaturalList(items: string[]): string {
+  if (items.length <= 1) {
+    return items[0] ?? "";
+  }
+
+  if (items.length === 2) {
+    return `${items[0]} y ${items[1]}`;
+  }
+
+  return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
+}
+
+/**
+ * IMPL-20260528-02
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260528-04_brief_chat_portal_cliente_v1.md
+ */
+export function inferBriefSummaryPatchFromClientMessage(
+  stage: BriefingStage,
+  currentSummary: StructuredBriefSummary,
+  messageText: string
+): Partial<StructuredBriefSummary> {
+  const normalizedMessage = cleanHeuristicValue(messageText);
+
+  if (!normalizedMessage) {
+    return {};
+  }
+
+  const normalizedText = normalizeHeuristicText(normalizedMessage);
+  const patch: Partial<StructuredBriefSummary> = {};
+
+  if (stage === "discovery") {
+    const projectObjective = extractFirstMatch(normalizedMessage, [
+      /(?:quiero|queremos|necesito|necesitamos|busco|buscamos|el objetivo es|objetivo)\s+([^.!?]+)/i,
+      /(?:para|con el fin de)\s+([^.!?]+)/i
+    ]);
+    const mainOffer = extractFirstMatch(normalizedMessage, [
+      /(?:ofrezco|ofrecemos|vendo|vendemos|brindo|brindamos)\s+([^.!?]+)/i,
+      /(?:nuestro|nuestra)\s+(?:producto|servicio|solucion|marca)\s+([^.!?]+)/i
+    ]);
+    const requestReason = extractFirstMatch(normalizedMessage, [
+      /(?:porque|por que|ya que|debido a que)\s+([^.!?]+)/i,
+      /(?:ahora|urgente|cuanto antes)\s+([^.!?]+)/i
+    ]);
+    const expectedResult = extractFirstMatch(normalizedMessage, [/(?:para|con la idea de|buscando)\s+([^.!?]+)/i]);
+
+    if (projectObjective) {
+      patch.projectObjective = projectObjective;
+    } else if (!currentSummary.projectObjective) {
+      patch.projectObjective = normalizedMessage;
+    }
+
+    if (mainOffer) {
+      patch.mainOffer = mainOffer;
+    }
+
+    if (requestReason) {
+      patch.requestReason = requestReason;
+    }
+
+    if (expectedResult) {
+      patch.expectedResult = expectedResult;
+    }
+
+    if (!currentSummary.businessContext) {
+      patch.businessContext = normalizedMessage;
+    }
+  }
+
+  if (stage === "precision") {
+    const audience = extractFirstMatch(normalizedMessage, [
+      /(?:para|dirigido a|enfocado en|orientado a)\s+([^.!?]+)/i,
+      /(?:nuestro publico|mi publico|cliente ideal)\s+([^.!?]+)/i
+    ]);
+    const deliverable = detectKeywordValue(normalizedText, [
+      { value: "landing page", keywords: ["landing", "landing page"] },
+      { value: "sitio web", keywords: ["sitio web", "pagina web", "web"] },
+      { value: "campana de anuncios", keywords: ["anuncio", "anuncios", "ads", "campana"] },
+      { value: "carrusel", keywords: ["carrusel"] },
+      { value: "video corto", keywords: ["video", "reel", "short"] },
+      { value: "brochure", keywords: ["brochure", "catalogo"] }
+    ]);
+    const platform = detectKeywordValue(normalizedText, [
+      { value: "Instagram", keywords: ["instagram"] },
+      { value: "Facebook", keywords: ["facebook"] },
+      { value: "TikTok", keywords: ["tiktok"] },
+      { value: "WhatsApp", keywords: ["whatsapp"] },
+      { value: "Google Ads", keywords: ["google ads", "google"] },
+      { value: "LinkedIn", keywords: ["linkedin"] },
+      { value: "Sitio web", keywords: ["sitio web", "pagina web", "web"] },
+      { value: "Email", keywords: ["email", "correo"] }
+    ]);
+    const cta = detectKeywordValue(normalizedText, [
+      { value: "agendar", keywords: ["agendar", "agenda", "reservar", "reserva"] },
+      { value: "comprar", keywords: ["comprar", "compra", "venta"] },
+      { value: "cotizar", keywords: ["cotizar", "cotizacion"] },
+      { value: "escribir por WhatsApp", keywords: ["whatsapp", "escribir"] },
+      { value: "registrarse", keywords: ["registrar", "registrarse", "inscribirse"] },
+      { value: "descargar", keywords: ["descargar"] }
+    ]);
+    const tone = detectKeywordValue(normalizedText, [
+      { value: "formal", keywords: ["formal", "sobrio"] },
+      { value: "cercano", keywords: ["cercano", "amigable"] },
+      { value: "tecnico", keywords: ["tecnico", "profesional"] },
+      { value: "premium", keywords: ["premium", "elegante"] },
+      { value: "urgente", keywords: ["urgente", "directo"] }
+    ]);
+    const urgency = detectKeywordValue(normalizedText, [
+      { value: "alta", keywords: ["urgente", "cuanto antes", "ya", "esta semana"] },
+      { value: "media", keywords: ["este mes", "pronto"] },
+      { value: "baja", keywords: ["sin apuro", "sin prisa", "luego"] }
+    ]);
+    const references = normalizedText.includes("referen") || normalizedText.includes("como ") ? normalizedMessage : "";
+    const restrictions =
+      normalizedText.includes("sin ") || normalizedText.includes("no ") || normalizedText.includes("evitar")
+        ? normalizedMessage
+        : "";
+
+    if (audience) {
+      patch.audience = audience;
+    }
+
+    if (platform) {
+      patch.platform = platform;
+    }
+
+    if (deliverable) {
+      patch.deliverable = deliverable;
+    }
+
+    if (cta) {
+      patch.cta = cta;
+    }
+
+    if (tone) {
+      patch.tone = tone;
+    }
+
+    if (urgency) {
+      patch.urgency = urgency;
+    }
+
+    if (references && !currentSummary.references) {
+      patch.references = references;
+    }
+
+    if (restrictions && !currentSummary.restrictions) {
+      patch.restrictions = restrictions;
+    }
+  }
+
+  if (stage === "commercial_fit") {
+    const recommendedProductSlotKey = detectKeywordValue(normalizedText, [
+      { value: "campana", keywords: ["campana", "ads", "anuncios"] },
+      { value: "presencia", keywords: ["sitio web", "pagina web", "presencia"] },
+      { value: "contenido", keywords: ["contenido", "reels", "carrusel", "video"] },
+      { value: "lanzamiento", keywords: ["lanzamiento", "lanzar"] }
+    ]);
+
+    if (recommendedProductSlotKey) {
+      patch.recommendedProductSlotKey = recommendedProductSlotKey;
+    }
+
+    if (!currentSummary.commercialFitReason) {
+      patch.commercialFitReason = normalizedMessage;
+    }
+
+    if (normalizedText.includes("revis") || normalizedText.includes("validar")) {
+      patch.operatorReviewNote = normalizedMessage;
+    }
+  }
+
+  return patch;
+}
+
 export function buildAssistantGuidance(stage: BriefingStage, summary: StructuredBriefSummary): string {
   if (stage === "discovery") {
-    return "Cuéntame qué quieres lograr con este proyecto, qué estás ofreciendo y por qué ahora es importante moverlo.";
+    const openPoints = [
+      summary.projectObjective ? "" : "que quieres lograr con este proyecto",
+      summary.mainOffer ? "" : "que estas ofreciendo exactamente",
+      summary.requestReason ? "" : "por que ahora es importante moverlo",
+      summary.businessContext ? "" : "el contexto actual del negocio"
+    ].filter(Boolean);
+
+    if (openPoints.length === 4) {
+      return "Cuentame que quieres lograr con este proyecto, que estas ofreciendo y por que ahora es importante moverlo.";
+    }
+
+    if (openPoints.length === 0) {
+      return "Ya tengo la base del proyecto. Si quieres, agrega un matiz mas o continua a la siguiente etapa para aterrizar publico, canal y entregable.";
+    }
+
+    return `Ya capte parte del contexto. Ahora necesito ${joinNaturalList(openPoints)}.`;
   }
 
   if (stage === "precision") {
     const openPoints = [summary.audience ? "" : "publico", summary.platform ? "" : "plataforma", summary.deliverable ? "" : "entregable", summary.cta ? "" : "CTA"]
       .filter(Boolean)
-      .join(", ");
+      ;
 
-    return openPoints
-      ? `Ya tengo la base. Ahora necesito aterrizar ${openPoints} para que el brief quede utilizable por produccion y cotizacion.`
+    return openPoints.length
+      ? `Ya tengo la base. Ahora necesito aterrizar ${joinNaturalList(openPoints)} para que el brief quede utilizable por produccion y cotizacion.`
       : "Ya tenemos base suficiente. Precisa tono, restricciones, referencias y tiempos para consolidar esta etapa.";
   }
 
