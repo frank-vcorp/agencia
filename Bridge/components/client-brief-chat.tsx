@@ -1,6 +1,8 @@
 "use client";
 
 /**
+ * IMPL-20260602-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260602-01_brief_cliente_conversacion_primero_y_procesado_unico_al_cierre_v1.md
  * IMPL-20260529-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260529-08_historial_optimista_y_tono_mas_natural_v1.md
  * FIX-20260528-01: Envio con Enter y timestamp corto por mensaje.
@@ -24,7 +26,7 @@ type OptimisticClientMessage = BriefMessage & {
 };
 
 function stageCopy(stage: BriefRecord["status"]): string {
-  if (stage === "stage_1_discovery") return "Cuentanos que quieres mover y te iremos guiando en la conversacion.";
+  if (stage === "stage_1_discovery") return "Cuentanos que quieres mover y Vika te ira guiando con preguntas claras.";
   if (stage === "stage_2_precision") return "Ya tenemos contexto. Ahora estamos aterrizando los detalles clave de la propuesta.";
   if (stage === "stage_3_commercial_fit") return "Estamos cerrando el mejor encaje para que tu propuesta salga bien enfocada.";
   if (stage === "pending_operator_review" || stage === "operator_review_in_progress") {
@@ -274,7 +276,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
       <section className="panel rounded-[22px] px-4 py-3">
         <p className="text-sm font-semibold text-[color:var(--ink)]">Como trabajamos esta conversacion</p>
         <p className="mt-2 text-sm text-[color:var(--muted)]">
-          Tu conversacion se va estructurando en segundo plano para que el equipo prepare una propuesta clara, sin obligarte a llenar un formulario paso a paso.
+          Tu conversacion queda guardada tal como la compartes. Al cerrar el brief, el equipo la procesa en una sola revision interna para preparar la propuesta.
         </p>
       </section>
     </div>

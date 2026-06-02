@@ -1,15 +1,15 @@
 "use server";
 
 /**
+ * IMPL-20260602-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260602-01_brief_cliente_conversacion_primero_y_procesado_unico_al_cierre_v1.md
  * IMPL-20260529-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
  */
 import { revalidatePath } from "next/cache";
 
 import {
-  buildFinalSummaryText,
   advanceBriefStage,
-  advanceBriefStageInBackground,
   appendBriefMessage,
   appendClientBriefMessage,
   getBriefByProjectId,
@@ -18,32 +18,8 @@ import {
 } from "@/lib/briefing";
 import {
   generateBriefChatReply,
-  generateBriefFinalJson,
-  hasStageSufficientInfo,
-  isBriefReadyForProposal
+  generateBriefClosureArtifacts
 } from "@/lib/briefing-assistant-ai";
-
-/**
- * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
- */
-async function syncBackgroundStages(
-  briefId: string,
-  versionId: string,
-  stageVersion: Awaited<ReturnType<typeof updateBriefSummary>>
-) {
-  let currentVersion = stageVersion;
-
-  while (hasStageSufficientInfo(currentVersion.stage, currentVersion.structuredSummary)) {
-    if (currentVersion.stage === "commercial_fit") {
-      return currentVersion;
-    }
-
-    currentVersion = await advanceBriefStageInBackground({ briefId, versionId });
-  }
-
-  return currentVersion;
-}
 
 /**
  * IMPL-20260529-01
@@ -66,16 +42,15 @@ export async function sendClientMessageAction(
   const brief = await getBriefByProjectId(projectId);
   const currentVersion = brief?.currentVersion;
 
-  if (currentVersion) {
+  if (currentVersion?.id === versionId) {
     const aiReply = await generateBriefChatReply({
       stage: currentVersion.stage,
-      summary: currentVersion.structuredSummary,
+      messages: currentVersion.messages.map((message) => ({
+        authorRole: message.authorRole,
+        messageText: message.messageText
+      })),
       clientMessage: normalizedText
     });
-    const nextVersion = Object.keys(aiReply.summaryPatch).length
-      ? await updateBriefSummary({ briefId, versionId }, aiReply.summaryPatch)
-      : currentVersion;
-    const runtimeVersion = await syncBackgroundStages(briefId, versionId, nextVersion);
 
     await appendBriefMessage({
       briefId,
@@ -83,27 +58,8 @@ export async function sendClientMessageAction(
       authorRole: "assistant",
       actorLabel: "Bridge briefing",
       messageText: aiReply.visibleReply,
-      stage: runtimeVersion.stage
+      stage: currentVersion.stage
     });
-
-    if (
-      runtimeVersion.stage === "commercial_fit" &&
-      hasStageSufficientInfo(runtimeVersion.stage, runtimeVersion.structuredSummary) &&
-      isBriefReadyForProposal(runtimeVersion.structuredSummary)
-    ) {
-      const finalBriefJson = await generateBriefFinalJson({
-        stage: runtimeVersion.stage,
-        summary: runtimeVersion.structuredSummary,
-        messages: runtimeVersion.messages
-      });
-
-      const finalSummaryPatch = {
-        operatorReviewNote: JSON.stringify(finalBriefJson)
-      };
-
-      await updateBriefSummary({ briefId, versionId }, finalSummaryPatch);
-      await submitBriefForOperatorReview({ briefId, versionId });
-    }
   }
 
   revalidatePath(`/cliente/brief/${projectId}`);
@@ -129,21 +85,20 @@ export async function submitBriefAction(
   const currentVersion = brief?.currentVersion;
 
   if (currentVersion?.id === versionId) {
-    const finalBriefJson = await generateBriefFinalJson({
+    const closureArtifacts = await generateBriefClosureArtifacts({
       stage: currentVersion.stage,
       summary: currentVersion.structuredSummary,
-      messages: currentVersion.messages
+      messages: currentVersion.messages.map((message) => ({
+        authorRole: message.authorRole,
+        messageText: message.messageText
+      }))
     });
-
-    const finalSummaryText = buildFinalSummaryText(currentVersion.structuredSummary);
 
     await updateBriefSummary(
       { briefId, versionId },
       {
-        operatorReviewNote: JSON.stringify(finalBriefJson),
-        commercialFitReason:
-          currentVersion.structuredSummary.commercialFitReason ||
-          `Cierre interno listo para propuesta. ${finalSummaryText}`
+        ...closureArtifacts.finalSummaryPatch,
+        operatorReviewNote: JSON.stringify(closureArtifacts.finalJson)
       }
     );
   }

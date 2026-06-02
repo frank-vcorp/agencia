@@ -1,4 +1,6 @@
 /**
+ * IMPL-20260602-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260602-01_brief_cliente_conversacion_primero_y_procesado_unico_al_cierre_v1.md
  * IMPL-20260529-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260529-08_historial_optimista_y_tono_mas_natural_v1.md
  */
@@ -1312,12 +1314,11 @@ export async function submitBriefForOperatorReview(context: MutationContext): Pr
 
   const summary = normalizeSummary(version.structured_summary_json);
   const missing = getCriticalMissingFields(summary);
-
-  if (missing.length > 0) {
-    throw new Error(`missing_required_fields:${missing.join(",")}`);
-  }
-
-  const finalSummaryText = buildFinalSummaryText(summary);
+  const finalSummaryBase = buildFinalSummaryText(summary);
+  const finalSummaryText =
+    missing.length > 0 && !summary.gaps
+      ? `${finalSummaryBase} Faltantes detectados al cierre: ${joinNaturalList(missing)}.`.trim()
+      : finalSummaryBase;
   const brief = await getBriefRowById(context.briefId);
 
   if (!brief) {

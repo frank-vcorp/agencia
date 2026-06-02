@@ -161,6 +161,7 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 11. `ARCH-20260529-06` autorizado: reescritura controlada del runtime del chat brief cliente para eliminar loops de aclaración, unificar apertura y ocultar labels internas al cliente, con alcance tecnico acotado a 4 archivos.
 12. `ARCH-20260529-07` autorizado: redefinir el brief cliente como conversación adaptativa guiada por prompt con etapas en background y sin dependencia visible de heurística ni cambio manual de etapa, con alcance tecnico acotado a 5 archivos.
 13. `ARCH-20260529-08` autorizado: mejorar el historial optimista del chat cliente y suavizar el tono visible de Vika sin reabrir el rediseño general del runtime, con alcance tecnico acotado a 4 archivos.
+14. `ARCH-20260602-01` autorizado: redefinir el brief cliente como conversación guiada por prompt con persistencia exclusiva de mensajes durante el chat y procesamiento estructurado unico al cierre, con alcance tecnico acotado a 5 archivos.
 
 ### [ ] Pendiente
 

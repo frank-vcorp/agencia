@@ -1,4 +1,6 @@
 /**
+ * IMPL-20260602-01
+ * Respaldo: context/SPECs/SPEC_ARCH-20260602-01_brief_cliente_conversacion_primero_y_procesado_unico_al_cierre_v1.md
  * IMPL-20260529-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260529-08_historial_optimista_y_tono_mas_natural_v1.md
  */
@@ -20,6 +22,7 @@ import {
 import {
   buildBriefChatSystemPrompt,
   buildDeterministicBriefFinalJson,
+  generateBriefClosureArtifacts,
   generateBriefChatReply,
   generateBriefFinalJson,
   hasStageSufficientInfo,
@@ -111,14 +114,18 @@ describe("briefing", () => {
 });
 
 describe("briefing-assistant-ai", () => {
-  it("incluye reglas de chat natural y etapa actual en el prompt de conversacion", () => {
-    const prompt = buildBriefChatSystemPrompt("discovery", emptyStructuredBriefSummary());
+  it("incluye reglas de chat natural, agenda interna y historial en el prompt de conversacion", () => {
+    const prompt = buildBriefChatSystemPrompt("discovery", [
+      { authorRole: "client", messageText: "Quiero mover una mentoria premium" }
+    ]);
 
     expect(prompt).toContain("Responde solo con texto plano visible para el cliente.");
     expect(prompt).toContain("Etapa actual: discovery");
-    expect(prompt).toContain("Aun falta: objetivo del proyecto, oferta principal, motivo del pedido, contexto del negocio");
+    expect(prompt).toContain("Agenda interna prioritaria: objetivo del proyecto, oferta principal, motivo del pedido, contexto del negocio");
+    expect(prompt).toContain("Historial reciente:");
+    expect(prompt).toContain("Cliente: Quiero mover una mentoria premium");
     expect(prompt).toContain("No devuelvas JSON");
-    expect(prompt).toContain("Usa el resumen estructurado solo como contexto silencioso");
+    expect(prompt).not.toContain("summaryPatch");
     expect(prompt).toContain("Nunca digas frases como 'mi objetivo es' o 'necesito entender'.");
     expect(prompt).toContain("evita sentirse robotica o demasiado ensayada");
   });
@@ -167,74 +174,16 @@ describe("briefing-assistant-ai", () => {
 
     const result = await generateBriefChatReply({
       stage: "discovery",
-      summary: emptyStructuredBriefSummary(),
+      messages: [],
       clientMessage: "Necesito ayuda para definir mi oferta"
     });
 
-    expect(result.summaryPatch).toEqual({});
     expect(result.visibleReply).toContain("Se interrumpio este turno");
 
     vi.unstubAllEnvs();
   });
 
-  it("retorna una respuesta natural y un summaryPatch cuando Gemini responde JSON valido", async () => {
-    vi.stubEnv("GEMINI_API_KEY", "fake-key");
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          candidates: [
-            {
-              finishReason: "STOP",
-              content: {
-                parts: [
-                  {
-                    text: "Entendido, el foco es cambio de aceite y mantenimiento preventivo. ¿Qué los impulsa a mover esta línea justo ahora?"
-                  }
-                ]
-              }
-            }
-          ]
-        })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          candidates: [
-            {
-              finishReason: "STOP",
-              content: {
-                parts: [
-                  {
-                    text: JSON.stringify({
-                      summaryPatch: {
-                        mainOffer: "Cambio de aceite y mantenimiento preventivo"
-                      }
-                    })
-                  }
-                ]
-              }
-            }
-          ]
-        })
-      });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const result = await generateBriefChatReply({
-      stage: "discovery",
-      summary: emptyStructuredBriefSummary(),
-      clientMessage: "Queremos mover cambio de aceite y mantenimiento preventivo"
-    });
-
-    expect(result.visibleReply).toContain("cambio de aceite");
-    expect(result.summaryPatch.mainOffer).toContain("Cambio de aceite");
-    expect(result.stageHasSufficientInfo).toBe(false);
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
-  });
-
-  it("acepta una respuesta de texto plano del modelo cuando no trae JSON estructurado", async () => {
+  it("retorna una respuesta natural con una sola llamada visible por turno", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -257,13 +206,46 @@ describe("briefing-assistant-ai", () => {
 
     const result = await generateBriefChatReply({
       stage: "discovery",
-      summary: emptyStructuredBriefSummary(),
+      messages: [
+        { authorRole: "client", messageText: "Queremos mover cambio de aceite y mantenimiento preventivo" }
+      ],
       clientMessage: "Queremos mover cambio de aceite y mantenimiento preventivo"
     });
 
     expect(result.visibleReply).toContain("cambio de aceite");
-    expect(result.summaryPatch).toEqual({});
-    expect(result.stageHasSufficientInfo).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("acepta una respuesta de texto plano del modelo sin depender de JSON estructurado", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "fake-key");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            finishReason: "STOP",
+            content: {
+              parts: [
+                {
+                  text: "Entendido, el foco es cambio de aceite y mantenimiento preventivo. ¿Qué los impulsa a mover esta línea justo ahora?"
+                }
+              ]
+            }
+          }
+        ]
+      })
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateBriefChatReply({
+      stage: "discovery",
+      messages: [],
+      clientMessage: "Queremos mover cambio de aceite y mantenimiento preventivo"
+    });
+
+    expect(result.visibleReply).toContain("cambio de aceite");
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
@@ -294,11 +276,10 @@ describe("briefing-assistant-ai", () => {
 
     const result = await generateBriefChatReply({
       stage: "discovery",
-      summary: emptyStructuredBriefSummary(),
+      messages: [],
       clientMessage: "Quiero captar leads"
     });
 
-    expect(result.summaryPatch).toEqual({});
     expect(result.visibleReply).toContain("Se interrumpio este turno");
 
     vi.unstubAllGlobals();
@@ -331,11 +312,10 @@ describe("briefing-assistant-ai", () => {
 
     const result = await generateBriefChatReply({
       stage: "discovery",
-      summary: emptyStructuredBriefSummary(),
+      messages: [],
       clientMessage: "Quiero lanzar una campana"
     });
 
-    expect(result.summaryPatch).toEqual({});
     expect(result.visibleReply).toContain("Se interrumpio este turno");
 
     vi.unstubAllGlobals();
@@ -368,11 +348,10 @@ describe("briefing-assistant-ai", () => {
 
     const result = await generateBriefChatReply({
       stage: "precision",
-      summary: emptyStructuredBriefSummary(),
+      messages: [],
       clientMessage: "Necesito una landing para vender"
     });
 
-    expect(result.summaryPatch).toEqual({});
     expect(result.visibleReply).toContain("Se interrumpio este turno");
 
     vi.unstubAllGlobals();
@@ -386,11 +365,10 @@ describe("briefing-assistant-ai", () => {
 
     const result = await generateBriefChatReply({
       stage: "precision",
-      summary: emptyStructuredBriefSummary(),
+      messages: [],
       clientMessage: "Mi servicio es una mentoria"
     });
 
-    expect(result.summaryPatch).toEqual({});
     expect(result.visibleReply).toContain("Se interrumpio este turno");
 
     vi.unstubAllGlobals();
@@ -445,6 +423,83 @@ describe("briefing-assistant-ai", () => {
 
     expect(result.projectObjective).toBe("Captar leads");
     expect(result.proposalReadiness).toBe("low");
+    vi.unstubAllEnvs();
+  });
+
+  it("convierte el procesamiento final en un solo patch estructurado al cierre", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "fake-key");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            finishReason: "STOP",
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    projectObjective: "Captar leads calificados",
+                    mainOffer: "Mentoria premium",
+                    businessContext: "Negocio con ventas organicas sin sistema comercial estable",
+                    requestReason: "Necesitan acelerar cierres este trimestre",
+                    audience: "Fundadores de pymes",
+                    platform: "Landing y WhatsApp",
+                    deliverable: "Sistema de captacion con pagina corta",
+                    cta: "Agendar llamada",
+                    tone: "Claro y confiable",
+                    restrictions: "Sin promesas exageradas",
+                    references: "Competidores del nicho",
+                    urgency: "Lanzar este mes",
+                    commercialFitReason: "El caso requiere ordenar oferta, mensaje y conversion.",
+                    recommendedProductSlotKey: "slot_lanzamiento",
+                    operatorReviewNote: "Revisar pricing antes de enviar propuesta.",
+                    proposalReadiness: "medium",
+                    missingCriticalData: ["detalle de presupuesto"]
+                  })
+                }
+              ]
+            }
+          }
+        ]
+      })
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateBriefClosureArtifacts({
+      stage: "commercial_fit",
+      summary: emptyStructuredBriefSummary(),
+      messages: [
+        { authorRole: "client", messageText: "Quiero captar leads para una mentoria premium" },
+        { authorRole: "assistant", messageText: "Perfecto, cuentame a quien quieres atraer primero." }
+      ]
+    });
+
+    expect(result.finalJson.mainOffer).toBe("Mentoria premium");
+    expect(result.finalSummaryPatch.mainOffer).toBe("Mentoria premium");
+    expect(result.finalSummaryPatch.gaps).toContain("detalle de presupuesto");
+    expect(result.finalSummaryPatch.operatorReviewNote).toContain("Readiness: medium");
+
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("mantiene viable el cierre aunque falle el procesador final, sin tocar la conversacion previa", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "fake-key");
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
+    vi.stubGlobal("fetch", fetchMock);
+    const messages = [{ authorRole: "client" as const, messageText: "Necesito una landing para vender" }];
+
+    const result = await generateBriefClosureArtifacts({
+      stage: "precision",
+      summary: emptyStructuredBriefSummary(),
+      messages
+    });
+
+    expect(messages).toEqual([{ authorRole: "client", messageText: "Necesito una landing para vender" }]);
+    expect(result.finalJson.proposalReadiness).toBe("low");
+    expect(result.finalSummaryPatch.operatorReviewNote).toContain("Faltantes detectados al cierre");
+
+    vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 });
