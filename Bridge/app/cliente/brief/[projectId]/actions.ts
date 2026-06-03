@@ -1,6 +1,8 @@
 "use server";
 
 /**
+ * IMPL-20260603-03
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-03_memoria_conversacional_incremental_y_control_antirepeticion_brief_v1.md
  * IMPL-20260603-02
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-02_cierre_brief_doble_salida_humano_raw_y_agenda_performance_v1.md
  * IMPL-20260603-01
@@ -13,10 +15,13 @@
 import { revalidatePath } from "next/cache";
 
 import {
+  advanceBriefStageInBackground,
   advanceBriefStage,
   appendBriefMessage,
   appendClientBriefMessage,
   getBriefByProjectId,
+  hasBackgroundStageSufficientInfo,
+  inferBriefSummaryPatchFromClientMessage,
   submitBriefForOperatorReview,
   updateBriefSummary
 } from "@/lib/briefing";
@@ -26,6 +31,8 @@ import {
 } from "@/lib/briefing-assistant-ai";
 
 /**
+ * IMPL-20260603-03
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-03_memoria_conversacional_incremental_y_control_antirepeticion_brief_v1.md
  * IMPL-20260529-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260529-01_brief_cliente_doble_capa_conversacional_v1.md
  */
@@ -44,16 +51,41 @@ export async function sendClientMessageAction(
   await appendClientBriefMessage({ briefId, versionId }, normalizedText);
 
   const brief = await getBriefByProjectId(projectId);
-  const currentVersion = brief?.currentVersion;
+  let currentVersion = brief?.currentVersion;
 
   if (currentVersion?.id === versionId) {
+    const summaryPatch = inferBriefSummaryPatchFromClientMessage(
+      currentVersion.stage,
+      currentVersion.structuredSummary,
+      normalizedText
+    );
+    const hasSummaryPatch = Object.keys(summaryPatch).length > 0;
+
+    if (hasSummaryPatch) {
+      currentVersion = await updateBriefSummary({ briefId, versionId }, summaryPatch);
+    }
+
+    if (
+      currentVersion.stage !== "commercial_fit" &&
+      hasBackgroundStageSufficientInfo(currentVersion.stage, currentVersion.structuredSummary)
+    ) {
+      await advanceBriefStageInBackground({ briefId, versionId });
+
+      const refreshedBrief = await getBriefByProjectId(projectId);
+
+      if (refreshedBrief?.currentVersion?.id === versionId) {
+        currentVersion = refreshedBrief.currentVersion;
+      }
+    }
+
     const aiReply = await generateBriefChatReply({
       stage: currentVersion.stage,
       messages: currentVersion.messages.map((message) => ({
         authorRole: message.authorRole,
         messageText: message.messageText
       })),
-      clientMessage: normalizedText
+      clientMessage: normalizedText,
+      summary: currentVersion.structuredSummary
     });
 
     if (!aiReply.degraded) {

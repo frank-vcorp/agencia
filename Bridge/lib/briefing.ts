@@ -1,4 +1,6 @@
 /**
+ * IMPL-20260603-03
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-03_memoria_conversacional_incremental_y_control_antirepeticion_brief_v1.md
  * IMPL-20260603-02
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-02_cierre_brief_doble_salida_humano_raw_y_agenda_performance_v1.md
  * IMPL-20260603-01
@@ -549,6 +551,33 @@ const FIELD_COMPLETION_RULES: Partial<
 
 const GENERIC_SUMMARY_VALUES = new Set(["hola", "buenas", "gracias", "si", "no", "ok", "dale", "listo"]);
 
+const HEURISTIC_PLATFORM_OPTIONS = [
+  { value: "Instagram", keywords: ["instagram", "ig", "reels"] },
+  { value: "WhatsApp", keywords: ["whatsapp", "whats", "wa"] },
+  { value: "Landing", keywords: ["landing", "pagina", "página", "sitio web", "sitio", "web"] },
+  { value: "Facebook", keywords: ["facebook", "meta ads", "meta"] },
+  { value: "TikTok", keywords: ["tiktok", "tik tok"] },
+  { value: "Email", keywords: ["email", "correo", "mail"] },
+  { value: "Google Ads", keywords: ["google ads", "google", "search"] }
+];
+
+const HEURISTIC_DELIVERABLE_OPTIONS = [
+  { value: "Landing", keywords: ["landing", "pagina", "página", "sitio", "web"] },
+  { value: "Campana publicitaria", keywords: ["campana", "campaña", "ads", "anuncios", "publicidad"] },
+  { value: "Piezas graficas", keywords: ["piezas", "creativos", "grafica", "gráfica", "banners"] },
+  { value: "Video", keywords: ["video", "reel", "spot"] },
+  { value: "Secuencia de mensajes", keywords: ["secuencia", "mensajes", "whatsapp", "follow up"] },
+  { value: "Cotizacion comercial", keywords: ["cotizacion", "cotización", "propuesta"] }
+];
+
+const HEURISTIC_CTA_OPTIONS = [
+  { value: "Agendar llamada", keywords: ["agendar", "agenda", "llamada", "reunion", "reunión", "cita"] },
+  { value: "Escribir por WhatsApp", keywords: ["whatsapp", "escribir", "mensaje"] },
+  { value: "Solicitar cotizacion", keywords: ["cotizacion", "cotización", "cotizar", "presupuesto"] },
+  { value: "Comprar", keywords: ["comprar", "pagar"] },
+  { value: "Registrarse", keywords: ["registrarse", "registro", "inscribirse", "inscripcion", "inscripción"] }
+];
+
 function countWords(value: string): number {
   return value
     .trim()
@@ -589,6 +618,174 @@ export function hasMeaningfulSummaryValue(
   }
 
   return true;
+}
+
+function extractProjectObjectiveCandidate(messageText: string, normalizedText: string): string {
+  return (
+    extractFirstMatch(messageText, [
+      /(?:objetivo|meta|resultado(?:\s+principal)?)\s+(?:es|seria|sería)?\s*([^.;\n]+)/i,
+      /(?:queremos|buscamos|necesitamos)\s+((?:captar|generar|vender|agendar|llenar|posicionar|activar|conseguir|lanzar)[^.;\n]+)/i,
+      /((?:captar|generar|vender|agendar|llenar|posicionar|activar|conseguir|lanzar)[^.;\n]+)/i
+    ]) ||
+    detectKeywordValue(normalizedText, [
+      { value: "Generar leads calificados", keywords: ["leads", "prospectos"] },
+      { value: "Agendar citas", keywords: ["citas", "agendar"] },
+      { value: "Vender mas", keywords: ["vender", "ventas"] },
+      { value: "Lanzar una oferta", keywords: ["lanzar", "preventa"] }
+    ])
+  );
+}
+
+function extractMainOfferCandidate(messageText: string): string {
+  return extractFirstMatch(messageText, [
+    /(?:servicio|producto|oferta|linea|línea|frente)\s+(?:principal\s+)?(?:es|son)?\s*([^.;\n]+)/i,
+    /(?:quiero|queremos|busco|buscamos|necesito|necesitamos)\s+(?:mover|vender|impulsar|promocionar|lanzar)\s+([^.;\n]+)/i,
+    /(?:ofrecemos|vendo|vendemos)\s+([^.;\n]+)/i
+  ]);
+}
+
+function extractBusinessContextCandidate(messageText: string): string {
+  return extractFirstMatch(messageText, [
+    /(?:hoy|actualmente|ahora)\s+([^.;\n]+)/i,
+    /(?:venimos|hasta ahora|ya)\s+([^.;\n]+)/i,
+    /(?:somos|tenemos)\s+([^.;\n]+)/i
+  ]);
+}
+
+function extractRequestReasonCandidate(messageText: string): string {
+  return extractFirstMatch(messageText, [
+    /(?:porque|por que|ya que|debido a que)\s+([^.;\n]+)/i,
+    /(?:nos urge|me urge|urge|nos importa ahora|me importa ahora)\s+([^.;\n]+)/i,
+    /(?:la necesidad|este pedido|esto)\s+(?:nace|viene)\s+de\s+([^.;\n]+)/i
+  ]);
+}
+
+function extractAudienceCandidate(messageText: string): string {
+  return extractFirstMatch(messageText, [
+    /(?:publico|público|audiencia|cliente(?:s)? ideal(?:es)?)\s+(?:principal|objetivo)?\s*(?:es|son)?\s*([^.;\n]+)/i,
+    /(?:dirigido|enfocado|orientado)\s+a\s+([^.;\n]+)/i,
+    /(?:para)\s+((?:personas|empresas|negocios|duenos?|dueños?|madres?|padres?|pacientes?|equipos|profesionales|marcas)[^.;\n]*)/i
+  ]);
+}
+
+function extractPlatformCandidate(messageText: string, normalizedText: string): string {
+  return (
+    detectKeywordValue(normalizedText, HEURISTIC_PLATFORM_OPTIONS) ||
+    extractFirstMatch(messageText, [
+      /(?:canal|plataforma)\s+(?:principal\s+)?(?:es|seria|sería)?\s*([^.;\n]+)/i,
+      /(?:en|por|via|vía)\s+([^.;\n]+(?:instagram|whatsapp|landing|facebook|tiktok|email|google)[^.;\n]*)/i
+    ])
+  );
+}
+
+function extractDeliverableCandidate(messageText: string, normalizedText: string): string {
+  return (
+    extractFirstMatch(messageText, [
+      /(?:necesitamos|quiero|queremos|busco|buscamos)\s+(?:una|un|unos|unas)?\s*(landing|campana|campaña|video|sitio web|pagina|página|cotizacion|cotización|propuesta|secuencia de mensajes|piezas graficas|piezas gráficas)/i,
+      /(?:pieza|entregable|solucion|solución)\s+(?:principal\s+)?(?:es|seria|sería)?\s*([^.;\n]+)/i
+    ]) || detectKeywordValue(normalizedText, HEURISTIC_DELIVERABLE_OPTIONS)
+  );
+}
+
+function extractCtaCandidate(messageText: string, normalizedText: string): string {
+  return (
+    extractFirstMatch(messageText, [
+      /(?:cta|accion|acción)\s+(?:principal\s+)?(?:es|seria|sería)?\s*([^.;\n]+)/i,
+      /(?:queremos|quiero|busco|buscamos)\s+que\s+(?:la gente|las personas|el cliente)\s+([^.;\n]+)/i
+    ]) || detectKeywordValue(normalizedText, HEURISTIC_CTA_OPTIONS)
+  );
+}
+
+function extractCommercialFitReasonCandidate(messageText: string): string {
+  return extractFirstMatch(messageText, [
+    /(?:nos hace sentido|hace sentido|conviene|encaja)\s+([^.;\n]+)/i,
+    /(?:porque|por que|ya que)\s+([^.;\n]+)/i,
+    /(?:la mejor opcion|la mejor opción|lo mejor)\s+(?:es|seria|sería)?\s*([^.;\n]+)/i
+  ]);
+}
+
+function shouldApplySummaryCandidate(
+  field: keyof StructuredBriefSummary,
+  currentValue: string,
+  candidateValue: string
+): boolean {
+  const nextValue = cleanHeuristicValue(candidateValue);
+
+  if (!hasMeaningfulSummaryValue(field, nextValue)) {
+    return false;
+  }
+
+  const current = cleanHeuristicValue(currentValue);
+
+  if (!hasMeaningfulSummaryValue(field, current)) {
+    return true;
+  }
+
+  const normalizedCurrent = normalizeHeuristicText(current);
+  const normalizedNext = normalizeHeuristicText(nextValue);
+
+  if (!normalizedNext || normalizedCurrent === normalizedNext) {
+    return false;
+  }
+
+  if (normalizedNext.includes(normalizedCurrent) && nextValue.length > current.length + 4) {
+    return true;
+  }
+
+  return nextValue.length >= current.length + 12 && countWords(nextValue) >= countWords(current) + 1;
+}
+
+/**
+ * IMPL-20260603-03
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-03_memoria_conversacional_incremental_y_control_antirepeticion_brief_v1.md
+ */
+export function inferBriefSummaryPatchFromClientMessage(
+  stage: BriefingStage,
+  currentSummary: StructuredBriefSummary,
+  messageText: string
+): Partial<StructuredBriefSummary> {
+  const cleanedMessage = cleanHeuristicValue(messageText);
+
+  if (!cleanedMessage) {
+    return {};
+  }
+
+  const summary = normalizeSummary(currentSummary);
+  const normalizedText = normalizeHeuristicText(cleanedMessage);
+  const fieldOrder = Array.from(
+    new Set<keyof StructuredBriefSummary>([
+      ...STAGE_FIELD_PRIORITY[stage],
+      "audience",
+      "platform",
+      "deliverable",
+      "cta",
+      "commercialFitReason"
+    ])
+  );
+  const candidateByField: Partial<Record<keyof StructuredBriefSummary, string>> = {
+    projectObjective: extractProjectObjectiveCandidate(cleanedMessage, normalizedText),
+    mainOffer: extractMainOfferCandidate(cleanedMessage),
+    businessContext: extractBusinessContextCandidate(cleanedMessage),
+    requestReason: extractRequestReasonCandidate(cleanedMessage),
+    audience: extractAudienceCandidate(cleanedMessage),
+    platform: extractPlatformCandidate(cleanedMessage, normalizedText),
+    deliverable: extractDeliverableCandidate(cleanedMessage, normalizedText),
+    cta: extractCtaCandidate(cleanedMessage, normalizedText),
+    commercialFitReason: extractCommercialFitReasonCandidate(cleanedMessage)
+  };
+  const patch: Partial<StructuredBriefSummary> = {};
+
+  for (const field of fieldOrder) {
+    const candidate = candidateByField[field];
+
+    if (!candidate || !shouldApplySummaryCandidate(field, summary[field], candidate)) {
+      continue;
+    }
+
+    patch[field] = cleanHeuristicValue(candidate);
+  }
+
+  return patch;
 }
 
 /**

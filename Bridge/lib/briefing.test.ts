@@ -1,4 +1,6 @@
 /**
+ * IMPL-20260603-03
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-03_memoria_conversacional_incremental_y_control_antirepeticion_brief_v1.md
  * IMPL-20260603-02
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-02_cierre_brief_doble_salida_humano_raw_y_agenda_performance_v1.md
  * IMPL-20260603-01
@@ -18,6 +20,7 @@ import {
   getCriticalMissingFields,
   hasBackgroundStageSufficientInfo,
   hasMeaningfulSummaryValue,
+  inferBriefSummaryPatchFromClientMessage,
   mergeStructuredBriefSummary,
   nextStage,
   selectPreferredProject,
@@ -100,6 +103,31 @@ describe("briefing", () => {
     expect(hasBackgroundStageSufficientInfo("discovery", summary)).toBe(true);
   });
 
+  it("infiera patch incremental desde un mensaje cliente con senales claras tipo Rodamax", () => {
+    const patch = inferBriefSummaryPatchFromClientMessage(
+      "discovery",
+      emptyStructuredBriefSummary(),
+      "Queremos mover cambio de aceite y mantenimiento preventivo para dueños de autos en Instagram y WhatsApp, con una landing para agendar por WhatsApp porque bajaron las ventas este mes."
+    );
+
+    expect(patch.mainOffer).toContain("cambio de aceite");
+    expect(patch.audience).toContain("dueños de autos");
+    expect(patch.platform).toBe("Instagram");
+    expect(patch.deliverable).toBe("Landing");
+    expect(patch.cta).toBe("Agendar llamada");
+    expect(patch.requestReason).toContain("bajaron las ventas");
+  });
+
+  it("no sobreescribe un campo significativo con una respuesta mas vaga", () => {
+    const currentSummary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      projectObjective: "Captar 40 leads calificados para servicio premium en 30 dias"
+    });
+
+    const patch = inferBriefSummaryPatchFromClientMessage("discovery", currentSummary, "Si, eso.");
+
+    expect(patch.projectObjective).toBeUndefined();
+  });
+
   it("traduce el faltante mainOffer a una pregunta visible natural", () => {
     const question = getCurrentVisibleStageQuestion("discovery", emptyStructuredBriefSummary());
 
@@ -121,9 +149,14 @@ describe("briefing", () => {
 
 describe("briefing-assistant-ai", () => {
   it("incluye reglas de chat natural, agenda interna y historial en el prompt de conversacion", () => {
-    const prompt = buildBriefChatSystemPrompt("discovery", [
-      { authorRole: "client", messageText: "Quiero mover una mentoria premium" }
-    ]);
+    const prompt = buildBriefChatSystemPrompt(
+      "discovery",
+      [{ authorRole: "client", messageText: "Quiero mover una mentoria premium" }],
+      mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+        mainOffer: "Mentoria premium",
+        audience: "Fundadores de pymes"
+      })
+    );
 
     expect(prompt).toContain("Responde solo con texto plano visible para el cliente.");
     expect(prompt).toContain("Etapa actual: discovery");
@@ -137,6 +170,10 @@ describe("briefing-assistant-ai", () => {
     expect(prompt).toContain("Nunca digas frases como 'mi objetivo es' o 'necesito entender'.");
     expect(prompt).toContain("evita sentirse robotica o demasiado ensayada");
     expect(prompt).toContain("Refleja el registro del cliente");
+    expect(prompt).toContain("Datos ya capturados:");
+    expect(prompt).toContain("- Oferta principal: Mentoria premium");
+    expect(prompt).toContain("No vuelvas a preguntar por un dato ya capturado");
+    expect(prompt).toContain("Frentes pendientes de esta etapa:");
   });
 
   it("postprocesa salida visible para limitar desborde y limpiar lineas vacias repetidas", () => {
@@ -184,7 +221,8 @@ describe("briefing-assistant-ai", () => {
     const result = await generateBriefChatReply({
       stage: "discovery",
       messages: [],
-      clientMessage: "Necesito ayuda para definir mi oferta"
+      clientMessage: "Necesito ayuda para definir mi oferta",
+      summary: emptyStructuredBriefSummary()
     });
 
     expect(result.visibleReply).toContain("Se interrumpio este turno");
@@ -218,7 +256,8 @@ describe("briefing-assistant-ai", () => {
       messages: [
         { authorRole: "client", messageText: "Queremos mover cambio de aceite y mantenimiento preventivo" }
       ],
-      clientMessage: "Queremos mover cambio de aceite y mantenimiento preventivo"
+      clientMessage: "Queremos mover cambio de aceite y mantenimiento preventivo",
+      summary: emptyStructuredBriefSummary()
     });
 
     expect(result.visibleReply).toContain("cambio de aceite");
@@ -251,7 +290,8 @@ describe("briefing-assistant-ai", () => {
     const result = await generateBriefChatReply({
       stage: "discovery",
       messages: [],
-      clientMessage: "Queremos mover cambio de aceite y mantenimiento preventivo"
+      clientMessage: "Queremos mover cambio de aceite y mantenimiento preventivo",
+      summary: emptyStructuredBriefSummary()
     });
 
     expect(result.visibleReply).toContain("cambio de aceite");
@@ -286,7 +326,8 @@ describe("briefing-assistant-ai", () => {
     const result = await generateBriefChatReply({
       stage: "discovery",
       messages: [],
-      clientMessage: "Quiero captar leads"
+      clientMessage: "Quiero captar leads",
+      summary: emptyStructuredBriefSummary()
     });
 
     expect(result.visibleReply).toContain("Se interrumpio este turno");
@@ -322,7 +363,8 @@ describe("briefing-assistant-ai", () => {
     const result = await generateBriefChatReply({
       stage: "discovery",
       messages: [],
-      clientMessage: "Quiero lanzar una campana"
+      clientMessage: "Quiero lanzar una campana",
+      summary: emptyStructuredBriefSummary()
     });
 
     expect(result.visibleReply).toContain("Se interrumpio este turno");
@@ -358,7 +400,8 @@ describe("briefing-assistant-ai", () => {
     const result = await generateBriefChatReply({
       stage: "precision",
       messages: [],
-      clientMessage: "Necesito una landing para vender"
+      clientMessage: "Necesito una landing para vender",
+      summary: emptyStructuredBriefSummary()
     });
 
     expect(result.visibleReply).toContain("Se interrumpio este turno");
@@ -375,7 +418,8 @@ describe("briefing-assistant-ai", () => {
     const result = await generateBriefChatReply({
       stage: "precision",
       messages: [],
-      clientMessage: "Mi servicio es una mentoria"
+      clientMessage: "Mi servicio es una mentoria",
+      summary: emptyStructuredBriefSummary()
     });
 
     expect(result.visibleReply).toContain("Se interrumpio este turno");

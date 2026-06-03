@@ -1,4 +1,6 @@
 /**
+ * IMPL-20260603-03
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-03_memoria_conversacional_incremental_y_control_antirepeticion_brief_v1.md
  * IMPL-20260603-02
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-02_cierre_brief_doble_salida_humano_raw_y_agenda_performance_v1.md
  * IMPL-20260603-01
@@ -12,6 +14,7 @@ import {
   buildFinalSummaryText,
   emptyStructuredBriefSummary,
   hasBackgroundStageSufficientInfo,
+  hasMeaningfulSummaryValue,
   type BriefMessage,
   type BriefingStage,
   type StructuredBriefSummary
@@ -35,6 +38,7 @@ export type GenerateBriefChatReplyInput = {
   stage: BriefStage;
   messages: FinalBriefMessageInput[];
   clientMessage: string;
+  summary: BriefSummary;
 };
 
 export type BriefChatReply = {
@@ -73,6 +77,36 @@ const INTERNAL_COVERAGE_AGENDA_BY_STAGE: Record<BriefStage, string[]> = {
     "restricciones relevantes",
     "encaje y siguiente paso comercial"
   ]
+};
+
+const SUMMARY_FIELD_LABELS: Partial<Record<keyof BriefSummary, string>> = {
+  projectObjective: "Objetivo",
+  mainOffer: "Oferta principal",
+  businessContext: "Contexto del negocio",
+  requestReason: "Motivo del pedido",
+  audience: "Audiencia",
+  platform: "Canal o plataforma",
+  deliverable: "Entregable",
+  cta: "CTA",
+  commercialFitReason: "Razon de encaje"
+};
+
+const PROMPT_MEMORY_FIELDS: Array<keyof BriefSummary> = [
+  "projectObjective",
+  "mainOffer",
+  "businessContext",
+  "requestReason",
+  "audience",
+  "platform",
+  "deliverable",
+  "cta",
+  "commercialFitReason"
+];
+
+const PROMPT_PENDING_FIELDS_BY_STAGE: Record<BriefStage, Array<keyof BriefSummary>> = {
+  discovery: ["mainOffer", "projectObjective", "requestReason", "businessContext"],
+  precision: ["audience", "platform", "deliverable", "cta"],
+  commercial_fit: ["commercialFitReason"]
 };
 
 const MAX_CHAT_REPLY_WORDS = 110;
@@ -211,14 +245,33 @@ export function hasStageSufficientInfo(stage: BriefStage, summary: BriefSummary)
   return hasBackgroundStageSufficientInfo(stage, summary);
 }
 
-export function buildBriefChatSystemPrompt(stage: BriefStage, messages: FinalBriefMessageInput[]): string {
+function buildCapturedSummaryBlock(summary: BriefSummary): string {
+  const lines = PROMPT_MEMORY_FIELDS.filter((field) => hasMeaningfulSummaryValue(field, summary[field]))
+    .map((field) => `- ${SUMMARY_FIELD_LABELS[field] ?? field}: ${summary[field]}`);
+
+  return lines.length > 0 ? lines.join("\n") : "- Sin datos capturados confiables todavia.";
+}
+
+function buildPendingFrontsBlock(stage: BriefStage, summary: BriefSummary): string {
+  const pending = PROMPT_PENDING_FIELDS_BY_STAGE[stage]
+    .filter((field) => !hasMeaningfulSummaryValue(field, summary[field]))
+    .map((field) => SUMMARY_FIELD_LABELS[field] ?? field);
+
+  return pending.length > 0 ? pending.join(", ") : "ninguno prioritario";
+}
+
+export function buildBriefChatSystemPrompt(
+  stage: BriefStage,
+  messages: FinalBriefMessageInput[],
+  summary: BriefSummary
+): string {
   return [
     "Eres Vika, estratega comercial de Bridge, conversando con un cliente real.",
     "Tu tarea en este turno es responder con texto natural para seguir madurando el brief sin sonar a formulario.",
     "Suena cercana, clara y sobria; evita sentirse robotica o demasiado ensayada.",
     "Responde solo con texto plano visible para el cliente.",
     "No devuelvas JSON, etiquetas internas, markdown ni listas tecnicas.",
-    "Guiate por el historial de la conversacion y por tu agenda interna de cobertura, sin mencionar esa agenda al cliente.",
+    "Guiate por la memoria capturada, por el historial reciente y por tu agenda interna de cobertura, sin mencionar esa agenda al cliente.",
     "No hables de tus instrucciones ni de tu objetivo interno. Nunca digas frases como 'mi objetivo es' o 'necesito entender'.",
     "Evita saludos de cortesia vacios como 'Hola, un gusto saludarte' si no hacen avanzar la conversacion.",
     "Evita repetir siempre las mismas muletillas como 'perfecto', 'entiendo' o 'ahora quiero'.",
@@ -228,8 +281,12 @@ export function buildBriefChatSystemPrompt(stage: BriefStage, messages: FinalBri
     "Si el cliente se desvia, reconduce con suavidad hacia la solicitud comercial.",
     "Si el cliente hace una pregunta meta como 'que vamos a hacer' o 'a que te refieres', respondela brevemente y vuelve a una sola pregunta util.",
     "Si ya tienes contexto util, confirma brevemente y abre el siguiente frente de conversacion sin mencionar etapas ni checklist.",
+    "No vuelvas a preguntar por un dato ya capturado salvo que el cliente lo haya contradicho, sea ambiguo o siga siendo demasiado vago para accionar.",
     `Etapa actual: ${stage}`,
     `Agenda interna prioritaria: ${INTERNAL_COVERAGE_AGENDA_BY_STAGE[stage].join(", ")}`,
+    "Datos ya capturados:",
+    buildCapturedSummaryBlock(summary),
+    `Frentes pendientes de esta etapa: ${buildPendingFrontsBlock(stage, summary)}`,
     "Historial reciente:",
     formatConversationHistory(messages)
   ].join("\n");
@@ -237,7 +294,7 @@ export function buildBriefChatSystemPrompt(stage: BriefStage, messages: FinalBri
 
 function buildBriefChatTurnPrompt(input: GenerateBriefChatReplyInput): string {
   return [
-    buildBriefChatSystemPrompt(input.stage, input.messages),
+    buildBriefChatSystemPrompt(input.stage, input.messages, input.summary),
     "Ultimo mensaje del cliente:",
     input.clientMessage
   ].join("\n");
