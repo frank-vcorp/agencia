@@ -9,7 +9,6 @@ import {
   appendClientBriefMessage,
   briefingStages,
   buildAssistantGuidance,
-  createBriefForDefaultTenant,
   createDerivedBriefVersion,
   getBriefWorkspace,
   getCriticalMissingFields,
@@ -74,13 +73,6 @@ const summarySections: Array<{
     ]
   }
 ];
-
-async function startBriefAction() {
-  "use server";
-
-  await createBriefForDefaultTenant();
-  revalidatePath("/briefs");
-}
 
 async function saveSummaryAction(formData: FormData) {
   "use server";
@@ -241,11 +233,6 @@ export default async function BriefsPage() {
           <p className="mt-3 max-w-3xl text-base leading-7 text-[color:var(--muted)]">
             Esta vista crea el primer brief del tenant por defecto y lo deja listo para discovery, precision, commercial fit y revision humana minima del operador.
           </p>
-          <form action={startBriefAction} className="mt-6">
-            <button className="rounded-full bg-[color:var(--accent)] px-5 py-3 text-sm font-semibold text-white" type="submit">
-              Crear brief persistido de demo controlada
-            </button>
-          </form>
         </section>
       </div>
     );
