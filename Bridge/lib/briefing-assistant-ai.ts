@@ -1,4 +1,6 @@
 /**
+ * IMPL-20260603-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-01_estabilizacion_runtime_chat_brief_cliente_v1.md
  * IMPL-20260602-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260602-01_brief_cliente_conversacion_primero_y_procesado_unico_al_cierre_v1.md
  * IMPL-20260529-01
@@ -35,6 +37,7 @@ export type GenerateBriefChatReplyInput = {
 
 export type BriefChatReply = {
   visibleReply: string;
+  degraded: boolean;
 };
 
 export type FinalBriefMessageInput = Pick<BriefMessage, "authorRole" | "messageText">;
@@ -82,8 +85,6 @@ const BRIEF_CHAT_RECOVERY_REPLY =
 const TECHNICAL_LEAK_PATTERN =
   /(^|\s)(FOCO|CAPTURADO|PREGUNTAS|SIGUIENTE_ACCION|summaryPatch|missingPriorityFields|stageHasSufficientInfo|redirectNote)\s*:/i;
 const RELIABLE_VISIBLE_FINISH_REASONS = new Set(["", "STOP"]);
-const OPEN_REPLY_ENDING_PATTERN =
-  /(para entender mejor|para seguir|necesito entender|ahora necesito|con esto|para avanzar bien|para avanzar|para afinarlo|para poder|quiero entender|necesito confirmar)\s*[.!?]*$/i;
 const DANGLING_REPLY_ENDING_PATTERN = /(?:\.{3}|…|[,;:\-\/(])\s*$/;
 const FINAL_JSON_KEYS = new Set<keyof BriefFinalJson>([
   "projectObjective",
@@ -279,10 +280,6 @@ export function isAcceptableAssistantVisibleReply(rawReply: string, finishReason
     return false;
   }
 
-  if (OPEN_REPLY_ENDING_PATTERN.test(lastVisibleLine)) {
-    return false;
-  }
-
   return true;
 }
 
@@ -357,7 +354,7 @@ async function requestGeminiContent(prompt: string, apiKey: string, responseMime
       ],
       generationConfig: {
         temperature: 0.55,
-        maxOutputTokens: responseMimeType === "application/json" ? 512 : 1024,
+        maxOutputTokens: responseMimeType === "application/json" ? 8192 : 8192,
         ...(responseMimeType ? { responseMimeType } : {})
       }
     })
@@ -471,28 +468,33 @@ export async function generateBriefChatReply(
 
   if (!apiKey) {
     return {
-      visibleReply: BRIEF_CHAT_RECOVERY_REPLY
+      visibleReply: BRIEF_CHAT_RECOVERY_REPLY,
+      degraded: true
     };
   }
 
   const visiblePrompt = buildBriefChatTurnPrompt(input);
 
-  try {
-    const visibleResult = await requestGeminiContent(visiblePrompt, apiKey);
-    const plainTextTurn = buildPlainTextChatTurn(visibleResult.candidateText, visibleResult.candidate?.finishReason);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const visibleResult = await requestGeminiContent(visiblePrompt, apiKey);
+      const plainTextTurn = buildPlainTextChatTurn(visibleResult.candidateText, visibleResult.candidate?.finishReason);
 
-    if (!plainTextTurn) {
-      throw new Error("brief_chat_ai_invalid_visible_reply");
+      if (plainTextTurn) {
+        return {
+          visibleReply: plainTextTurn.visibleReply,
+          degraded: false
+        };
+      }
+    } catch {
+      // El segundo intento se ejecuta automaticamente en la siguiente iteracion.
     }
-
-    return {
-      visibleReply: plainTextTurn.visibleReply
-    };
-  } catch {
-    return {
-      visibleReply: BRIEF_CHAT_RECOVERY_REPLY
-    };
   }
+
+  return {
+    visibleReply: BRIEF_CHAT_RECOVERY_REPLY,
+    degraded: true
+  };
 }
 
 export async function generateBriefClosureArtifacts(
@@ -539,7 +541,7 @@ export async function generateBriefFinalJson(
         ],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 700,
+          maxOutputTokens: 8192,
           responseMimeType: "application/json"
         }
       })

@@ -1,6 +1,8 @@
 "use server";
 
 /**
+ * IMPL-20260603-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-01_estabilizacion_runtime_chat_brief_cliente_v1.md
  * IMPL-20260602-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260602-01_brief_cliente_conversacion_primero_y_procesado_unico_al_cierre_v1.md
  * IMPL-20260529-01
@@ -52,14 +54,16 @@ export async function sendClientMessageAction(
       clientMessage: normalizedText
     });
 
-    await appendBriefMessage({
-      briefId,
-      versionId,
-      authorRole: "assistant",
-      actorLabel: "Bridge briefing",
-      messageText: aiReply.visibleReply,
-      stage: currentVersion.stage
-    });
+    if (!aiReply.degraded) {
+      await appendBriefMessage({
+        briefId,
+        versionId,
+        authorRole: "assistant",
+        actorLabel: "Bridge briefing",
+        messageText: aiReply.visibleReply,
+        stage: currentVersion.stage
+      });
+    }
   }
 
   revalidatePath(`/cliente/brief/${projectId}`);

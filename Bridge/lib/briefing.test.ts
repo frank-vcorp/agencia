@@ -1,4 +1,6 @@
 /**
+ * IMPL-20260603-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-01_estabilizacion_runtime_chat_brief_cliente_v1.md
  * IMPL-20260602-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260602-01_brief_cliente_conversacion_primero_y_procesado_unico_al_cierre_v1.md
  * IMPL-20260529-01
@@ -156,8 +158,8 @@ describe("briefing-assistant-ai", () => {
     ).toBe(false);
   });
 
-  it("rechaza una respuesta visible si termina en una idea abierta", () => {
-    expect(isAcceptableAssistantVisibleReply("Entendido. Para entender mejor", "STOP")).toBe(false);
+  it("rechaza una respuesta visible si termina con un cierre colgante", () => {
+    expect(isAcceptableAssistantVisibleReply("Entendido,", "STOP")).toBe(false);
   });
 
   it("acepta una respuesta visible completa y natural", () => {

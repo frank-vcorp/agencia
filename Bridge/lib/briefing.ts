@@ -1,4 +1,6 @@
 /**
+ * IMPL-20260603-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-01_estabilizacion_runtime_chat_brief_cliente_v1.md
  * IMPL-20260602-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260602-01_brief_cliente_conversacion_primero_y_procesado_unico_al_cierre_v1.md
  * IMPL-20260529-01
@@ -1688,6 +1690,33 @@ export async function getBriefByProjectId(projectId: string, tenantSlug = supaba
   }
 
   return hydrateBriefRecord(briefRow, tenant);
+}
+
+/**
+ * IMPL-20260603-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-01_estabilizacion_runtime_chat_brief_cliente_v1.md
+ */
+export async function getOrCreateBriefForProject(
+  projectId: string,
+  tenantSlug = supabaseEnv.defaultTenant
+): Promise<BriefRecord> {
+  const existingBrief = await getBriefByProjectId(projectId, tenantSlug);
+
+  if (existingBrief) {
+    return existingBrief;
+  }
+
+  try {
+    return await createBriefForProject(projectId, tenantSlug);
+  } catch (error) {
+    const briefAfterCreateError = await getBriefByProjectId(projectId, tenantSlug);
+
+    if (briefAfterCreateError) {
+      return briefAfterCreateError;
+    }
+
+    throw error;
+  }
 }
 
 /**
