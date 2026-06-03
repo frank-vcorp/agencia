@@ -1,6 +1,8 @@
 "use client";
 
 /**
+ * IMPL-20260603-02
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-02_cierre_brief_doble_salida_humano_raw_y_agenda_performance_v1.md
  * IMPL-20260602-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260602-01_brief_cliente_conversacion_primero_y_procesado_unico_al_cierre_v1.md
  * IMPL-20260529-01
@@ -109,6 +111,8 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
     status === "pending_operator_review" || status === "operator_review_in_progress";
   const isApprovedStatus = status === "approved_locked";
   const hideConversationSurface = isReviewStatus || isApprovedStatus;
+  const clientFacingSummary =
+    currentVersion?.structuredSummary.clientFacingSummary || currentVersion?.finalSummaryText || "";
 
   const disabledReason = isReviewStatus
     ? "En revision"
@@ -202,8 +206,18 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
 
       <section className="panel rounded-[22px] px-3 py-3 sm:px-4 sm:py-4">
         {hideConversationSurface ? (
-          <div className="rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900 sm:px-4">
-            Ya capturamos la informacion necesaria para preparar tu propuesta. Nuestro equipo ya esta en la siguiente accion.
+          <div className="space-y-3">
+            {clientFacingSummary ? (
+              <article className="rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-3 sm:px-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800">
+                  Esto es lo que capturamos de tu proyecto
+                </p>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-emerald-900">{clientFacingSummary}</p>
+              </article>
+            ) : null}
+            <div className="rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900 sm:px-4">
+              Ya capturamos la informacion necesaria para preparar tu propuesta. Nuestro equipo ya esta en la siguiente accion.
+            </div>
           </div>
         ) : (
           <div

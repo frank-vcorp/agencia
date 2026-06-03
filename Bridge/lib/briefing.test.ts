@@ -1,4 +1,6 @@
 /**
+ * IMPL-20260603-02
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-02_cierre_brief_doble_salida_humano_raw_y_agenda_performance_v1.md
  * IMPL-20260603-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-01_estabilizacion_runtime_chat_brief_cliente_v1.md
  * IMPL-20260602-01
@@ -23,10 +25,8 @@ import {
 } from "./briefing";
 import {
   buildBriefChatSystemPrompt,
-  buildDeterministicBriefFinalJson,
-  generateBriefClosureArtifacts,
+  generateBriefClosure,
   generateBriefChatReply,
-  generateBriefFinalJson,
   hasStageSufficientInfo,
   isAcceptableAssistantVisibleReply,
   sanitizeAssistantReply
@@ -51,6 +51,10 @@ describe("briefing", () => {
     });
 
     expect(getCriticalMissingFields(summary)).toEqual(["encaje comercial o nota explicita de revision comercial"]);
+  });
+
+  it("incluye clientFacingSummary en la forma base del resumen estructurado", () => {
+    expect(emptyStructuredBriefSummary().clientFacingSummary).toBe("");
   });
 
   it("compone un resumen final persistible y una guia contextual de etapa", () => {
@@ -123,13 +127,16 @@ describe("briefing-assistant-ai", () => {
 
     expect(prompt).toContain("Responde solo con texto plano visible para el cliente.");
     expect(prompt).toContain("Etapa actual: discovery");
-    expect(prompt).toContain("Agenda interna prioritaria: objetivo del proyecto, oferta principal, motivo del pedido, contexto del negocio");
+    expect(prompt).toContain(
+      "Agenda interna prioritaria: objetivo de negocio medible, oferta y diferencial, contexto del negocio, motivo y urgencia del pedido"
+    );
     expect(prompt).toContain("Historial reciente:");
     expect(prompt).toContain("Cliente: Quiero mover una mentoria premium");
     expect(prompt).toContain("No devuelvas JSON");
     expect(prompt).not.toContain("summaryPatch");
     expect(prompt).toContain("Nunca digas frases como 'mi objetivo es' o 'necesito entender'.");
     expect(prompt).toContain("evita sentirse robotica o demasiado ensayada");
+    expect(prompt).toContain("Refleja el registro del cliente");
   });
 
   it("postprocesa salida visible para limitar desborde y limpiar lineas vacias repetidas", () => {
@@ -389,27 +396,7 @@ describe("briefing-assistant-ai", () => {
     expect(hasStageSufficientInfo("discovery", summary)).toBe(true);
   });
 
-  it("genera JSON final deterministico con readiness y faltantes", () => {
-    const summary = {
-      ...emptyStructuredBriefSummary(),
-      projectObjective: "Captar leads",
-      mainOffer: "Mentoria",
-      audience: "Pymes",
-      platform: "Instagram",
-      deliverable: "Landing",
-      cta: "Agendar llamada",
-      commercialFitReason: "Hay encaje con oferta de lanzamiento",
-      recommendedProductSlotKey: "slot_lanzamiento"
-    };
-
-    const finalJson = buildDeterministicBriefFinalJson(summary);
-
-    expect(finalJson.proposalReadiness).toBe("high");
-    expect(finalJson.missingCriticalData).toEqual([]);
-    expect(finalJson.recommendedProductSlotKey).toBe("slot_lanzamiento");
-  });
-
-  it("usa fallback deterministico para JSON final cuando GEMINI_API_KEY no existe", async () => {
+  it("usa fallback deterministico para cierre dual cuando GEMINI_API_KEY no existe", async () => {
     vi.stubEnv("GEMINI_API_KEY", "");
 
     const summary = {
@@ -417,89 +404,33 @@ describe("briefing-assistant-ai", () => {
       projectObjective: "Captar leads"
     };
 
-    const result = await generateBriefFinalJson({
+    const result = await generateBriefClosure({
       stage: "discovery",
       summary,
       messages: [{ authorRole: "client", messageText: "Quiero vender mas" }]
     });
 
-    expect(result.projectObjective).toBe("Captar leads");
-    expect(result.proposalReadiness).toBe("low");
+    expect(result.clientSummary).toContain("Objetivo: Captar leads.");
+    expect(result.agentRawBrief).toContain("Conversacion completa:");
+    expect(result.agentRawBrief).toContain("Cliente: Quiero vender mas");
     vi.unstubAllEnvs();
   });
 
-  it("convierte el procesamiento final en un solo patch estructurado al cierre", async () => {
-    vi.stubEnv("GEMINI_API_KEY", "fake-key");
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        candidates: [
-          {
-            finishReason: "STOP",
-            content: {
-              parts: [
-                {
-                  text: JSON.stringify({
-                    projectObjective: "Captar leads calificados",
-                    mainOffer: "Mentoria premium",
-                    businessContext: "Negocio con ventas organicas sin sistema comercial estable",
-                    requestReason: "Necesitan acelerar cierres este trimestre",
-                    audience: "Fundadores de pymes",
-                    platform: "Landing y WhatsApp",
-                    deliverable: "Sistema de captacion con pagina corta",
-                    cta: "Agendar llamada",
-                    tone: "Claro y confiable",
-                    restrictions: "Sin promesas exageradas",
-                    references: "Competidores del nicho",
-                    urgency: "Lanzar este mes",
-                    commercialFitReason: "El caso requiere ordenar oferta, mensaje y conversion.",
-                    recommendedProductSlotKey: "slot_lanzamiento",
-                    operatorReviewNote: "Revisar pricing antes de enviar propuesta.",
-                    proposalReadiness: "medium",
-                    missingCriticalData: ["detalle de presupuesto"]
-                  })
-                }
-              ]
-            }
-          }
-        ]
-      })
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const result = await generateBriefClosureArtifacts({
-      stage: "commercial_fit",
-      summary: emptyStructuredBriefSummary(),
-      messages: [
-        { authorRole: "client", messageText: "Quiero captar leads para una mentoria premium" },
-        { authorRole: "assistant", messageText: "Perfecto, cuentame a quien quieres atraer primero." }
-      ]
-    });
-
-    expect(result.finalJson.mainOffer).toBe("Mentoria premium");
-    expect(result.finalSummaryPatch.mainOffer).toBe("Mentoria premium");
-    expect(result.finalSummaryPatch.gaps).toContain("detalle de presupuesto");
-    expect(result.finalSummaryPatch.operatorReviewNote).toContain("Readiness: medium");
-
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
-  });
-
-  it("mantiene viable el cierre aunque falle el procesador final, sin tocar la conversacion previa", async () => {
+  it("mantiene viable el cierre aunque falle Gemini, sin tocar la conversacion previa", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
     vi.stubGlobal("fetch", fetchMock);
     const messages = [{ authorRole: "client" as const, messageText: "Necesito una landing para vender" }];
 
-    const result = await generateBriefClosureArtifacts({
+    const result = await generateBriefClosure({
       stage: "precision",
       summary: emptyStructuredBriefSummary(),
       messages
     });
 
     expect(messages).toEqual([{ authorRole: "client", messageText: "Necesito una landing para vender" }]);
-    expect(result.finalJson.proposalReadiness).toBe("low");
-    expect(result.finalSummaryPatch.operatorReviewNote).toContain("Faltantes detectados al cierre");
+    expect(typeof result.clientSummary).toBe("string");
+    expect(result.agentRawBrief).toContain("Conversacion completa:");
 
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();

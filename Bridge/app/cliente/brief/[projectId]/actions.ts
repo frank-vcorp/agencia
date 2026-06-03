@@ -1,6 +1,8 @@
 "use server";
 
 /**
+ * IMPL-20260603-02
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-02_cierre_brief_doble_salida_humano_raw_y_agenda_performance_v1.md
  * IMPL-20260603-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-01_estabilizacion_runtime_chat_brief_cliente_v1.md
  * IMPL-20260602-01
@@ -20,7 +22,7 @@ import {
 } from "@/lib/briefing";
 import {
   generateBriefChatReply,
-  generateBriefClosureArtifacts
+  generateBriefClosure
 } from "@/lib/briefing-assistant-ai";
 
 /**
@@ -89,7 +91,7 @@ export async function submitBriefAction(
   const currentVersion = brief?.currentVersion;
 
   if (currentVersion?.id === versionId) {
-    const closureArtifacts = await generateBriefClosureArtifacts({
+    const closure = await generateBriefClosure({
       stage: currentVersion.stage,
       summary: currentVersion.structuredSummary,
       messages: currentVersion.messages.map((message) => ({
@@ -101,9 +103,9 @@ export async function submitBriefAction(
     await updateBriefSummary(
       { briefId, versionId },
       {
-        ...closureArtifacts.finalSummaryPatch,
-        operatorReviewNote: JSON.stringify(closureArtifacts.finalJson)
-      }
+        clientFacingSummary: closure.clientSummary
+      },
+      { finalSummaryTextOverride: closure.agentRawBrief }
     );
   }
 

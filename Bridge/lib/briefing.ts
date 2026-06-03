@@ -1,4 +1,6 @@
 /**
+ * IMPL-20260603-02
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-02_cierre_brief_doble_salida_humano_raw_y_agenda_performance_v1.md
  * IMPL-20260603-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-01_estabilizacion_runtime_chat_brief_cliente_v1.md
  * IMPL-20260602-01
@@ -51,6 +53,7 @@ export type StructuredBriefSummary = {
   commercialFitReason: string;
   upsellSignal: string;
   operatorReviewNote: string;
+  clientFacingSummary: string;
 };
 
 export type BriefMessage = {
@@ -268,7 +271,8 @@ export const emptyStructuredBriefSummary = (): StructuredBriefSummary => ({
   recommendedProductConfidence: "",
   commercialFitReason: "",
   upsellSignal: "",
-  operatorReviewNote: ""
+  operatorReviewNote: "",
+  clientFacingSummary: ""
 });
 
 export function normalizeSummary(input: Partial<StructuredBriefSummary> | null | undefined): StructuredBriefSummary {
@@ -518,7 +522,8 @@ const VISIBLE_QUESTION_BY_FIELD: Record<keyof StructuredBriefSummary, StageQuest
       "Aqu\u00ed me ayuda entender por qu\u00e9 esta v\u00eda te hace sentido: por ejemplo por velocidad, presupuesto, complejidad del caso o porque ya intentaste otra cosa. \u00bfQu\u00e9 te hace pensar que esta es la mejor direcci\u00f3n?"
   },
   upsellSignal: null,
-  operatorReviewNote: null
+  operatorReviewNote: null,
+  clientFacingSummary: null
 };
 
 const STAGE_FIELD_PRIORITY: Record<BriefingStage, Array<keyof StructuredBriefSummary>> = {
@@ -1212,7 +1217,8 @@ async function getBriefRowById(briefId: string): Promise<BriefRow | null> {
 
 export async function updateBriefSummary(
   context: MutationContext,
-  patch: Partial<StructuredBriefSummary>
+  patch: Partial<StructuredBriefSummary>,
+  options?: { finalSummaryTextOverride?: string }
 ): Promise<BriefVersion> {
   const version = await getBriefVersionRow(context.versionId);
 
@@ -1223,7 +1229,7 @@ export async function updateBriefSummary(
   const merged = mergeStructuredBriefSummary(normalizeSummary(version.structured_summary_json), patch);
   await updateVersionRecord(context.versionId, {
     structured_summary_json: merged,
-    final_summary_text: buildFinalSummaryText(merged)
+    final_summary_text: options?.finalSummaryTextOverride || buildFinalSummaryText(merged)
   });
 
   const current = await getBriefVersionRow(context.versionId);

@@ -1,4 +1,6 @@
 /**
+ * IMPL-20260603-02
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-02_cierre_brief_doble_salida_humano_raw_y_agenda_performance_v1.md
  * IMPL-20260505-22
  * Respaldo: context/CLIENTS_Y_PROJECTS_V1.md, context/SPECs/SPEC_ARCH-20260505-22_clients_y_projects_v1.md, context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md, context/IDENTIDAD_Y_MEMBERSHIPS_V1.md, context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, PROYECTO.md
  */
@@ -188,7 +190,8 @@ function buildSummaryPatchSeed(): StructuredBriefSummary {
     recommendedProductConfidence: "",
     commercialFitReason: "",
     upsellSignal: "",
-    operatorReviewNote: ""
+    operatorReviewNote: "",
+    clientFacingSummary: ""
   };
 }
 

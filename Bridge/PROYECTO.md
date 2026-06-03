@@ -163,6 +163,7 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 13. `ARCH-20260529-08` autorizado: mejorar el historial optimista del chat cliente y suavizar el tono visible de Vika sin reabrir el rediseño general del runtime, con alcance tecnico acotado a 4 archivos.
 14. `ARCH-20260602-01` autorizado: redefinir el brief cliente como conversación guiada por prompt con persistencia exclusiva de mensajes durante el chat y procesamiento estructurado unico al cierre, con alcance tecnico acotado a 5 archivos.
 15. `ARCH-20260603-01` autorizado: estabilizar el runtime del chat brief cliente elevando el presupuesto de tokens para conservar thinking natural, reintentando el turno antes de degradar, evitando persistir el recovery reply y haciendo idempotente la creacion del brief desde el render, con alcance tecnico acotado a 5 archivos.
+16. `ARCH-20260603-02` autorizado: reemplazar el cierre de brief de 17 campos por una sola salida doble (resumen humano para el dashboard del cliente + raw exhaustivo para Vika-VSCode) con una unica llamada IA, mostrar el resumen humano en la pagina del cliente, y reorientar la agenda conversacional a performance marketing con espejeo de tono, con alcance tecnico acotado a 6 archivos.
 
 ### [ ] Pendiente
 
