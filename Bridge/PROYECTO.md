@@ -2,8 +2,8 @@
 
 **Proyecto:** Bridge  
 **ID activo:** ARCH-20260510-11  
-**Fecha de actualizacion:** 2026-05-28  
-**Estado general:** Bridge mantiene `ARCH-20260510-11` como corte paraguas de refinamiento operativo. Los slices `ARCH-20260513-01`, `ARCH-20260513-02`, `ARCH-20260513-03`, `ARCH-20260513-04`, `ARCH-20260513-05`, `ARCH-20260513-15` y `ARCH-20260513-16` ya quedaron implementados. La migración de contacto estructurado y la migración de configuración SendGrid ya fueron aplicadas en producción. El siguiente slice técnico recomendado ahora es **ARCH-20260513-19**, enfocado en limpieza técnica antes del refinamiento UX/UI final del piloto. `ARCH-20260513-06` queda absorbido por `ARCH-20260513-15` y no debe ejecutarse por separado.
+**Fecha de actualizacion:** 2026-06-10  
+**Estado general:** Bridge mantiene `ARCH-20260510-11` como corte paraguas de refinamiento operativo. Arquitectura V1 está **95% completada** con los slices del `ARCH-20260529` y `ARCH-20260603` ya implementados y validados. Los slices `ARCH-20260513-01` a `ARCH-20260513-17` quedaron implementados. La migración de contacto estructurado y la migración de configuración SendGrid ya fueron aplicadas en producción. El bloqueador operativo es el **e2e final + registro Jira** del cierre técnico.
 
 ## MICRO-SPRINT COMPLETADO (MCP + MCT + Caso Demostración)
 
@@ -151,20 +151,18 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 1. Cierre operativo final del corte `ARCH-20260510-11`: corrida e2e final de punta a punta y trazabilidad Jira del cierre tecnico `20260526-06..09`.
 2. Slices posteriores del corte paraguas `ARCH-20260510-11`, una vez liberado el bloqueador operativo.
 3. `ARCH-20260528-07` autorizado: portal cliente por proyecto con brief conversacional como entrada principal; la capa informativa posterior al brief queda fuera de alcance y se tratara en un slice independiente.
-4. `ARCH-20260528-08` autorizado: brief cliente en capa IA real (Gemini) con fallback determinista y alcance tecnico acotado a 3 archivos.
-5. `ARCH-20260528-09` autorizado: hardening del prompt del asistente de brief por etapas con alcance acotado a 2 archivos.
-6. `ARCH-20260529-01` autorizado: brief cliente en doble capa conversacional, con respuesta natural visible y estructuracion invisible para Bridge, manteniendo alcance tecnico acotado a 3 archivos.
-7. `ARCH-20260529-02` autorizado: brief cliente con un solo prompt natural durante el chat y JSON final interno generado al cierre para consumo posterior por Vika en VS Code, con alcance tecnico acotado a 3 archivos.
-8. `ARCH-20260529-03` autorizado: brief cliente con chat natural persistido, cierre por itinerario y JSON final independiente post-cierre, con alcance tecnico acotado a 4 archivos.
-9. `ARCH-20260529-04` autorizado: refinamiento visual del chat cliente a estilo mensajeria compacta, sin recuadros pesados y con timestamp corto numerico, con alcance tecnico acotado a 1 archivo.
-10. `ARCH-20260529-05` autorizado: hardening del runtime del brief cliente para bloquear respuestas truncadas de Gemini y degradar a fallback natural, con alcance tecnico acotado a 2 archivos.
-11. `ARCH-20260529-06` autorizado: reescritura controlada del runtime del chat brief cliente para eliminar loops de aclaración, unificar apertura y ocultar labels internas al cliente, con alcance tecnico acotado a 4 archivos.
-12. `ARCH-20260529-07` autorizado: redefinir el brief cliente como conversación adaptativa guiada por prompt con etapas en background y sin dependencia visible de heurística ni cambio manual de etapa, con alcance tecnico acotado a 5 archivos.
-13. `ARCH-20260529-08` autorizado: mejorar el historial optimista del chat cliente y suavizar el tono visible de Vika sin reabrir el rediseño general del runtime, con alcance tecnico acotado a 4 archivos.
-14. `ARCH-20260602-01` autorizado: redefinir el brief cliente como conversación guiada por prompt con persistencia exclusiva de mensajes durante el chat y procesamiento estructurado unico al cierre, con alcance tecnico acotado a 5 archivos.
-15. `ARCH-20260603-01` autorizado: estabilizar el runtime del chat brief cliente elevando el presupuesto de tokens para conservar thinking natural, reintentando el turno antes de degradar, evitando persistir el recovery reply y haciendo idempotente la creacion del brief desde el render, con alcance tecnico acotado a 5 archivos.
-16. `ARCH-20260603-02` autorizado: reemplazar el cierre de brief de 17 campos por una sola salida doble (resumen humano para el dashboard del cliente + raw exhaustivo para Vika-VSCode) con una unica llamada IA, mostrar el resumen humano en la pagina del cliente, y reorientar la agenda conversacional a performance marketing con espejeo de tono, con alcance tecnico acotado a 6 archivos.
-17. `ARCH-20260603-03` autorizado: introducir memoria conversacional incremental y control anti-repeticion en el brief cliente, reutilizando `structuredSummary` durante el chat, alimentando el prompt con datos ya capturados, y avanzando la etapa en background cuando discovery/precision ya queden cubiertas, con alcance tecnico acotado a 4 archivos de codigo + 1 archivo de tests.
+
+### [x] Completado (refinamiento brief cliente - mayo/junio 2026)
+
+1. **IMPL-20260529-04** - Chat cliente estilo mensajería compacta - commit `7116a17` + `19126b1`
+2. **IMPL-20260529-05** - Hardening runtime bloquea respuestas truncadas - commit `7d8e36f`
+3. **IMPL-20260529-06** - Reescritura runtime sin loops de aclaración - commit `a098a10` + `db5faba` + `2318dcf` + `6e616bf`
+4. **IMPL-20260529-07** - Conversación adaptativa guiada por prompt + etapas background - commit `d258515`
+5. **IMPL-20260529-08** - Historial optimista + suavizado de tono Vika - commit `34cf379` + `6d41b78` + `bf1cf84` + `5e87b49` + `81df0c3` (FIX-20260529-03)
+6. **IMPL-20260602-01** - Brief con persistencia exclusiva de mensajes + procesamiento único al cierre - commits `876cf01` + `7f9fa6f`
+7. **IMPL-20260603-01** - Runtime estabilizado con presupuesto tokens elevado - commit `e21b37c`
+8. **IMPL-20260603-02** - Cierre dual (humano/raw) con agenda performance marketing - commit `2177c38`
+9. **IMPL-20260603-03** - Memoria conversacional incremental + control anti-repetición - commit `42bd5a1` + `DICTAMEN_FIX-20260529-03`
 
 ### [ ] Pendiente
 
@@ -173,14 +171,15 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 
 ## Ultimo Corte Cerrado
 
-**ARCH-20260526-04 / IMPL-20260526-01 + IMPL-20260526-02**
+**IMPL-20260603-03 / FIX-20260529-03**
 
-1. **Contrato MCP CRUD logico por entidad** completado para `clients`, `projects`, `briefs`, `quotations` y `assets` en list/get/update, manteniendo eliminaciones seguras con `preview/execute`.
-2. **Registro y despacho MCP ampliado** en `mcp/src/index.ts` con tools nuevas de consulta y actualizacion por entidad.
-3. **Endpoints API por ID** implementados para `GET/PATCH` en `/api/v1/clients/[id]`, `/api/v1/projects/[id]`, `/api/v1/briefs/[id]`, `/api/v1/quotations/[id]` y `/api/v1/assets/[id]`.
-4. **Hardening TypeScript en delete tools** para evitar coerciones de `unknown` y mantener contratos estrictos en `bridge_delete_project`, `bridge_delete_asset`, `bridge_delete_brief`, `bridge_delete_quotation`.
-5. **Validación:** `cd Bridge && npm run build` limpio; `cd Bridge/mcp && npm run build` limpio.
-6. **Checkpoint:** `context/checkpoints/CHECKPOINT_IMPL-20260526-02_cierre_arch_20260526_04_mcp_crud_entidades.md`.
+1. **Memoria conversacional incremental** implementada - `structuredSummary` reutilizado durante el chat para evitar preguntas repetidas
+2. **Control anti-repetición** activo - El prompt recibe bloques "Datos ya capturados" y "Frentes pendientes de esta etapa"
+3. **Avance automático de etapas en background** - `advanceBriefStageInBackground` ejecuta transición cuando discovery/precision cubiertas
+4. **Test anti-bucle añadido** - Verifica que respuesta natural llena `mainOffer` y `getCurrentVisibleStageQuestion` deja de devolver el mismo campo
+5. **Alineación de aserciones** - Tests de brief corregidos para copy con acentos
+6. **Validación:** Build limpio, 26/26 tests en `lib/briefing.test.ts`
+7. **Checkpoint:** `context/checkpoints/CHECKPOINT_IMPL-20260603-03_memoria_conversacional_incremental_y_control_antirepeticion_brief_v1.md`
 
 ## Siguiente Paso Recomendado
 
@@ -281,6 +280,7 @@ Prioridad recomendada:
 78. Bridge/lib/notifications.ts — Módulo MCT (Resend, Google Chat, WhatsApp)
 79. Bridge/emails/ — Plantillas React Email (client-created, quotation-active, asset-delivered)
 80. Bridge/context/clientes/superman/ — Caso demostración completo (brief.md, propuesta.md, prompts)
+81. context/interconsultas/DICTAMEN_FIX-20260529-03_loop_main_offer_en_produccion.md — Dictamen técnico del fix anti-bucle
 81. context/SPECs/SPEC_ARCH-20260513-20_workspace_disenador_estacion_unica_v2.md
 
 ## Decisiones Ya Tomadas
@@ -459,12 +459,23 @@ Prioridad recomendada:
 - MCP Server: ✅ 8 tools operativos
 - MCT: ✅ código completo (falta config producción)
 - Caso demostración: ✅ Superman end-to-end
+- **ARCH-20260529-01 completado** - Brief cliente en doble capa conversacional, respuesta natural visible + estructuración invisible (CHECKPOINT_IMPL-20260529-01)
+- **ARCH-20260529-02 completado** - Brief cliente con prompt natural y JSON final interno generado al cierre (CHECKPOINT_IMPL-20260603-02)
+- **ARCH-20260529-03 completado** - Chat natural persistido con cierre por itinerario + control anti-repetición (CHECKPOINT_IMPL-20260603-03 + FIX-20260529-03)
+- **ARCH-20260529-04 completado** - Chat cliente estilo mensajería compacta (CHECKPOINT_IMPL-20260529-04)
+- **ARCH-20260529-05 completado** - Hardening runtime brief cliente bloquea respuestas truncadas (CHECKPOINT_IMPL-20260529-05)
+- **ARCH-20260529-06 completado** - Reescritura runtime chat brief cliente sin loops (CHECKPOINT_IMPL-20260529-06)
+- **ARCH-20260529-07 completado** - Conversación adaptativa guiada por prompt con etapas en background (CHECKPOINT_IMPL-20260529-07)
+- **ARCH-20260529-08 completado** - Historial optimista + suavizado de tono Vika (CHECKPOINT_IMPL-20260529-08)
 
-**Lo único pendiente es refinamiento operativo** para usar en piloto real:
+**Lo único pendiente es cierre operativo final:**
 
-- **Crítico:** PDFs de cotizaciones
-- **Crítico:** modelo de contacto del cliente con email + WhatsApp reales
-- **Recomendado:** Disparadores MCT + plantillas finales
+- **Crítico:** e2e final + issue Jira del cierre (estado actual: SIN-ISSUE)
+- **Crítico:** PDFs de cotizaciones (ya implementado en ARCH-20260513-03)
+- **Crítico:** email + WhatsApp estructurados del cliente (ya implementado en ARCH-20260513-01)
+- **Recomendado:** Disparadores MCT reales en eventos de negocio
 - **Opcional:** Limpieza código + UX/UI
 
-**Tiempo estimado para piloto real:** 8-12 horas de refinamiento.
+**Tests actuales:** 419/422 pasando (3 tests rojos pre-existentes no relacionados: bridge-data, designer-workspace)
+
+**Tiempo estimado para cierre operativo:** 2-3 horas (e2e + Jira).
