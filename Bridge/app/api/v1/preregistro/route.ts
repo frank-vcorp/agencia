@@ -1,12 +1,15 @@
 /**
  * IMPL-20260610-04
+ * IMPL-20260610-06 - helpers extraídos a lib/preregistro-helpers.ts
  * Endpoint de pre-registro para vendedores.
  * Crea cliente + proyecto + brief y genera link de WhatsApp.
  */
 // IMPL-20260610-04 - Endpoint de pre-registro para vendedores
+// IMPL-20260610-06 - Refactor: helpers de teléfono y WhatsApp movidos a lib/
 import { createClient, createProject } from "@/lib/assets";
 import { resolveTenantIdBySlug } from "@/lib/tenant";
 import { supabaseEnv } from "@/lib/supabase";
+import { generateWhatsappUrl, normalizePhoneMX } from "@/lib/preregistro-helpers";
 
 type PreregistroInput = {
   clientName: string;
@@ -26,21 +29,6 @@ type PreregistroError = {
   error: string;
 };
 
-function normalizePhone(phone: string): string {
-  // Asegura formato +52[Tel] o [Tel] sin espacios
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length === 10) {
-    return `+52${digits}`;
-  }
-  return phone;
-}
-
-function generateWhatsappUrl(projectId: string, phone: string): string {
-  const baseUrl = `https://vectoria-zeta.vercel.app/cliente/proyecto/${projectId}`;
-  const message = `Hola%21%20Te%20comparto%20el%20link%20para%20tu%20brief%3A%20${encodeURIComponent(baseUrl)}`;
-  return `https://wa.me/${phone.replace("+", "")}?text=${message}`;
-}
-
 export async function POST(request: Request): Promise<Response> {
   const body = await request.json().catch(() => ({})) as PreregistroInput;
 
@@ -53,7 +41,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "Teléfono debe tener 10 dígitos" } as PreregistroError, { status: 400 });
   }
 
-  const normalizedPhone = normalizePhone(body.clientPhone);
+  const normalizedPhone = normalizePhoneMX(body.clientPhone);
 
   try {
     // Obtener tenantId del tenant por defecto (vectoria)
