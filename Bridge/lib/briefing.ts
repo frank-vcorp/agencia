@@ -989,7 +989,7 @@ export function buildAssistantGuidance(stage: BriefingStage, summary: Structured
 
   if (stage === "discovery") {
     if (!summary.mainOffer && !summary.projectObjective && !summary.requestReason && !summary.businessContext) {
-      return "Cu\u00e9ntame un poco qu\u00e9 quieres mover con este proyecto y qu\u00e9 te gustar\u00eda ver pasar si esto sale bien.";
+      return "\u00a1Hola! Para armar tu estrategia, cu\u00e9ntame: \u00bfDe qu\u00e9 es tu negocio y qu\u00e9 es lo que m\u00e1s se vende?";
     }
 
     if (!currentQuestion) {
