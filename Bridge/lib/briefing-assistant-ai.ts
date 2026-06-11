@@ -257,6 +257,18 @@ Valida en tu memoria interna los siguientes puntos:
 7. presupuesto (Monto mensual asignado o $0 si no tienen)
 8. cta_deseado (WhatsApp, llamada, visita directa)
 
+[REGLA DE CIERRE OBLIGATORIO]
+Cuando el bloque [PROGRESO ACTUAL DE LA CONVERSACI\u00d3N] muestre que las 8 preguntas est\u00e1n completadas (marcadas con \u2713), DEBES cerrar la conversaci\u00f3n en este mismo turno. NO hagas m\u00e1s preguntas del checklist.
+Procede as\u00ed:
+1. Si a\u00fan no se hizo la pregunta abierta de la [FASE DE DESCUBRIMIENTO NARRATIVO], hazla ahora.
+2. Cuando el cliente responda (en el siguiente turno), desp\u00eddete y emite OBLIGATORIAMENTE al final de tu mensaje:
+   - Texto humano de cierre
+   - [SYS_ACTION: LOCK_SUCCESS]
+   - [BRIEF_COMPLETO]
+   - Objeto JSON con las 9 claves: giro_y_producto_heroe, madurez, local_fisico, logo, diferenciador, objeciones, presupuesto, cta_deseado, historia_y_contexto
+
+Si el bloque [PROGRESO ACTUAL] muestra preguntas pendientes, avanza SOLO a la siguiente pendiente. NO repitas preguntas ya marcadas con \u2713.
+
 [FASE DE DESCUBRIMIENTO NARRATIVO]
 Al completar los 8 puntos, relaja la pl\u00e1tica. Haz UNA pregunta abierta ("\u00bfC\u00f3mo te animaste a poner el negocio?", o "\u00bfQu\u00e9 ha sido lo m\u00e1s dif\u00edcil?"). Deja que el usuario responda libremente. No insistas si es cortante.`;
 
@@ -284,7 +296,7 @@ export function buildBriefChatSystemPrompt(
     clientMessage,
     "",
     "[INSTRUCCION DE FORMATO]",
-    "Responde \u00fanicamente con el texto visible para el cliente (sin JSON, sin markdown, sin bloques de c\u00f3digo, sin etiquetas internas). Una sola pregunta por turno."
+    "Durante la conversacion, responde solo con texto visible para el cliente (sin JSON, sin markdown, sin bloques de codigo, sin etiquetas internas). Una sola pregunta por turno. EXCEPCION: cuando cierres el brief, SI debes emitir los tags [SYS_ACTION: LOCK_SUCCESS] y [BRIEF_COMPLETO] y el JSON de 9 claves como se indico en [REGLA DE CIERRE OBLIGATORIO]."
   ].join("\n");
 }
 
