@@ -15,6 +15,7 @@
 import {
   buildFinalSummaryText,
   emptyStructuredBriefSummary,
+  renderVikaProgressBlock,
   type BriefMessage,
   type StructuredBriefSummary
 } from "./briefing";
@@ -35,6 +36,14 @@ type GeminiGenerateContentResponse = {
 export type GenerateBriefChatReplyInput = {
   messages: FinalBriefMessageInput[];
   clientMessage: string;
+  /**
+   * IMPL-20260611-01
+   * Resumen estructurado actual de la version del brief. Se inyecta en el
+   * System Prompt de Vika como bloque "PROGRESO ACTUAL DE LA CONVERSACIÓN"
+   * para evitar que el modelo repita preguntas ya respondidas.
+   * Opcional para mantener compatibilidad con callers/tests previos.
+   */
+  summary?: BriefSummary;
 };
 
 export type BriefChatReply = {
@@ -249,10 +258,14 @@ const VIKA_OPENING_QUESTION =
 
 export function buildBriefChatSystemPrompt(
   messages: FinalBriefMessageInput[],
-  clientMessage: string
+  clientMessage: string,
+  summary?: BriefSummary
 ): string {
   return [
     VIKA_MASTER_PROMPT,
+    "",
+    "[PROGRESO ACTUAL DE LA CONVERSACIÓN]",
+    renderVikaProgressBlock(summary ?? emptyStructuredBriefSummary()),
     "",
     "[SALIDA INICIAL OBLIGATORIA]",
     VIKA_OPENING_QUESTION,
@@ -394,7 +407,7 @@ export async function generateBriefChatReply(
     };
   }
 
-  const visiblePrompt = buildBriefChatSystemPrompt(input.messages, input.clientMessage);
+  const visiblePrompt = buildBriefChatSystemPrompt(input.messages, input.clientMessage, input.summary);
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {

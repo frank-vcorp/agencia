@@ -61,6 +61,60 @@ export function emptyVikaBriefData(): VikaBriefData {
 /**
  * IMPL-20260611-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
+ *
+ * Mapeo entre las 8 claves de Vika (usadas en el chat) y los campos del
+ * resumen estructurado que las almacenan en el jsonb existente.
+ * `diferenciador` viaja en `audience` y `objeciones` en `restrictions` por
+ * la regla de mapeo del contrato (ver `mapVikaBriefDataToStructuredSummary`).
+ */
+const VIKA_CHECKLIST_TO_SUMMARY_KEY: ReadonlyArray<{
+  vikaKey: string;
+  summaryKey: keyof StructuredBriefSummary;
+}> = [
+  { vikaKey: "giro_y_producto_heroe", summaryKey: "giroYProductoHeroe" },
+  { vikaKey: "madurez", summaryKey: "madurez" },
+  { vikaKey: "local_fisico", summaryKey: "localFisico" },
+  { vikaKey: "logo", summaryKey: "logo" },
+  { vikaKey: "diferenciador", summaryKey: "audience" },
+  { vikaKey: "objeciones", summaryKey: "restrictions" },
+  { vikaKey: "presupuesto", summaryKey: "presupuesto" },
+  { vikaKey: "cta_deseado", summaryKey: "cta" }
+];
+
+/**
+ * IMPL-20260611-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
+ *
+ * Renderiza el bloque "PROGRESO ACTUAL DE LA CONVERSACIÓN" que se inyecta en
+ * el System Prompt de Vika para que el modelo NO repita preguntas ya
+ * respondidas. Devuelve 3 lineas:
+ *  1. Encabezado del bloque.
+ *  2. Preguntas completadas (checks).
+ *  3. Preguntas pendientes (lista numerada con la clave de Vika).
+ */
+export function renderVikaProgressBlock(summary: StructuredBriefSummary): string {
+  const completed = VIKA_CHECKLIST_TO_SUMMARY_KEY.filter(({ summaryKey }) =>
+    hasMeaningfulSummaryValue(summaryKey, summary[summaryKey])
+  );
+  const pending = VIKA_CHECKLIST_TO_SUMMARY_KEY.filter(
+    ({ summaryKey }) => !hasMeaningfulSummaryValue(summaryKey, summary[summaryKey])
+  );
+
+  return [
+    "[PROGRESO ACTUAL DE LA CONVERSACIÓN]",
+    `Preguntas completadas: ${completed.length > 0 ? completed.map(() => "\u2713").join(" ") : "Ninguna"}`,
+    `Preguntas pendientes: ${pending
+      .map(({ vikaKey }) => {
+        const index = VIKA_CHECKLIST_TO_SUMMARY_KEY.findIndex((item) => item.vikaKey === vikaKey);
+        return `${index + 1}. ${vikaKey}`;
+      })
+      .join(", ")}`
+  ].join("\n");
+}
+
+/**
+ * IMPL-20260611-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
  * Mapea el JSON de 8 puntos emitido por Vika a los campos del resumen estructurado.
  * Los 3 campos nuevos (madurez, logo, presupuesto) se conservan en el jsonb existente.
  */
