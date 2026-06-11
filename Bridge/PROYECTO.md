@@ -163,6 +163,8 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 7. **IMPL-20260603-01** - Runtime estabilizado con presupuesto tokens elevado - commit `e21b37c`
 8. **IMPL-20260603-02** - Cierre dual (humano/raw) con agenda performance marketing - commit `2177c38`
 9. **IMPL-20260603-03** - Memoria conversacional incremental + control anti-repetición - commit `42bd5a1` + `DICTAMEN_FIX-20260529-03`
+10. **IMPL-20260610-04** - Piloto 2.1 creado via MCP - commit `7266acb`
+11. **IMPL-20260610-05** - Endpoint pre-registro vendedor + formulario cliente - commit `dd88ffb` (deploy pendiente)
 
 ### [ ] Pendiente
 
@@ -171,7 +173,13 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 
 ## Ultimo Corte Cerrado
 
-**IMPL-20260603-03 / FIX-20260529-03**
+**IMPL-20260610-05 — Pre-registro cliente vía vendedor**
+
+1. Endpoint `/api/v1/preregistro` POST (cliente + proyecto + link WhatsApp)
+2. Página `/cliente/preregistro` con formulario para vendedores
+3. Flujo: vendedor captura datos → sistema crea proyecto → genera link WhatsApp → cliente completa brief
+4. Commit: `dd88ffb` (deploy pendiente Vercel)
+5. SPEC: `context/SPECs/SPEC_ARCH-20260610-05_preregistro_cliente_vendedor.md`
 
 1. **Memoria conversacional incremental** implementada - `structuredSummary` reutilizado durante el chat para evitar preguntas repetidas
 2. **Control anti-repetición** activo - El prompt recibe bloques "Datos ya capturados" y "Frentes pendientes de esta etapa"
