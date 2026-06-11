@@ -38,15 +38,15 @@ Reemplazar la arquitectura actual del chat por el flujo definido en la Especific
 1. **`VikaBriefData`** (nuevo tipo en `briefing.ts`):
    ```ts
    type VikaBriefData = {
-     giro_y_producto_heroe: string;    // ¿De qué es tu negocio y qué es lo que más se vende?
-     madurez: string;                  // ¿Cuánto tiempo llevas con el negocio abierto?
-     local_fisico: string;             // ¿Tienes un local o entregas a domicilio?
-     logo: string;                     // ¿Tienes logotipo o usas el nombre con letras bonitas?
-     diferenciador: string;            // ¿Por qué te compran a ti y no a la competencia?
-     objeciones: string;               // ¿Qué dudas tiene la gente antes de comprar?
-     presupuesto: string;              // ¿De cuánto dinero dispones mensual?
-     cta_deseado: string;              // ¿Qué acción quieres que haga el cliente al ver el anuncio?
-     historia_y_contexto?: string;     // Pregunta abierta final (opcional)
+     giro_y_producto_heroe: string;
+     madurez: string;
+     local_fisico: string;
+     logo: string;
+     diferenciador: string;
+     objeciones: string;
+     presupuesto: string;
+     cta_deseado: string;
+     historia_y_contexto?: string;
    };
    ```
 
@@ -94,6 +94,11 @@ Reemplazar la arquitectura actual del chat por el flujo definido en la Especific
    7. presupuesto (Monto mensual asignado o $0 si no tienen)
    8. cta_deseado (WhatsApp, llamada, visita directa)
    
+   [CONDICIONAL DE LOCAL]
+   - Si el cliente indica que tiene local físico, taller o negocio presencial: preguntar "¿Dónde queda tu negocio? ¿En qué colonia o calle?"
+   - Si el cliente indica domicilio, online, digital o trabajo a domicilio: preguntar "¿Dónde publicas actualmente? ¿En Instagram, Facebook, WhatsApp, TikTok?"
+   - Si ya mencionó una plataforma o ubicación, no volver a preguntar.
+   
    [FASE DE DESCUBRIMIENTO NARRATIVO]
    Al completar los 8 puntos, relaja la plática. Haz UNA pregunta abierta ("¿Cómo te animaste a poner el negocio?", o "¿Qué ha sido lo más difícil?"). Deja que el usuario responda libremente. No insistas si es cortante.
    
@@ -112,6 +117,7 @@ Reemplazar la arquitectura actual del chat por el flujo definido en la Especific
 3. Agregar campos `madurez`, `logo`, `presupuesto` al `StructuredBriefSummary` (viajan en jsonb)
 4. `updateBriefSummary` debe aceptar el JSON plano de Vika y mapear a campos internos
 5. Mapeo: `giro_y_producto_heroe` → `mainOffer` + `projectObjective`, `diferenciador` → `audience`, `objeciones` → `restrictions`, `cta_deseado` → `cta`
+6. Agregar `renderVikaProgressBlock(summary)` → bloque de progreso para inyectar en prompt
 
 ### B) `Bridge/lib/briefing-assistant-ai.ts`
 
@@ -119,15 +125,16 @@ Reemplazar la arquitectura actual del chat por el flujo definido en la Especific
 2. Eliminar `INTERNAL_COVERAGE_AGENDA_BY_STAGE` y `PROMPT_PENDING_FIELDS_BY_STAGE`
 3. Eliminar lógica de avance de etapa en prompt
 4. Agregar detección de tag `[SYS_ACTION: LOCK_SUCCESS]` mediante regex
-5. `generateBriefChatReply` usa el nuevo prompt (sin cambios de contrato)
-6. `generateBriefClosure` genera JSON de 8 campos con el tag + extrae el bloque
+5. Si `GEMINI_API_KEY` no disponible: no persistir respuesta visible, registrar log console.error
+6. `generateBriefChatReply` usa el nuevo prompt
+7. `generateBriefClosure` genera JSON de 8 campos con el tag + extrae el bloque
 
 ### C) `Bridge/app/cliente/brief/[projectId]/actions.ts`
 
 1. Simplificar `sendClientMessageAction`:
    - Persiste mensaje cliente
-   - Llama a IA con nuevo prompt
-   - Persiste respuesta del asistente
+   - Llama a IA con nuevo prompt (si disponible)
+   - Persiste respuesta del asistente SOLO si IA responde exitosamente
 2. Eliminar llamadas a `inferBriefSummaryPatchFromClientMessage` y `advanceBriefStageInBackground`
 3. `submitBriefAction` debe:
    - Buscar `[SYS_ACTION: LOCK_SUCCESS]` en `messages` del asistente
@@ -139,15 +146,16 @@ Reemplazar la arquitectura actual del chat por el flujo definido en la Especific
 
 1. Eliminar bloque de "etapa actual" / "frentes pendientes" (función `stageCopy`)
 2. Eliminar referencia a etapas en UI
-3. Mostrar texto inicial: "Tengo 8 preguntas para entender tu negocio. Con gusto te ayudo."
+3. Mostrar texto inicial: "Tengo 8 preguntas para entender tu negocio. ¡Empecemos!"
 4. Al cierre, mostrar resumen humano derivado de los 8 campos
+5. Brief $0 presupuesto: mostrar "Estrategia orgánica sin inversión en publicidad"
 
 ### E) `Bridge/app/briefs/page.tsx` (panel operador)
 
 1. Eliminar panel de etapas (Discovery/Precision/Commercial Fit)
 2. Reemplazar formulario de 21 campos con:
-   - Lista de verificación de los 8 puntos
-   - Botón "Brief completado" que detecta el tag LOCK_SUCCESS
+   - Lista de verificación de los 8 puntos con checkboxes verificables
+   - Badge: `$0 / Orgánico` cuando presupuesto indica sin inversión
 3. Mostrar JSON extrído del brief para revisión del operador
 4. Mantener chat operativo independiente
 
@@ -182,3 +190,5 @@ cd Bridge && npm run build && npx vitest run
 4. El cliente ve un resumen humano de su negocio al cierre (sin jerga técnica)
 5. Build y tests verdes
 6. MCP `bridge_get_brief` entrega los campos mapeados correctamente
+7. **El bloque "CONDICIONAL DE LOCAL" evita repreguntas duplicadas**
+8. **El bloque "PROGRESO ACTUAL DE LA CONVERSACIÓN" muestra preguntas completadas/pendientes**
