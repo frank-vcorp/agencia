@@ -16,6 +16,30 @@
    - IMPL-20260603-01 a 03 (runtime estabilizado, cierre dual, memoria incremental)
 4. **Actualización de "Último Corte Cerrado"** - IMPL-20260603-03 destacado
 5. **Agregado dictamen técnico** - DICTAMEN_FIX-20260529-03 a artefactos clave
+6. **Push a GitHub** - Commits sincronizados con origin/main
+
+---
+
+## Limpieza operativa completada (2026-06-10)
+
+1. **Proyecto Piloto 2.0** eliminado - `bridge_delete_project` efectivo
+2. **2 briefs huérfanos** movidos a papelera - `bridge_delete_brief` soft-delete
+3. **Activos** - Ya vacíos
+4. **Cliente Rodamax** - Sin proyectos/briefs activos, disponible para nuevo flujo
+
+---
+
+## Estado actual verificado
+
+| Área | Estado |
+|------|--------|
+| Build | ✅ Limpio |
+| Tests briefing.test.ts | ✅ 26/26 verdes |
+| Tests totales | ⚠️ 419/422 (3 rojos pre-existentes) |
+| MCP Server | ✅ 8 tools operativos (proceso activo en PID 123353) |
+| MCT | ✅ Código completo |
+| FIX loop mainOffer | ✅ Aplicado + dictamen emitido |
+| Tenant vectoria | ✅ Limpio para nuevo piloto |
 
 ---
 
