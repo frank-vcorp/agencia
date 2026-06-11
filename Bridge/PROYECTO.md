@@ -164,7 +164,8 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 8. **IMPL-20260603-02** - Cierre dual (humano/raw) con agenda performance marketing - commit `2177c38`
 9. **IMPL-20260603-03** - Memoria conversacional incremental + control anti-repetición - commit `42bd5a1` + `DICTAMEN_FIX-20260529-03`
 10. **IMPL-20260610-04** - Piloto 2.1 creado via MCP - commit `7266acb`
-11. **IMPL-20260610-05** - Endpoint pre-registro vendedor + formulario cliente - commit `dd88ffb` (deploy pendiente)
+11. **IMPL-20260610-05** - Endpoint pre-registro vendedor + formulario cliente - commit `dd88ffb`
+12. **IMPL-20260610-06** - Tests + helpers extraídos - checkpoint `CHECKPOINT_IMPL-20260610-06.md` (PR pendiente QA)
 
 ### [ ] Pendiente
 
