@@ -1,4 +1,6 @@
 /**
+ * IMPL-20260611-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
  * IMPL-20260603-03
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-03_memoria_conversacional_incremental_y_control_antirepeticion_brief_v1.md
  * IMPL-20260603-02
@@ -13,6 +15,98 @@
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 import { getTenantIdentityContextByTenantId, resolveActorTrace } from "./identity";
 import { resolveTenantIdBySlug } from "./tenant";
+
+/**
+ * IMPL-20260611-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
+ * Payload de 8 puntos obligatorios + narrativa opcional emitido por Vika al cierre.
+ */
+export type VikaBriefData = {
+  giro_y_producto_heroe: string;
+  madurez: string;
+  local_fisico: string;
+  logo: string;
+  diferenciador: string;
+  objeciones: string;
+  presupuesto: string;
+  cta_deseado: string;
+  historia_y_contexto?: string;
+};
+
+export const VIKA_BRIEF_FIELDS = [
+  "giro_y_producto_heroe",
+  "madurez",
+  "local_fisico",
+  "logo",
+  "diferenciador",
+  "objeciones",
+  "presupuesto",
+  "cta_deseado"
+] as const satisfies ReadonlyArray<keyof VikaBriefData>;
+
+export function emptyVikaBriefData(): VikaBriefData {
+  return {
+    giro_y_producto_heroe: "",
+    madurez: "",
+    local_fisico: "",
+    logo: "",
+    diferenciador: "",
+    objeciones: "",
+    presupuesto: "",
+    cta_deseado: "",
+    historia_y_contexto: ""
+  };
+}
+
+/**
+ * IMPL-20260611-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
+ * Mapea el JSON de 8 puntos emitido por Vika a los campos del resumen estructurado.
+ * Los 3 campos nuevos (madurez, logo, presupuesto) se conservan en el jsonb existente.
+ */
+export function mapVikaBriefDataToStructuredSummary(
+  vika: Partial<VikaBriefData>
+): Partial<StructuredBriefSummary> {
+  const get = (key: keyof VikaBriefData): string => (typeof vika[key] === "string" ? (vika[key] as string).trim() : "");
+
+  const giro = get("giro_y_producto_heroe");
+  const diferenciador = get("diferenciador");
+  const objeciones = get("objeciones");
+  const cta = get("cta_deseado");
+  const madurez = get("madurez");
+  const logo = get("logo");
+  const presupuesto = get("presupuesto");
+  const localFisico = get("local_fisico");
+  const historia = get("historia_y_contexto");
+
+  const patch: Partial<StructuredBriefSummary> = {
+    madurez,
+    logo,
+    presupuesto,
+    localFisico,
+    giroYProductoHeroe: giro,
+    historiaYContexto: historia
+  };
+
+  if (giro) {
+    patch.mainOffer = giro;
+    patch.projectObjective = giro;
+  }
+
+  if (diferenciador) {
+    patch.audience = diferenciador;
+  }
+
+  if (objeciones) {
+    patch.restrictions = objeciones;
+  }
+
+  if (cta) {
+    patch.cta = cta;
+  }
+
+  return patch;
+}
 
 export const briefingStages = ["discovery", "precision", "commercial_fit"] as const;
 
@@ -56,6 +150,17 @@ export type StructuredBriefSummary = {
   upsellSignal: string;
   operatorReviewNote: string;
   clientFacingSummary: string;
+  /**
+   * IMPL-20260611-01
+   * Campos del flujo Vika (8 puntos) que viajan en el jsonb existente.
+   * No requieren migración de Supabase.
+   */
+  madurez: string;
+  logo: string;
+  presupuesto: string;
+  localFisico: string;
+  giroYProductoHeroe: string;
+  historiaYContexto: string;
 };
 
 export type BriefMessage = {
@@ -274,7 +379,13 @@ export const emptyStructuredBriefSummary = (): StructuredBriefSummary => ({
   commercialFitReason: "",
   upsellSignal: "",
   operatorReviewNote: "",
-  clientFacingSummary: ""
+  clientFacingSummary: "",
+  madurez: "",
+  logo: "",
+  presupuesto: "",
+  localFisico: "",
+  giroYProductoHeroe: "",
+  historiaYContexto: ""
 });
 
 export function normalizeSummary(input: Partial<StructuredBriefSummary> | null | undefined): StructuredBriefSummary {
@@ -380,7 +491,13 @@ export function buildFinalSummaryText(summary: StructuredBriefSummary): string {
     summary.gaps && `Faltantes o alertas: ${summary.gaps}.`,
     summary.recommendedProductSlotKey && `Slot comercial sugerido: ${summary.recommendedProductSlotKey}.`,
     summary.commercialFitReason && `Razon de encaje: ${summary.commercialFitReason}.`,
-    summary.upsellSignal && `Oportunidad comercial: ${summary.upsellSignal}.`
+    summary.upsellSignal && `Oportunidad comercial: ${summary.upsellSignal}.`,
+    summary.madurez && `Madurez del negocio: ${summary.madurez}.`,
+    summary.logo && `Logo o marca: ${summary.logo}.`,
+    summary.presupuesto && `Presupuesto mensual: ${summary.presupuesto}.`,
+    summary.localFisico && `Local fisico: ${summary.localFisico}.`,
+    summary.giroYProductoHeroe && `Giro y producto heroe: ${summary.giroYProductoHeroe}.`,
+    summary.historiaYContexto && `Historia y contexto: ${summary.historiaYContexto}.`
   ].filter(Boolean);
 
   return lines.join(" ");
@@ -525,7 +642,33 @@ const VISIBLE_QUESTION_BY_FIELD: Record<keyof StructuredBriefSummary, StageQuest
   },
   upsellSignal: null,
   operatorReviewNote: null,
-  clientFacingSummary: null
+  clientFacingSummary: null,
+  madurez: {
+    key: "madurez",
+    question: "\u00bfCu\u00e1nto tiempo llevas con el negocio abierto?",
+    clarification:
+      "Me interesa saber si apenas est\u00e1s empezando o si ya tienes un tiempo operando. Eso me ayuda a pensar la estrategia adecuada."
+  },
+  logo: {
+    key: "logo",
+    question: "\u00bfTienes un logotipo o usas el nombre del negocio con letras bonitas?",
+    clarification:
+      "Con esto ubico si ya tienes marca gr\u00e1fica lista o si necesitamos contemplarla dentro de la estrategia."
+  },
+  presupuesto: {
+    key: "presupuesto",
+    question: "\u00bfDe cu\u00e1nto dinero dispones al mes para invertir en este proyecto?",
+    clarification:
+      "Si no tienes un monto claro, lo anotamos como $0 / Org\u00e1nico y dise\u00f1amos la estrategia en consecuencia."
+  },
+  localFisico: {
+    key: "localFisico",
+    question: "\u00bfTienes un local donde la gente te visita o entregas a domicilio?",
+    clarification:
+      "Con eso decido si conviene mostrar la fachada del local o si la estrategia es 100% digital o a domicilio."
+  },
+  giroYProductoHeroe: null,
+  historiaYContexto: null
 };
 
 const STAGE_FIELD_PRIORITY: Record<BriefingStage, Array<keyof StructuredBriefSummary>> = {
@@ -546,7 +689,13 @@ const FIELD_COMPLETION_RULES: Partial<
   deliverable: { minLength: 4, minWords: 1 },
   cta: { minLength: 4, minWords: 1 },
   recommendedProductSlotKey: { minLength: 4, minWords: 1 },
-  commercialFitReason: { minLength: 12, minWords: 3 }
+  commercialFitReason: { minLength: 12, minWords: 3 },
+  madurez: { minLength: 2, minWords: 1 },
+  logo: { minLength: 2, minWords: 1 },
+  presupuesto: { minLength: 1, minWords: 1 },
+  localFisico: { minLength: 2, minWords: 1 },
+  giroYProductoHeroe: { minLength: 4, minWords: 1 },
+  historiaYContexto: { minLength: 4, minWords: 1 }
 };
 
 const GENERIC_SUMMARY_VALUES = new Set(["hola", "buenas", "gracias", "si", "no", "ok", "dale", "listo"]);
@@ -733,59 +882,6 @@ function shouldApplySummaryCandidate(
   }
 
   return nextValue.length >= current.length + 12 && countWords(nextValue) >= countWords(current) + 1;
-}
-
-/**
- * IMPL-20260603-03
- * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-03_memoria_conversacional_incremental_y_control_antirepeticion_brief_v1.md
- */
-export function inferBriefSummaryPatchFromClientMessage(
-  stage: BriefingStage,
-  currentSummary: StructuredBriefSummary,
-  messageText: string
-): Partial<StructuredBriefSummary> {
-  const cleanedMessage = cleanHeuristicValue(messageText);
-
-  if (!cleanedMessage) {
-    return {};
-  }
-
-  const summary = normalizeSummary(currentSummary);
-  const normalizedText = normalizeHeuristicText(cleanedMessage);
-  const fieldOrder = Array.from(
-    new Set<keyof StructuredBriefSummary>([
-      ...STAGE_FIELD_PRIORITY[stage],
-      "audience",
-      "platform",
-      "deliverable",
-      "cta",
-      "commercialFitReason"
-    ])
-  );
-  const candidateByField: Partial<Record<keyof StructuredBriefSummary, string>> = {
-    projectObjective: extractProjectObjectiveCandidate(cleanedMessage, normalizedText),
-    mainOffer: extractMainOfferCandidate(cleanedMessage),
-    businessContext: extractBusinessContextCandidate(cleanedMessage),
-    requestReason: extractRequestReasonCandidate(cleanedMessage),
-    audience: extractAudienceCandidate(cleanedMessage),
-    platform: extractPlatformCandidate(cleanedMessage, normalizedText),
-    deliverable: extractDeliverableCandidate(cleanedMessage, normalizedText),
-    cta: extractCtaCandidate(cleanedMessage, normalizedText),
-    commercialFitReason: extractCommercialFitReasonCandidate(cleanedMessage)
-  };
-  const patch: Partial<StructuredBriefSummary> = {};
-
-  for (const field of fieldOrder) {
-    const candidate = candidateByField[field];
-
-    if (!candidate || !shouldApplySummaryCandidate(field, summary[field], candidate)) {
-      continue;
-    }
-
-    patch[field] = cleanHeuristicValue(candidate);
-  }
-
-  return patch;
 }
 
 /**
@@ -1500,14 +1596,6 @@ async function updateBriefStage(
  */
 export async function advanceBriefStage(context: MutationContext): Promise<BriefVersion> {
   return updateBriefStage(context, { appendAssistantMessage: true });
-}
-
-/**
- * IMPL-20260529-01
- * Respaldo: context/SPECs/SPEC_ARCH-20260529-07_chat_brief_adaptativo_y_etapas_background_v1.md
- */
-export async function advanceBriefStageInBackground(context: MutationContext): Promise<BriefVersion> {
-  return updateBriefStage(context, { appendAssistantMessage: false });
 }
 
 export async function submitBriefForOperatorReview(context: MutationContext): Promise<BriefVersion> {

@@ -1,4 +1,6 @@
 /**
+ * IMPL-20260611-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
  * IMPL-20260603-03
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-03_memoria_conversacional_incremental_y_control_antirepeticion_brief_v1.md
  * IMPL-20260603-02
@@ -16,24 +18,96 @@ import {
   buildAssistantGuidance,
   buildFinalSummaryText,
   emptyStructuredBriefSummary,
+  emptyVikaBriefData,
   getCurrentVisibleStageQuestion,
   getCriticalMissingFields,
   hasBackgroundStageSufficientInfo,
   hasMeaningfulSummaryValue,
-  inferBriefSummaryPatchFromClientMessage,
+  mapVikaBriefDataToStructuredSummary,
   mergeStructuredBriefSummary,
   nextStage,
   selectPreferredProject,
-  statusFromStage
+  statusFromStage,
+  VIKA_BRIEF_FIELDS
 } from "./briefing";
 import {
+  BRIEF_COMPLETO_TAG_REGEX,
   buildBriefChatSystemPrompt,
-  generateBriefClosure,
+  extractJsonObject,
   generateBriefChatReply,
-  hasStageSufficientInfo,
+  generateBriefClosure,
   isAcceptableAssistantVisibleReply,
+  LOCK_SUCCESS_TAG_REGEX,
   sanitizeAssistantReply
 } from "./briefing-assistant-ai";
+
+describe("briefing Vika data model", () => {
+  it("expone los 8 campos obligatorios + narrativa", () => {
+    expect(VIKA_BRIEF_FIELDS).toEqual([
+      "giro_y_producto_heroe",
+      "madurez",
+      "local_fisico",
+      "logo",
+      "diferenciador",
+      "objeciones",
+      "presupuesto",
+      "cta_deseado"
+    ]);
+  });
+
+  it("genera un inicializador vacio para VikaBriefData", () => {
+    expect(emptyVikaBriefData()).toEqual({
+      giro_y_producto_heroe: "",
+      madurez: "",
+      local_fisico: "",
+      logo: "",
+      diferenciador: "",
+      objeciones: "",
+      presupuesto: "",
+      cta_deseado: "",
+      historia_y_contexto: ""
+    });
+  });
+
+  it("mapea VikaBriefData a StructuredBriefSummary segun el contrato de la SPEC", () => {
+    const patch = mapVikaBriefDataToStructuredSummary({
+      giro_y_producto_heroe: "Pizzeria - especial de carnes frias",
+      madurez: "5 anos",
+      local_fisico: "Local a la calle",
+      logo: "Tiene logotipo profesional",
+      diferenciador: "Receta de la abuela",
+      objeciones: "Temor al precio",
+      presupuesto: "$3,000 MXN",
+      cta_deseado: "Pedir por WhatsApp",
+      historia_y_contexto: "Tradicion familiar"
+    });
+
+    expect(patch.giroYProductoHeroe).toBe("Pizzeria - especial de carnes frias");
+    expect(patch.madurez).toBe("5 anos");
+    expect(patch.localFisico).toBe("Local a la calle");
+    expect(patch.logo).toBe("Tiene logotipo profesional");
+    expect(patch.presupuesto).toBe("$3,000 MXN");
+    expect(patch.cta).toBe("Pedir por WhatsApp");
+    expect(patch.historiaYContexto).toBe("Tradicion familiar");
+    // Mapeos cruzados del contrato (Vika -> Structured):
+    expect(patch.mainOffer).toBe("Pizzeria - especial de carnes frias");
+    expect(patch.projectObjective).toBe("Pizzeria - especial de carnes frias");
+    expect(patch.audience).toBe("Receta de la abuela");
+    expect(patch.restrictions).toBe("Temor al precio");
+  });
+
+  it("tolera campos faltantes en el mapeo sin romper", () => {
+    const patch = mapVikaBriefDataToStructuredSummary({});
+    expect(patch).toEqual({
+      madurez: "",
+      logo: "",
+      presupuesto: "",
+      localFisico: "",
+      giroYProductoHeroe: "",
+      historiaYContexto: ""
+    });
+  });
+});
 
 describe("briefing", () => {
   it("calcula la secuencia obligatoria de tres etapas", () => {
@@ -56,11 +130,33 @@ describe("briefing", () => {
     expect(getCriticalMissingFields(summary)).toEqual(["encaje comercial o nota explicita de revision comercial"]);
   });
 
-  it("incluye clientFacingSummary en la forma base del resumen estructurado", () => {
-    expect(emptyStructuredBriefSummary().clientFacingSummary).toBe("");
+  it("incluye clientFacingSummary y campos Vika en la forma base del resumen estructurado", () => {
+    const base = emptyStructuredBriefSummary();
+    expect(base.clientFacingSummary).toBe("");
+    expect(base.madurez).toBe("");
+    expect(base.logo).toBe("");
+    expect(base.presupuesto).toBe("");
+    expect(base.localFisico).toBe("");
+    expect(base.giroYProductoHeroe).toBe("");
+    expect(base.historiaYContexto).toBe("");
   });
 
-  it("compone un resumen final persistible y una guia contextual de etapa", () => {
+  it("compone un resumen final persistible con campos Vika", () => {
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria - carnes frias",
+      madurez: "5 anos",
+      presupuesto: "$3,000 MXN",
+      logo: "Logotipo profesional"
+    });
+
+    const text = buildFinalSummaryText(summary);
+    expect(text).toContain("Giro y producto heroe: Pizzeria - carnes frias.");
+    expect(text).toContain("Madurez del negocio: 5 anos.");
+    expect(text).toContain("Presupuesto mensual: $3,000 MXN.");
+    expect(text).toContain("Logo o marca: Logotipo profesional.");
+  });
+
+  it("compone un resumen final y una guia contextual de etapa (legacy)", () => {
     const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
       projectObjective: "Generar leads para una preventa",
       mainOffer: "Mentoria premium",
@@ -78,7 +174,7 @@ describe("briefing", () => {
     expect(buildAssistantGuidance("commercial_fit", summary)).toContain("Ya veo por d\u00f3nde puede ir la propuesta");
   });
 
-  it("suaviza la guia visible en discovery y precision sin perder foco comercial", () => {
+  it("suaviza la guia visible en discovery y precision sin perder foco comercial (legacy)", () => {
     expect(buildAssistantGuidance("discovery", emptyStructuredBriefSummary())).toContain(
       "qu\u00e9 te gustar\u00eda ver pasar si esto sale bien"
     );
@@ -91,7 +187,7 @@ describe("briefing", () => {
     })).toContain("base \u00fatil");
   });
 
-  it("valida suficiencia en background con contenido significativo y no por texto vacio", () => {
+  it("valida suficiencia en background con contenido significativo y no por texto vacio (legacy)", () => {
     const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
       projectObjective: "Captar leads calificados para una preventa",
       mainOffer: "Mentoria premium",
@@ -103,37 +199,11 @@ describe("briefing", () => {
     expect(hasBackgroundStageSufficientInfo("discovery", summary)).toBe(true);
   });
 
-  it("infiera patch incremental desde un mensaje cliente con senales claras tipo Rodamax", () => {
-    const patch = inferBriefSummaryPatchFromClientMessage(
-      "discovery",
-      emptyStructuredBriefSummary(),
-      "Queremos mover cambio de aceite y mantenimiento preventivo para dueños de autos en Instagram y WhatsApp, con una landing para agendar por WhatsApp porque bajaron las ventas este mes."
-    );
-
-    expect(patch.mainOffer).toContain("cambio de aceite");
-    expect(patch.audience).toContain("dueños de autos");
-    expect(patch.platform).toBe("Instagram");
-    expect(patch.deliverable).toBe("Landing");
-    expect(patch.cta).toBe("Agendar llamada");
-    expect(patch.requestReason).toContain("bajaron las ventas");
-  });
-
-  it("no sobreescribe un campo significativo con una respuesta mas vaga", () => {
-    const currentSummary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
-      projectObjective: "Captar 40 leads calificados para servicio premium en 30 dias"
-    });
-
-    const patch = inferBriefSummaryPatchFromClientMessage("discovery", currentSummary, "Si, eso.");
-
-    expect(patch.projectObjective).toBeUndefined();
-  });
-
-  it("traduce el faltante mainOffer a una pregunta visible natural", () => {
+  it("traduce el faltante mainOffer a una pregunta visible natural (legacy)", () => {
     const question = getCurrentVisibleStageQuestion("discovery", emptyStructuredBriefSummary());
 
     expect(question?.key).toBe("mainOffer");
     expect(question?.question).toBe("\u00bfCu\u00e1l es el servicio o producto principal que quieres mover primero?");
-    expect(question?.question.toLowerCase()).not.toContain("oferta principal");
   });
 
   it("prioriza el project activo como contenedor operativo por encima de otros estados", () => {
@@ -147,33 +217,61 @@ describe("briefing", () => {
   });
 });
 
-describe("briefing-assistant-ai", () => {
-  it("incluye reglas de chat natural, agenda interna y historial en el prompt de conversacion", () => {
+describe("briefing-assistant-ai (Vika)", () => {
+  it("incluye el System Prompt Maestro de Vika con sus reglas de oro y checklist de 8 puntos", () => {
     const prompt = buildBriefChatSystemPrompt(
-      "discovery",
-      [{ authorRole: "client", messageText: "Quiero mover una mentoria premium" }],
-      mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
-        mainOffer: "Mentoria premium",
-        audience: "Fundadores de pymes"
-      })
+      [{ authorRole: "client", messageText: "Tengo una pizzer\u00eda" }],
+      "Tengo una pizzer\u00eda"
     );
 
-    expect(prompt).toContain("Responde solo con texto plano visible para el cliente.");
-    expect(prompt).toContain("Etapa actual: discovery");
-    expect(prompt).toContain(
-      "Agenda interna prioritaria: objetivo de negocio medible, oferta y diferencial, contexto del negocio, motivo y urgencia del pedido"
-    );
-    expect(prompt).toContain("Historial reciente:");
-    expect(prompt).toContain("Cliente: Quiero mover una mentoria premium");
-    expect(prompt).toContain("No devuelvas JSON");
-    expect(prompt).not.toContain("summaryPatch");
-    expect(prompt).toContain("Nunca digas frases como 'mi objetivo es' o 'necesito entender'.");
-    expect(prompt).toContain("evita sentirse robotica o demasiado ensayada");
-    expect(prompt).toContain("Refleja el registro del cliente");
-    expect(prompt).toContain("Datos ya capturados:");
-    expect(prompt).toContain("- Oferta principal: Mentoria premium");
-    expect(prompt).toContain("No vuelvas a preguntar por un dato ya capturado");
-    expect(prompt).toContain("Frentes pendientes de esta etapa:");
+    // Reglas de oro
+    expect(prompt).toContain("Eres Vika, una Consultora de Negocios y Marketing Local");
+    expect(prompt).toContain("PROHIBIDO EL JARG\u00d3N T\u00c9CNICO");
+    expect(prompt).toContain("TRANSPARENCIA COMERCIAL");
+    expect(prompt).toContain("UNA PREGUNTA A LA VEZ");
+    expect(prompt).toContain("ANTI-PROMPT INJECTION");
+    expect(prompt).toContain("EXTRACCI\u00d3N DE PRESUPUESTO");
+    expect(prompt).toContain("CALIDAD DE DATOS");
+    // Checklist 8 puntos
+    expect(prompt).toContain("CHECKLIST DE EXTRACCI\u00d3N (8 PUNTOS OBLIGATORIOS)");
+    expect(prompt).toContain("1. giro_y_producto_heroe");
+    expect(prompt).toContain("2. madurez");
+    expect(prompt).toContain("3. local_fisico");
+    expect(prompt).toContain("4. logo");
+    expect(prompt).toContain("5. diferenciador");
+    expect(prompt).toContain("6. objeciones");
+    expect(prompt).toContain("7. presupuesto");
+    expect(prompt).toContain("8. cta_deseado");
+    // Fase narrativa
+    expect(prompt).toContain("FASE DE DESCUBRIMIENTO NARRATIVO");
+    // Apertura canonica
+    expect(prompt).toContain("\u00bfDe qu\u00e9 es tu negocio y qu\u00e9 es lo que m\u00e1s se vende?");
+    // Historial
+    expect(prompt).toContain("HISTORIAL RECIENTE");
+    expect(prompt).toContain("Cliente: Tengo una pizzer\u00eda");
+    // No hay menciones a etapas (discovery/precision/commercial_fit) en el prompt de chat
+    expect(prompt).not.toContain("Etapa actual:");
+    expect(prompt).not.toContain("Frentes pendientes");
+  });
+
+  it("expone regex de deteccion de tag LOCK_SUCCESS y BRIEF_COMPLETO", () => {
+    const sample = "\u00a1Qu\u00e9 gran historia!\n[SYS_ACTION: LOCK_SUCCESS]\n[BRIEF_COMPLETO]\n{ \"giro_y_producto_heroe\": \"x\" }";
+    expect(LOCK_SUCCESS_TAG_REGEX.test(sample)).toBe(true);
+    expect(BRIEF_COMPLETO_TAG_REGEX.test(sample)).toBe(true);
+    expect(LOCK_SUCCESS_TAG_REGEX.test("respuesta normal sin tag")).toBe(false);
+  });
+
+  it("extrae JSON de bloques ```json``` y de objetos en linea", () => {
+    const fenced = "texto previo\n```json\n{\"a\": 1}\n```\nm\u00e1s texto";
+    expect(extractJsonObject(fenced)).toBe("{\"a\": 1}");
+
+    const inline = "hola {\"a\": 1, \"b\": \"x\"} mundo";
+    expect(extractJsonObject(inline)).toBe("{\"a\": 1, \"b\": \"x\"}");
+
+    const nested = "{\"outer\": {\"inner\": [1,2]}} tail";
+    expect(extractJsonObject(nested)).toBe("{\"outer\": {\"inner\": [1,2]}}");
+
+    expect(extractJsonObject("sin json")).toBeNull();
   });
 
   it("postprocesa salida visible para limitar desborde y limpiar lineas vacias repetidas", () => {
@@ -209,22 +307,21 @@ describe("briefing-assistant-ai", () => {
   it("acepta una respuesta visible completa y natural", () => {
     expect(
       isAcceptableAssistantVisibleReply(
-        "Perfecto, ya entendí el contexto. Para avanzar bien, cuéntame cuál es tu objetivo principal con este proyecto.",
+        "Perfecto, ya entend\u00ed el contexto. Para avanzar bien, cu\u00e9ntame cu\u00e1l es tu objetivo principal con este proyecto.",
         "STOP"
       )
     ).toBe(true);
   });
 
-  it("devuelve una respuesta operativa cuando GEMINI_API_KEY no esta configurada", async () => {
+  it("devuelve respuesta degradada y vacia de payload visible cuando GEMINI_API_KEY no esta configurada", async () => {
     vi.stubEnv("GEMINI_API_KEY", "");
 
     const result = await generateBriefChatReply({
-      stage: "discovery",
       messages: [],
-      clientMessage: "Necesito ayuda para definir mi oferta",
-      summary: emptyStructuredBriefSummary()
+      clientMessage: "Necesito ayuda para definir mi oferta"
     });
 
+    expect(result.degraded).toBe(true);
     expect(result.visibleReply).toContain("Se interrumpio este turno");
 
     vi.unstubAllEnvs();
@@ -241,7 +338,7 @@ describe("briefing-assistant-ai", () => {
             content: {
               parts: [
                 {
-                  text: "Entendido, el foco es cambio de aceite y mantenimiento preventivo. ¿Qué los impulsa a mover esta línea justo ahora?"
+                  text: "Entendido, el foco es cambio de aceite y mantenimiento preventivo. \u00bfQu\u00e9 los impulsa a mover esta l\u00ednea justo ahora?"
                 }
               ]
             }
@@ -252,211 +349,55 @@ describe("briefing-assistant-ai", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await generateBriefChatReply({
-      stage: "discovery",
       messages: [
         { authorRole: "client", messageText: "Queremos mover cambio de aceite y mantenimiento preventivo" }
       ],
-      clientMessage: "Queremos mover cambio de aceite y mantenimiento preventivo",
-      summary: emptyStructuredBriefSummary()
+      clientMessage: "Queremos mover cambio de aceite y mantenimiento preventivo"
     });
 
     expect(result.visibleReply).toContain("cambio de aceite");
+    expect(result.degraded).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
-  it("acepta una respuesta de texto plano del modelo sin depender de JSON estructurado", async () => {
-    vi.stubEnv("GEMINI_API_KEY", "fake-key");
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        candidates: [
-          {
-            finishReason: "STOP",
-            content: {
-              parts: [
-                {
-                  text: "Entendido, el foco es cambio de aceite y mantenimiento preventivo. ¿Qué los impulsa a mover esta línea justo ahora?"
-                }
-              ]
-            }
-          }
-        ]
-      })
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const result = await generateBriefChatReply({
-      stage: "discovery",
-      messages: [],
-      clientMessage: "Queremos mover cambio de aceite y mantenimiento preventivo",
-      summary: emptyStructuredBriefSummary()
-    });
-
-    expect(result.visibleReply).toContain("cambio de aceite");
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
-  });
-
-  it("devuelve una respuesta operativa cuando Gemini devuelve una respuesta visible tecnica", async () => {
-    vi.stubEnv("GEMINI_API_KEY", "fake-key");
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        candidates: [
-          {
-            finishReason: "STOP",
-            content: {
-              parts: [
-                {
-                  text: JSON.stringify({
-                    visibleReply: "FOCO: discovery",
-                    summaryPatch: {}
-                  })
-                }
-              ]
-            }
-          }
-        ]
-      })
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const result = await generateBriefChatReply({
-      stage: "discovery",
-      messages: [],
-      clientMessage: "Quiero captar leads",
-      summary: emptyStructuredBriefSummary()
-    });
-
-    expect(result.visibleReply).toContain("Se interrumpio este turno");
-
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
-  });
-
-  it("devuelve una respuesta operativa cuando Gemini devuelve una frase truncada", async () => {
-    vi.stubEnv("GEMINI_API_KEY", "fake-key");
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        candidates: [
-          {
-            finishReason: "STOP",
-            content: {
-              parts: [
-                {
-                  text: JSON.stringify({
-                    visibleReply: "Entendido. Para entender mejor",
-                    summaryPatch: {}
-                  })
-                }
-              ]
-            }
-          }
-        ]
-      })
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const result = await generateBriefChatReply({
-      stage: "discovery",
-      messages: [],
-      clientMessage: "Quiero lanzar una campana",
-      summary: emptyStructuredBriefSummary()
-    });
-
-    expect(result.visibleReply).toContain("Se interrumpio este turno");
-
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
-  });
-
-  it("devuelve una respuesta operativa cuando Gemini corta la salida por maximo de tokens", async () => {
-    vi.stubEnv("GEMINI_API_KEY", "fake-key");
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        candidates: [
-          {
-            finishReason: "MAX_TOKENS",
-            content: {
-              parts: [
-                {
-                  text: JSON.stringify({
-                    visibleReply: "Perfecto, ya entiendo el contexto y te voy a ayudar con",
-                    summaryPatch: {}
-                  })
-                }
-              ]
-            }
-          }
-        ]
-      })
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const result = await generateBriefChatReply({
-      stage: "precision",
-      messages: [],
-      clientMessage: "Necesito una landing para vender",
-      summary: emptyStructuredBriefSummary()
-    });
-
-    expect(result.visibleReply).toContain("Se interrumpio este turno");
-
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
-  });
-
-  it("devuelve una respuesta operativa cuando Gemini falla", async () => {
+  it("devuelve respuesta degradada si Gemini falla la llamada", async () => {
     vi.stubEnv("GEMINI_API_KEY", "fake-key");
     const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await generateBriefChatReply({
-      stage: "precision",
       messages: [],
-      clientMessage: "Mi servicio es una mentoria",
-      summary: emptyStructuredBriefSummary()
+      clientMessage: "Mi servicio es una mentoria"
     });
 
+    expect(result.degraded).toBe(true);
     expect(result.visibleReply).toContain("Se interrumpio este turno");
 
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
-  it("detecta suficiencia de etapa discovery cuando los campos prioritarios existen", () => {
-    const summary = {
-      ...emptyStructuredBriefSummary(),
-      projectObjective: "Captar 30 leads",
-      mainOffer: "Programa de consultoria",
-      requestReason: "Necesito pipeline estable",
-      businessContext: "Negocio local en crecimiento"
-    };
-
-    expect(hasStageSufficientInfo("discovery", summary)).toBe(true);
-  });
-
-  it("usa fallback deterministico para cierre dual cuando GEMINI_API_KEY no existe", async () => {
+  it("usa fallback deterministico para cierre cuando GEMINI_API_KEY no existe y emite tag + JSON", async () => {
     vi.stubEnv("GEMINI_API_KEY", "");
 
     const summary = {
       ...emptyStructuredBriefSummary(),
-      projectObjective: "Captar leads"
+      giroYProductoHeroe: "Pizzeria",
+      madurez: "3 anos",
+      presupuesto: "$0 / Organico"
     };
 
     const result = await generateBriefClosure({
-      stage: "discovery",
       summary,
       messages: [{ authorRole: "client", messageText: "Quiero vender mas" }]
     });
 
-    expect(result.clientSummary).toContain("Objetivo: Captar leads.");
-    expect(result.agentRawBrief).toContain("Conversacion completa:");
-    expect(result.agentRawBrief).toContain("Cliente: Quiero vender mas");
+    expect(result.visibleReply).toContain("[SYS_ACTION: LOCK_SUCCESS]");
+    expect(result.visibleReply).toContain("[BRIEF_COMPLETO]");
+    expect(result.json?.giro_y_producto_heroe).toBe("Pizzeria");
+    expect(result.json?.presupuesto).toBe("$0 / Organico");
     vi.unstubAllEnvs();
   });
 
@@ -467,14 +408,51 @@ describe("briefing-assistant-ai", () => {
     const messages = [{ authorRole: "client" as const, messageText: "Necesito una landing para vender" }];
 
     const result = await generateBriefClosure({
-      stage: "precision",
       summary: emptyStructuredBriefSummary(),
       messages
     });
 
     expect(messages).toEqual([{ authorRole: "client", messageText: "Necesito una landing para vender" }]);
-    expect(typeof result.clientSummary).toBe("string");
-    expect(result.agentRawBrief).toContain("Conversacion completa:");
+    expect(result.visibleReply).toContain("[SYS_ACTION: LOCK_SUCCESS]");
+    expect(result.json).not.toBeNull();
+
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("anade tag [SYS_ACTION: LOCK_SUCCESS] programaticamente si el modelo responde JSON sin tag", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "fake-key");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            finishReason: "STOP",
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    giro_y_producto_heroe: "Tacos de birria",
+                    presupuesto: "$0"
+                  })
+                }
+              ]
+            }
+          }
+        ]
+      })
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateBriefClosure({
+      summary: emptyStructuredBriefSummary(),
+      messages: [{ authorRole: "client", messageText: "Vendo tacos" }]
+    });
+
+    expect(result.visibleReply).toContain("[SYS_ACTION: LOCK_SUCCESS]");
+    expect(result.visibleReply).toContain("[BRIEF_COMPLETO]");
+    expect(result.json?.giro_y_producto_heroe).toBe("Tacos de birria");
+    expect(result.json?.presupuesto).toBe("$0");
 
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();

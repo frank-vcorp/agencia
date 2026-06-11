@@ -1,6 +1,8 @@
 "use client";
 
 /**
+ * IMPL-20260611-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
  * IMPL-20260603-02
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260603-02_cierre_brief_doble_salida_humano_raw_y_agenda_performance_v1.md
  * IMPL-20260602-01
@@ -13,9 +15,9 @@
  */
 import { useEffect, useRef, useState, useTransition } from "react";
 
-import type { BriefMessage, BriefRecord } from "@/lib/briefing";
+import type { BriefMessage, BriefRecord, StructuredBriefSummary } from "@/lib/briefing";
 
-import { sendClientMessageAction } from "@/app/cliente/brief/[projectId]/actions";
+import { sendClientMessageAction, submitBriefAction } from "@/app/cliente/brief/[projectId]/actions";
 
 type ClientBriefChatViewProps = {
   brief: BriefRecord;
@@ -27,16 +29,22 @@ type OptimisticClientMessage = BriefMessage & {
   optimisticKey?: string;
 };
 
-function stageCopy(stage: BriefRecord["status"]): string {
-  if (stage === "stage_1_discovery") return "Cuentanos que quieres mover y Vika te ira guiando con preguntas claras.";
-  if (stage === "stage_2_precision") return "Ya tenemos contexto. Ahora estamos aterrizando los detalles clave de la propuesta.";
-  if (stage === "stage_3_commercial_fit") return "Estamos cerrando el mejor encaje para que tu propuesta salga bien enfocada.";
-  if (stage === "pending_operator_review" || stage === "operator_review_in_progress") {
-    return "Tu propuesta ya entro en revision con nuestro equipo.";
-  }
-  if (stage === "approved_locked") return "Tu brief ya fue validado y quedo listo para ejecucion.";
-  if (stage === "returned_for_rework") return "Necesitamos un ajuste adicional para dejar la propuesta alineada.";
-  return "Cuentanos que necesitas y te acompanamos paso a paso.";
+const VIKA_INTRO_TEXT = "Tengo 8 preguntas para entender tu negocio. \u00a1Empecemos!";
+
+function closureHumanSummary(summary: StructuredBriefSummary): string {
+  const lines = [
+    summary.giroYProductoHeroe && `Lo que ofreces: ${summary.giroYProductoHeroe}.`,
+    summary.madurez && `Trayectoria: ${summary.madurez}.`,
+    summary.localFisico && `Operacion: ${summary.localFisico}.`,
+    summary.logo && `Marca grafica: ${summary.logo}.`,
+    summary.audience && `Lo que te hace unico: ${summary.audience}.`,
+    summary.restrictions && `Lo que la gente duda antes de comprar: ${summary.restrictions}.`,
+    summary.presupuesto && `Presupuesto mensual: ${summary.presupuesto}.`,
+    summary.cta && `Accion esperada del cliente: ${summary.cta}.`,
+    summary.historiaYContexto && `Tu historia: ${summary.historiaYContexto}.`
+  ].filter(Boolean);
+
+  return lines.join("\n");
 }
 
 function messageBubbleClass(authorRole: BriefMessage["authorRole"]): string {
@@ -112,7 +120,10 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
   const isApprovedStatus = status === "approved_locked";
   const hideConversationSurface = isReviewStatus || isApprovedStatus;
   const clientFacingSummary =
-    currentVersion?.structuredSummary.clientFacingSummary || currentVersion?.finalSummaryText || "";
+    currentVersion?.structuredSummary.clientFacingSummary ||
+    (currentVersion ? closureHumanSummary(currentVersion.structuredSummary) : "") ||
+    currentVersion?.finalSummaryText ||
+    "";
 
   const disabledReason = isReviewStatus
     ? "En revision"
@@ -192,6 +203,20 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
     });
   }
 
+  function handleSubmitBrief() {
+    if (!currentVersion || !canSend) {
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await submitBriefAction(projectId, brief.id, currentVersion.id);
+      } catch (error) {
+        throw error;
+      }
+    });
+  }
+
   return (
     <div className="space-y-3 pb-6">
       <section className="panel rounded-[22px] px-4 py-4">
@@ -201,7 +226,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
         <h1 className="mt-1.5 font-[family-name:var(--font-heading)] text-xl font-bold tracking-tight sm:text-2xl">
           {brief.container.project?.name ?? "Tu proyecto"}
         </h1>
-        <p className="mt-1.5 text-xs text-[color:var(--muted)] sm:text-sm">{stageCopy(status)}</p>
+        <p className="mt-1.5 text-xs text-[color:var(--muted)] sm:text-sm">{VIKA_INTRO_TEXT}</p>
       </section>
 
       <section className="panel rounded-[22px] px-3 py-3 sm:px-4 sm:py-4">
@@ -283,6 +308,16 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
             >
               Enviar
             </button>
+            {canSend ? (
+              <button
+                type="button"
+                onClick={handleSubmitBrief}
+                disabled={isPending || !canSend}
+                className="rounded-[12px] bg-[color:var(--ink)] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cerrar y enviar mi brief
+              </button>
+            ) : null}
           </div>
         </div>
       </section>
@@ -290,7 +325,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
       <section className="panel rounded-[22px] px-4 py-3">
         <p className="text-sm font-semibold text-[color:var(--ink)]">Como trabajamos esta conversacion</p>
         <p className="mt-2 text-sm text-[color:var(--muted)]">
-          Tu conversacion queda guardada tal como la compartes. Al cerrar el brief, el equipo la procesa en una sola revision interna para preparar la propuesta.
+          Vika te hara 8 preguntas para entender tu negocio y tu presupuesto. Al cerrar el brief, nuestro equipo recibira el resumen y te contactara por WhatsApp.
         </p>
       </section>
     </div>
