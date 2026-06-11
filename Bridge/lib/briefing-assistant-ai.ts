@@ -17,6 +17,7 @@
 import {
   buildFinalSummaryText,
   emptyStructuredBriefSummary,
+  hasMeaningfulSummaryValue,
   renderVikaProgressBlock,
   type BriefMessage,
   type StructuredBriefSummary
@@ -51,6 +52,17 @@ export type GenerateBriefChatReplyInput = {
 export type BriefChatReply = {
   visibleReply: string;
   degraded: boolean;
+  /**
+   * IMPL-20260611-06
+   * `true` cuando la respuesta fue generada por el camino deterministico de
+   * `shouldForceClosure` (los 8 puntos completos + pregunta narrativa ya
+   * respondida). En ese caso el `visibleReply` ya contiene la despedida
+   * canonica + tag [SYS_ACTION: LOCK_SUCCESS] + [BRIEF_COMPLETO] + JSON con
+   * las 9 claves y NO se gasto una llamada a Gemini. El caller debe detectar
+   * este flag para ejecutar `submitBriefForOperatorReview` sin esperar un
+   * click del usuario.
+   */
+  forcedClosure?: boolean;
 };
 
 export type FinalBriefMessageInput = Pick<BriefMessage, "authorRole" | "messageText">;
@@ -74,6 +86,41 @@ export const LOCK_SUCCESS_TAG_REGEX = /\[SYS_ACTION: LOCK_SUCCESS\]/;
 export const BRIEF_COMPLETO_TAG_REGEX = /\[BRIEF_COMPLETO\]/;
 export const VIKA_CLOSING_HUMAN_TEXT =
   "\u00a1Qu\u00e9 gran historia! Mi equipo ya tiene toda esta informaci\u00f3n. La analizaremos a detalle y te contactaremos por WhatsApp con los pasos a seguir. \u00a1Mucho \u00e9xito!";
+
+/**
+ * IMPL-20260611-06
+ * Respaldo: cierre deterministico + texto canonico de despedida
+ *
+ * Preguntas narrativas canonicas de la [FASE DE NARRATIVA] de Vika. Cuando el
+ * modelo emite una de estas preguntas significa que los 8 puntos del checklist
+ * ya estan completos y solo falta la respuesta del cliente para emitir el
+ * cierre. El codigo las usa para detectar el momento exacto en que se debe
+ * forzar la despedida sin volver a llamar a Gemini.
+ */
+export const VIKA_NARRATIVE_QUESTIONS: readonly string[] = [
+  "\u00bfC\u00f3mo te animaste a poner el negocio?",
+  "\u00bfQu\u00e9 ha sido lo m\u00e1s dif\u00edcil?"
+];
+
+/**
+ * IMPL-20260611-06
+ * Respaldo: cierre deterministico + texto canonico de despedida
+ *
+ * Lista de campos de `StructuredBriefSummary` que Vika debe llenar como parte
+ * de los 8 puntos obligatorios del checklist. Se replica aqui (en lugar de
+ * importarse desde briefing.ts) para evitar acoplamiento adicional entre
+ * modulos. El orden y mapeo coincide con `VIKA_CHECKLIST_TO_SUMMARY_KEY`.
+ */
+const VIKA_CHECKLIST_SUMMARY_KEYS: ReadonlyArray<keyof BriefSummary> = [
+  "giroYProductoHeroe",
+  "madurez",
+  "localFisico",
+  "logo",
+  "audience",
+  "restrictions",
+  "presupuesto",
+  "cta"
+];
 
 const MAX_CHAT_REPLY_WORDS = 110;
 const BRIEF_CHAT_RECOVERY_REPLY =
@@ -214,6 +261,14 @@ export function isAcceptableAssistantVisibleReply(rawReply: string, finishReason
 }
 
 /**
+ * IMPL-20260611-06
+ * Respaldo: cierre deterministico + texto canonico de despedida
+ *  - El System Prompt Maestro de Vika ahora contiene la despedida canonica
+ *    (verbatim de la Especificacion Tecnica) y la pregunta narrativa como
+ *    unica opcion valida. Esto reduce la variabilidad del modelo.
+ *  - El codigo detecta cuando los 8 puntos + la pregunta narrativa estan
+ *    completos y fuerza el cierre sin volver a llamar a Gemini.
+ *
  * IMPL-20260611-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
  *
@@ -227,6 +282,7 @@ export function isAcceptableAssistantVisibleReply(rawReply: string, finishReason
  * 4. ANTI-PROMPT INJECTION: volver amablemente al brief.
  * 5. CHECKLIST de 8 puntos obligatorios antes del cierre.
  * 6. FASE NARRATIVA: una pregunta abierta al completar los 8 puntos.
+ * 7. IMPL-20260611-06: Texto canonico de despedida (no se permite variacion).
  */
 const VIKA_MASTER_PROMPT = `Eres Vika, una Consultora de Negocios y Marketing Local emp\u00e1tica, muy accesible y directa.
 Tu objetivo es auditar a due\u00f1os de micro-negocios locales (est\u00e9ticas, mec\u00e1nicos, fondas, tiendas) que YA SON CLIENTES de la agencia, para extraer la radiograf\u00eda de su negocio y conocer el presupuesto que tienen en mente.
@@ -258,19 +314,24 @@ Valida en tu memoria interna los siguientes puntos:
 8. cta_deseado (WhatsApp, llamada, visita directa)
 
 [REGLA DE CIERRE OBLIGATORIO]
-Cuando el bloque [PROGRESO ACTUAL DE LA CONVERSACI\u00d3N] muestre que las 8 preguntas est\u00e1n completadas (marcadas con \u2713), DEBES cerrar la conversaci\u00f3n en este mismo turno. NO hagas m\u00e1s preguntas del checklist.
-Procede as\u00ed:
-1. Si a\u00fan no se hizo la pregunta abierta de la [FASE DE DESCUBRIMIENTO NARRATIVO], hazla ahora.
-2. Cuando el cliente responda (en el siguiente turno), desp\u00eddete y emite OBLIGATORIAMENTE al final de tu mensaje:
-   - Texto humano de cierre
-   - [SYS_ACTION: LOCK_SUCCESS]
-   - [BRIEF_COMPLETO]
-   - Objeto JSON con las 9 claves: giro_y_producto_heroe, madurez, local_fisico, logo, diferenciador, objeciones, presupuesto, cta_deseado, historia_y_contexto
+Cuando el bloque [PROGRESO ACTUAL DE LA CONVERSACI\u00d3N] muestre las 8 preguntas completadas (\u2713),
+haz UNA pregunta abierta de la [FASE DE NARRATIVA]. Cuando el cliente responda,
+en tu siguiente turno desp\u00eddete EXACTAMENTE con este texto (sin variaciones):
+
+"\u00a1Qu\u00e9 gran historia! Mi equipo ya tiene toda esta informaci\u00f3n. La analizaremos a detalle y te contactaremos por WhatsApp con los pasos a seguir. \u00a1Mucho \u00e9xito!"
+
+Inmediatamente despu\u00e9s, sin texto intermedio, emite:
+[SYS_ACTION: LOCK_SUCCESS]
+[BRIEF_COMPLETO]
+{JSON con 9 claves}
+
+NO agregues m\u00e1s texto, NO hagas m\u00e1s preguntas, NO pidas confirmaci\u00f3n.
 
 Si el bloque [PROGRESO ACTUAL] muestra preguntas pendientes, avanza SOLO a la siguiente pendiente. NO repitas preguntas ya marcadas con \u2713.
 
-[FASE DE DESCUBRIMIENTO NARRATIVO]
-Al completar los 8 puntos, relaja la pl\u00e1tica. Haz UNA pregunta abierta ("\u00bfC\u00f3mo te animaste a poner el negocio?", o "\u00bfQu\u00e9 ha sido lo m\u00e1s dif\u00edcil?"). Deja que el usuario responda libremente. No insistas si es cortante.`;
+[FASE DE DESCUBRIMIENTO NARRATIVO / FASE DE NARRATIVA]
+"\u00bfC\u00f3mo te animaste a poner el negocio?" o "\u00bfQu\u00e9 ha sido lo m\u00e1s dif\u00edcil?"
+(Al completar los 8 puntos, escoge UNA de las dos preguntas narrativas, relajando la pl\u00e1tica. Deja que el usuario responda libremente. No insistas si es cortante.)`;
 
 const VIKA_OPENING_QUESTION =
   "\u00a1Hola! Para armar tu estrategia, cu\u00e9ntame: \u00bfDe qu\u00e9 es tu negocio y qu\u00e9 es lo que m\u00e1s se vende?";
@@ -414,9 +475,86 @@ function deterministicClosureJson(summary: BriefSummary): Record<string, string>
   };
 }
 
+/**
+ * IMPL-20260611-06
+ * Respaldo: cierre deterministico + texto canonico de despedida
+ *
+ * Determina si el codigo debe forzar la despedida canonica de Vika sin
+ * volver a llamar al modelo. Retorna `true` cuando se cumplen las DOS
+ * condiciones:
+ *  1. Los 8 campos del checklist de Vika ya tienen un valor significativo
+ *     segun `hasMeaningfulSummaryValue`.
+ *  2. El ultimo mensaje del asistente contiene una de las preguntas
+ *     narrativas canonicas de la [FASE DE NARRATIVA], lo que indica que
+ *     el cliente respondio y estamos en el turno del cierre.
+ *
+ * Esta funcion es sincrona y deterministica: no depende del modelo ni de
+ * estado externo, solo del resumen y del ultimo mensaje del asistente.
+ */
+export function shouldForceClosure(
+  summary: BriefSummary | undefined | null,
+  lastAssistantMessage: string | null | undefined
+): boolean {
+  if (!summary) {
+    return false;
+  }
+
+  const allFieldsComplete = VIKA_CHECKLIST_SUMMARY_KEYS.every((summaryKey) =>
+    hasMeaningfulSummaryValue(summaryKey, summary[summaryKey] ?? "")
+  );
+
+  if (!allFieldsComplete) {
+    return false;
+  }
+
+  const normalizedLastMessage = (lastAssistantMessage ?? "").trim();
+
+  if (!normalizedLastMessage) {
+    return false;
+  }
+
+  return VIKA_NARRATIVE_QUESTIONS.some((question) =>
+    normalizedLastMessage.includes(question.replace(/^\u00bf|\?$/g, "").trim())
+  );
+}
+
+/**
+ * IMPL-20260611-06
+ * Respaldo: cierre deterministico + texto canonico de despedida
+ *
+ * Compone la respuesta final del chat cuando se detecta la condicion de
+ * cierre deterministico. Emite la despedida canonica + tag de bloqueo +
+ * JSON de 9 claves a partir del resumen. No consulta a Gemini.
+ */
+function buildForcedClosureReply(summary: BriefSummary): BriefChatReply {
+  const json = deterministicClosureJson(summary);
+  const visibleReply = [
+    VIKA_CLOSING_HUMAN_TEXT,
+    "[SYS_ACTION: LOCK_SUCCESS]",
+    "[BRIEF_COMPLETO]",
+    JSON.stringify(json, null, 2)
+  ].join("\n");
+
+  return {
+    visibleReply,
+    degraded: false,
+    forcedClosure: true
+  };
+}
+
 export async function generateBriefChatReply(
   input: GenerateBriefChatReplyInput
 ): Promise<BriefChatReply> {
+  // IMPL-20260611-06: cierre deterministico sin llamada a Gemini.
+  const lastAssistantMessage =
+    [...(input.messages ?? [])]
+      .reverse()
+      .find((message) => message.authorRole === "assistant")?.messageText ?? null;
+
+  if (shouldForceClosure(input.summary, lastAssistantMessage)) {
+    return buildForcedClosureReply(input.summary as BriefSummary);
+  }
+
   const apiKey = process.env.GEMINI_API_KEY?.trim();
 
   if (!apiKey) {

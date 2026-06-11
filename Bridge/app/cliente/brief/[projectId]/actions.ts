@@ -39,6 +39,14 @@ import {
 } from "@/lib/briefing-assistant-ai";
 
 /**
+ * IMPL-20260611-06
+ * Respaldo: cierre deterministico + texto canonico de despedida
+ *  - Si `aiReply.forcedClosure === true` o el `visibleReply` contiene el tag
+ *    [SYS_ACTION: LOCK_SUCCESS], extraemos el JSON de 9 claves, persistimos
+ *    el resumen estructurado y enviamos el brief a revision humana con
+ *    `submitBriefForOperatorReview`. Esto evita depender exclusivamente del
+ *    modelo para emitir el cierre.
+ *
  * IMPL-20260611-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
  *
@@ -47,6 +55,9 @@ import {
  *  2. Llamar al modelo de IA con el System Prompt Maestro de Vika.
  *  3. Si GEMINI_API_KEY no esta disponible: no persistir respuesta visible, solo log.
  *  4. Si la IA responde, persistir la respuesta del asistente (puede incluir el tag de cierre).
+ *  5. IMPL-20260611-06: Si la respuesta incluye el tag de cierre (o fue
+ *     generada por el cierre deterministico), mapear el JSON al resumen
+ *     estructurado y enviar el brief a revision humana.
  */
 export async function sendClientMessageAction(
   projectId: string,
@@ -101,6 +112,51 @@ export async function sendClientMessageAction(
     messageText: aiReply.visibleReply,
     stage: currentVersion.stage
   });
+
+  // IMPL-20260611-06: detectar cierre (forcedClosure deterministico o tag del modelo)
+  // y ejecutar el mismo flujo que `submitBriefAction` para bloquear el brief.
+  const isClosure =
+    aiReply.forcedClosure === true || LOCK_SUCCESS_TAG_REGEX.test(aiReply.visibleReply);
+
+  if (isClosure) {
+    const jsonText = extractJsonObject(aiReply.visibleReply);
+    let extractedJson: Record<string, string> | null = null;
+
+    if (jsonText) {
+      try {
+        const parsed = JSON.parse(jsonText) as Record<string, unknown>;
+        extractedJson = {};
+        for (const [key, value] of Object.entries(parsed)) {
+          if (typeof value === "string") {
+            extractedJson[key] = value.trim();
+          }
+        }
+      } catch {
+        extractedJson = null;
+      }
+    }
+
+    const summaryPatch = extractedJson ? mapVikaBriefDataToStructuredSummary(extractedJson) : {};
+
+    if (extractedJson) {
+      const giro = extractedJson.giro_y_producto_heroe;
+      const clientSummary = giro
+        ? `Tu negocio: ${giro}.\n` +
+          `Te distingue: ${extractedJson.diferenciador || "por definir"}.\n` +
+          `Lo que te frena: ${extractedJson.objeciones || "por definir"}.\n` +
+          `Presupuesto mensual: ${extractedJson.presupuesto || "por definir"}.\n` +
+          `Accion que esperas: ${extractedJson.cta_deseado || "por definir"}.`
+        : "";
+
+      await updateBriefSummary(
+        { briefId, versionId },
+        { ...summaryPatch, clientFacingSummary: clientSummary },
+        { finalSummaryTextOverride: aiReply.visibleReply }
+      );
+    }
+
+    await submitBriefForOperatorReview({ briefId, versionId });
+  }
 
   revalidatePath(`/cliente/brief/${projectId}`);
   revalidatePath(`/cliente/proyecto/${projectId}`);
