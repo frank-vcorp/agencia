@@ -1,6 +1,12 @@
 "use server";
 
 /**
+ * IMPL-20260611-04
+ * Respaldo: fix critico Vika repregunta + textarea pierde foco.
+ *   - Pasamos `summary` (structuredSummary) a `generateBriefChatReply` para que
+ *     el System Prompt Maestro reciba el bloque "PROGRESO ACTUAL DE LA
+ *     CONVERSACION" y la IA no repita preguntas ya respondidas.
+ *
  * IMPL-20260611-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
  * IMPL-20260603-03
@@ -72,7 +78,8 @@ export async function sendClientMessageAction(
         authorRole: message.authorRole,
         messageText: message.messageText
       })),
-    clientMessage: normalizedText
+    clientMessage: normalizedText,
+    summary: currentVersion.structuredSummary
   });
 
   if (aiReply.degraded) {

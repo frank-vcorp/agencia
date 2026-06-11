@@ -1,6 +1,12 @@
 "use client";
 
 /**
+ * IMPL-20260611-04
+ * Respaldo: fix critico Vika repregunta + textarea pierde foco.
+ *   - El textarea ahora mantiene el foco: autoFocus al montar, foco tras
+ *     enviar y foco reactivo cuando isPending pasa de true a false (Vika
+ *     termino de responder).
+ *
  * IMPL-20260611-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
  * IMPL-20260603-02
@@ -98,6 +104,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
   const [optimisticMessages, setOptimisticMessages] = useState<OptimisticClientMessage[]>([]);
   const [isPending, startTransition] = useTransition();
   const messageListRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const currentVersion = brief.currentVersion;
 
   const messages = currentVersion?.messages ?? [];
@@ -161,6 +168,19 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
     });
   }, [messages]);
 
+  /**
+   * IMPL-20260611-04
+   * Cuando Vika termina de responder (isPending pasa de true a false) el
+   * textarea perdia foco y el usuario tenia que volver a hacer clic para
+   * escribir. Devolvemos el foco automaticamente al textarea para que la
+   * conversacion sea fluida.
+   */
+  useEffect(() => {
+    if (!isPending && textareaRef.current && canSend) {
+      textareaRef.current.focus();
+    }
+  }, [isPending, canSend]);
+
   function handleSendMessage() {
     const trimmedMessage = messageText.trim();
 
@@ -191,6 +211,10 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
 
     setOptimisticMessages((current) => [...current, optimisticMessage]);
     setMessageText("");
+
+    // IMPL-20260611-04: tras limpiar el texto, devolvemos el foco al textarea
+    // para que el cliente pueda seguir escribiendo sin hacer clic otra vez.
+    textareaRef.current?.focus();
 
     startTransition(async () => {
       try {
@@ -282,7 +306,9 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
             Tu mensaje
           </label>
           <textarea
+            ref={textareaRef}
             value={messageText}
+            autoFocus
             onChange={(event) => setMessageText(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
