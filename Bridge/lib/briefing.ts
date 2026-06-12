@@ -162,6 +162,119 @@ export function mapVikaBriefDataToStructuredSummary(
   return patch;
 }
 
+/**
+ * IMPL-20260611-07
+ * Respaldo: fix Bug 3 - Cierre deterministico requiere summary no vacio.
+ *
+ * Heuristica liviana que infiere un patch de resumen estructurado a partir
+ * del ultimo mensaje del cliente. Solo llena campos VACIOS (no sobrescribe
+ * valores existentes) y solo para los 8 puntos del checklist de Vika. Se
+ * ejecuta en el server action `sendClientMessageAction` despues de persistir
+ * el mensaje del cliente y ANTES de llamar a Gemini, para que
+ * `shouldForceClosure` pueda detectar cuando los 8 puntos estan completos
+ * sin depender exclusivamente de lo que el modelo emita en el System Prompt.
+ *
+ * Es deliberadamente conservadora: si no detecta nada plausible, devuelve
+ * `{}` y el flujo sigue normalmente. Si detecta valores plausibles, los
+ * persiste via `updateBriefSummary` y luego se relee la version para
+ * pasarsela a `generateBriefChatReply` con el `summary` actualizado.
+ *
+ * El parametro `stage` se acepta para mantener la firma estable con el
+ * caller; en esta version no se usa para discriminar campos porque los
+ * 8 puntos de Vika son ortogonales a las 3 etapas legacy.
+ */
+export function inferBriefSummaryPatchFromClientMessage(
+  stage: BriefingStage,
+  summary: StructuredBriefSummary,
+  messageText: string
+): Partial<StructuredBriefSummary> {
+  void stage;
+  const normalized = messageText.trim();
+
+  if (!normalized) {
+    return {};
+  }
+
+  const patch: Partial<StructuredBriefSummary> = {};
+
+  // giroYProductoHeroe: capturar frases tipo "vendo X", "tengo un negocio de X".
+  if (!hasMeaningfulSummaryValue("giroYProductoHeroe", summary.giroYProductoHeroe)) {
+    const candidate = extractFirstMatch(normalized, [
+      /(?:vendo|ofrezco|vendemos|ofrecemos|tengo un negocio de|tenemos un negocio de|mi negocio es|negocio de|soy duen[oa] de|trabajo en|trabajamos en)\s+([^.;\n]{4,140})/i,
+      /(?:es un|son unos?)\s+([^.;\n]{4,140})/i
+    ]);
+
+    if (candidate && hasMeaningfulSummaryValue("giroYProductoHeroe", candidate)) {
+      patch.giroYProductoHeroe = candidate;
+      if (!hasMeaningfulSummaryValue("mainOffer", summary.mainOffer)) {
+        patch.mainOffer = candidate;
+      }
+    }
+  }
+
+  // madurez: tiempo operando (anos/meses).
+  if (!hasMeaningfulSummaryValue("madurez", summary.madurez)) {
+    const candidate = extractFirstMatch(normalized, [
+      /(?:llevo|tenemos|ya)\s+(\d+\s+(?:anos|año|meses|semanas|dias|días)(?:\s+(?:de|operando|abierto|en el negocio))?)/i,
+      /(\d+\s+(?:anos|año|meses|semanas|dias|días)(?:\s+(?:de|operando|abierto|en el negocio))?)/i
+    ]);
+
+    if (candidate && hasMeaningfulSummaryValue("madurez", candidate)) {
+      patch.madurez = candidate;
+    }
+  }
+
+  // localFisico: local a la calle vs a domicilio/online.
+  if (!hasMeaningfulSummaryValue("localFisico", summary.localFisico)) {
+    if (/(?:local|taller|tienda|fisico|físico|establecimiento|presencial|a la calle|negocio presencial)/i.test(normalized)) {
+      patch.localFisico = "Local a la calle";
+    } else if (/(?:a domicilio|domicilio|online|en linea|en línea|por whats|whatsapp solamente|trabajo desde casa)/i.test(normalized)) {
+      patch.localFisico = "A domicilio / online";
+    }
+  }
+
+  // logo: tiene logotipo o solo el nombre.
+  if (!hasMeaningfulSummaryValue("logo", summary.logo)) {
+    if (/(?:tengo|tenemos|si tengo|si tenemos|cuenta con)\s+(?:un\s+)?(?:logotipo|logo)|logo\s+profesional|tiene\s+logo/i.test(normalized)) {
+      patch.logo = "Tiene logotipo";
+    } else if (/(?:no tengo|no tenemos|sin logo|solo el nombre|no tiene logo|aun no)/i.test(normalized) && /logo/i.test(normalized)) {
+      patch.logo = "Solo el nombre";
+    }
+  }
+
+  // presupuesto: monto explicito o $0.
+  if (!hasMeaningfulSummaryValue("presupuesto", summary.presupuesto)) {
+    const moneyMatch = normalized.match(/\$\s*[\d,]+(?:\s*(?:mil|k|mxn|pesos))?(?:\s*(?:mxn|pesos|mensuales|al mes|por mes))?/i);
+    if (moneyMatch) {
+      patch.presupuesto = cleanHeuristicValue(moneyMatch[0]);
+    } else if (/(?:no tengo|no hay|sin presupuesto|cero|por ahora no|nada)\b/i.test(normalized) && /(?:presupuesto|inversion|inversión|publicidad|anuncios|para invertir)/i.test(normalized)) {
+      patch.presupuesto = "$0 / Organico";
+    } else {
+      const kMatch = extractFirstMatch(normalized, [
+        /(\d+\s*(?:mil|k)\s*(?:pesos|mxn)?(?:\s*(?:mensuales|al mes|por mes))?)/i
+      ]);
+      if (kMatch && /pes|mxn/i.test(kMatch)) {
+        patch.presupuesto = kMatch;
+      }
+    }
+  }
+
+  // cta: WhatsApp, llamada, visita, agendar.
+  if (!hasMeaningfulSummaryValue("cta", summary.cta)) {
+    if (/(?:whatsapp|por whats|whats|wa\b)/i.test(normalized)) {
+      patch.cta = "Escribir por WhatsApp";
+    } else if (/(?:llamar|llamada|por telefono|por teléfono)/i.test(normalized)) {
+      patch.cta = "Llamar por telefono";
+    } else if (/(?:visitar|visita|ir al local|que vaya)/i.test(normalized)) {
+      patch.cta = "Visitar el local";
+    } else if (/(?:agendar|cita|reunion|reunión|agenda)/i.test(normalized)) {
+      patch.cta = "Agendar cita";
+    }
+  }
+
+  return patch;
+}
+
 export const briefingStages = ["discovery", "precision", "commercial_fit"] as const;
 
 export type BriefingStage = (typeof briefingStages)[number];

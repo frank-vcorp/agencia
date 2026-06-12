@@ -1,6 +1,15 @@
 "use server";
 
 /**
+ * IMPL-20260611-07
+ * Respaldo: fix Bug 3 - Cierre deterministico nunca se activaba.
+ *   - Despues de persistir el mensaje del cliente, inferimos un patch
+ *     heuristico del resumen estructurado (solo llena campos vacios) y lo
+ *     persistimos via `updateBriefSummary`. Esto hace que
+ *     `shouldForceClosure()` pueda detectar cuando los 8 puntos del
+ *     checklist de Vika estan completos y dispare el cierre deterministico
+ *     sin depender exclusivamente de lo que el modelo emita.
+ *
  * IMPL-20260611-04
  * Respaldo: fix critico Vika repregunta + textarea pierde foco.
  *   - Pasamos `summary` (structuredSummary) a `generateBriefChatReply` para que
@@ -26,6 +35,7 @@ import {
   appendBriefMessage,
   appendClientBriefMessage,
   getBriefByProjectId,
+  inferBriefSummaryPatchFromClientMessage,
   mapVikaBriefDataToStructuredSummary,
   submitBriefForOperatorReview,
   updateBriefSummary
@@ -73,13 +83,33 @@ export async function sendClientMessageAction(
 
   await appendClientBriefMessage({ briefId, versionId }, normalizedText);
 
-  const brief = await getBriefByProjectId(projectId);
-  const currentVersion = brief?.currentVersion;
+  let brief = await getBriefByProjectId(projectId);
+  let currentVersion = brief?.currentVersion;
 
   if (!currentVersion || currentVersion.id !== versionId) {
     revalidatePath(`/cliente/brief/${projectId}`);
     revalidatePath(`/cliente/proyecto/${projectId}`);
     return;
+  }
+
+  // IMPL-20260611-07 (Bug 3): inferir y persistir un patch del resumen
+  // estructurado a partir del mensaje del cliente. Esto llena los 8 campos
+  // del checklist de Vika conforme el cliente responde, para que
+  // `shouldForceClosure` pueda detectar el cierre deterministico cuando
+  // todos los puntos esten completos + el ultimo mensaje del asistente
+  // contenga una pregunta narrativa canonica.
+  const summaryPatch = inferBriefSummaryPatchFromClientMessage(
+    currentVersion.stage,
+    currentVersion.structuredSummary,
+    normalizedText
+  );
+
+  if (Object.keys(summaryPatch).length > 0) {
+    await updateBriefSummary({ briefId, versionId }, summaryPatch);
+    brief = await getBriefByProjectId(projectId);
+    if (brief?.currentVersion && brief.currentVersion.id === versionId) {
+      currentVersion = brief.currentVersion;
+    }
   }
 
   const aiReply = await generateBriefChatReply({
@@ -136,7 +166,7 @@ export async function sendClientMessageAction(
       }
     }
 
-    const summaryPatch = extractedJson ? mapVikaBriefDataToStructuredSummary(extractedJson) : {};
+    const closureSummaryPatch = extractedJson ? mapVikaBriefDataToStructuredSummary(extractedJson) : {};
 
     if (extractedJson) {
       const giro = extractedJson.giro_y_producto_heroe;
@@ -150,7 +180,7 @@ export async function sendClientMessageAction(
 
       await updateBriefSummary(
         { briefId, versionId },
-        { ...summaryPatch, clientFacingSummary: clientSummary },
+        { ...closureSummaryPatch, clientFacingSummary: clientSummary },
         { finalSummaryTextOverride: aiReply.visibleReply }
       );
     }

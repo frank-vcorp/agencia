@@ -7,6 +7,12 @@
  *     enviar y foco reactivo cuando isPending pasa de true a false (Vika
  *     termino de responder).
  *
+ * IMPL-20260611-07
+ * Respaldo: fix Bug 1 - Enter no enviaba en movil. Se agregan
+ *   `inputMode="text"` y `enterKeyHint="send"` al textarea para que el
+ *   teclado virtual de iOS/Android muestre el boton "Enviar" y dispare
+ *   el onKeyDown actual.
+ *
  * IMPL-20260611-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
  * IMPL-20260603-02
@@ -309,6 +315,8 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
             ref={textareaRef}
             value={messageText}
             autoFocus
+            inputMode="text"
+            enterKeyHint="send"
             onChange={(event) => setMessageText(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {

@@ -130,7 +130,7 @@ const TECHNICAL_LEAK_PATTERN =
 const RELIABLE_VISIBLE_FINISH_REASONS = new Set(["", "STOP"]);
 const DANGLING_REPLY_ENDING_PATTERN = /(?:\.{3}|\u2026|[,;:\-\/(])\s*$/;
 
-function formatConversationHistory(messages: FinalBriefMessageInput[], limit = 12): string {
+function formatConversationHistory(messages: FinalBriefMessageInput[], limit = 50): string {
   const conversation = messages
     .slice(-limit)
     .map((message) =>
