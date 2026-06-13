@@ -151,6 +151,7 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 1. Cierre operativo final del corte `ARCH-20260510-11`: corrida e2e final de punta a punta y trazabilidad Jira del cierre tecnico `20260526-06..09`.
 2. Slices posteriores del corte paraguas `ARCH-20260510-11`, una vez liberado el bloqueador operativo.
 3. `ARCH-20260528-07` autorizado: portal cliente por proyecto con brief conversacional como entrada principal; la capa informativa posterior al brief queda fuera de alcance y se tratara en un slice independiente.
+4. **`ARCH-20260612-01` — Checklist 13 puntos obligatorios + regla ejemplos dinámicos + fase narrativa dual** (SPEC: `context/SPECs/SPEC_ARCH-20260612-01_checklist_13_puntos_ejemplos_dinamicos_fase_narrativa_dual_v1.md`, Commit: `4033118`).
 
 ### [x] Completado (refinamiento brief cliente - mayo/junio 2026)
 
@@ -166,6 +167,7 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 10. **IMPL-20260610-04** - Piloto 2.1 creado via MCP - commit `7266acb`
 11. **IMPL-20260610-05** - Endpoint pre-registro vendedor + formulario cliente - commit `dd88ffb`
 12. **IMPL-20260610-06** - Tests + helpers extraídos - checkpoint `CHECKPOINT_IMPL-20260610-06.md` (PR pendiente QA)
+13. **IMPL-20260612-01** - Checklist 13 puntos obligatorios + regla ejemplos dinámicos + fase narrativa dual - commit `4033118` (SPEC: `SPEC_ARCH-20260612-01`)
 
 ### [ ] Pendiente
 
@@ -290,7 +292,8 @@ Prioridad recomendada:
 79. Bridge/emails/ — Plantillas React Email (client-created, quotation-active, asset-delivered)
 80. Bridge/context/clientes/superman/ — Caso demostración completo (brief.md, propuesta.md, prompts)
 81. context/interconsultas/DICTAMEN_FIX-20260529-03_loop_main_offer_en_produccion.md — Dictamen técnico del fix anti-bucle
-81. context/SPECs/SPEC_ARCH-20260513-20_workspace_disenador_estacion_unica_v2.md
+82. context/SPECs/SPEC_ARCH-20260513-20_workspace_disenador_estacion_unica_v2.md
+83. context/SPECs/SPEC_ARCH-20260612-01_checklist_13_puntos_ejemplos_dinamicos_fase_narrativa_dual_v1.md
 
 ## Decisiones Ya Tomadas
 
