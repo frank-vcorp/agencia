@@ -22,12 +22,12 @@ import {
 import {
   actorRoleLabel,
   appendBriefMessage,
-  formatMessageTimestamp,
   getBriefChat,
   type EntityChat
 } from "@/lib/chat";
 import { getTenantIdentityContext } from "@/lib/identity";
 import { submitBriefAction } from "@/app/cliente/brief/[projectId]/actions";
+import { BriefChatBubbles, type ChatBubbleItem } from "@/components/brief-chat-bubbles";
 
 const VIKA_CHECKLIST_LABELS: Record<keyof StructuredBriefSummary, string> = {
   giroYProductoHeroe: "Giro y producto heroe",
@@ -393,37 +393,45 @@ export default async function BriefsPage() {
             <div className="text-sm text-[color:var(--muted)]">{currentVersion.messages.length} mensajes</div>
           </div>
 
-          <div className="mt-5 space-y-3">
-            {currentVersion.messages.map((message) => (
-              <div key={message.id} className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] uppercase tracking-[0.18em] text-[color:var(--muted)]">
-                  <span>{message.actorLabel}</span>
-                  <span>{message.authorRole}</span>
+          <BriefChatBubbles
+            className="mt-5"
+            messages={currentVersion.messages.map<ChatBubbleItem>((message) => ({
+              id: message.id,
+              text: message.messageText,
+              role: message.authorRole,
+              actorLabel: message.actorLabel,
+              createdAt: message.createdAt
+            }))}
+            maxHeight="480px"
+            rightRoles={["client", "user"]}
+            emptyState={<p className="text-center text-[11px] text-[color:var(--muted)]">Sin mensajes registrados para esta version.</p>}
+            footer={
+              <form action={addMessageAction} className="space-y-2 border-t border-[color:var(--line)] bg-white/60 px-3 py-3">
+                <input name="briefId" type="hidden" value={brief.id} />
+                <input name="versionId" type="hidden" value={currentVersion.id} />
+                <textarea
+                  className="min-h-20 w-full resize-none rounded-[14px] border border-[color:var(--line)] bg-white px-3 py-2 text-sm leading-6 outline-none focus:ring-1 focus:ring-[color:var(--accent)]"
+                  disabled={!currentVersion.editable}
+                  name="messageText"
+                  placeholder="Texto de demo controlada para registrar la conversacion fuente del brief."
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] text-[color:var(--muted)]">
+                    {currentVersion.editable
+                      ? "El mensaje se publica como cliente en la conversacion fuente."
+                      : "Version bloqueada — no se pueden agregar mas mensajes."}
+                  </p>
+                  <button
+                    className="rounded-full bg-[color:var(--accent)] px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!currentVersion.editable}
+                    type="submit"
+                  >
+                    Registrar
+                  </button>
                 </div>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-7">{message.messageText}</p>
-                <div className="mt-2 text-xs text-[color:var(--muted)]">{new Date(message.createdAt).toLocaleString("es-ES")}</div>
-              </div>
-            ))}
-          </div>
-
-          <form action={addMessageAction} className="mt-5 space-y-3">
-            <input name="briefId" type="hidden" value={brief.id} />
-            <input name="versionId" type="hidden" value={currentVersion.id} />
-            <label className="block text-sm font-medium">Agregar mensaje fuente del cliente</label>
-            <textarea
-              className="min-h-28 w-full rounded-[24px] border border-[color:var(--line)] bg-white/80 px-4 py-4 text-sm outline-none"
-              disabled={!currentVersion.editable}
-              name="messageText"
-              placeholder="Texto de demo controlada para registrar la conversacion fuente del brief."
-            />
-            <button
-              className="rounded-full bg-[color:var(--accent)] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!currentVersion.editable}
-              type="submit"
-            >
-              Registrar mensaje
-            </button>
-          </form>
+              </form>
+            }
+          />
         </article>
 
         {/* ── Checklist Vika (8 puntos obligatorios) — IMPL-20260611-01 ─────────── */}
@@ -685,48 +693,40 @@ export default async function BriefsPage() {
           Seguimiento y decisiones operativas sobre este brief. Independiente de la conversacion fuente del cliente.
         </p>
 
-        <div className="mt-5">
-          {briefChat.messages.length === 0 ? (
-            <p className="py-3 text-center text-[11px] text-[color:var(--muted)]">
+        <BriefChatBubbles
+          className="mt-5"
+          messages={briefChat.messages.map<ChatBubbleItem>((msg) => ({
+            id: msg.id,
+            text: msg.messageText,
+            role: msg.actorRole,
+            actorLabel: actorRoleLabel(msg.actorRole),
+            createdAt: msg.createdAt
+          }))}
+          maxHeight="420px"
+          rightRoles={["operator", "designer"]}
+          emptyState={
+            <p className="text-center text-[11px] text-[color:var(--muted)]">
               Sin mensajes aun — inicia la conversacion operativa sobre este brief.
             </p>
-          ) : (
-            <div className="space-y-2">
-              {briefChat.messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className="rounded-[14px] bg-white/70 px-3 py-2.5 ring-1 ring-[color:var(--line)]"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent-deep)]">
-                      {actorRoleLabel(msg.actorRole)}
-                    </span>
-                    <span className="text-[10px] text-[color:var(--muted)]">
-                      {formatMessageTimestamp(msg.createdAt)}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm leading-6">{msg.messageText}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <form action={addBriefChatMessageAction} className="mt-3 flex gap-2">
-            <input type="hidden" name="briefId" value={brief.id} />
-            <input type="hidden" name="tenantId" value={brief.tenantId} />
-            <input
-              name="messageText"
-              placeholder="Escribe un mensaje operativo sobre este brief..."
-              className="flex-1 rounded-[14px] border border-[color:var(--line)] bg-white/80 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent-deep)]"
-            />
-            <button
-              type="submit"
-              className="rounded-[14px] bg-[color:var(--accent-deep)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
-            >
-              Enviar
-            </button>
-          </form>
-        </div>
+          }
+          footer={
+            <form action={addBriefChatMessageAction} className="flex gap-2 border-t border-[color:var(--line)] bg-white/60 px-3 py-3">
+              <input type="hidden" name="briefId" value={brief.id} />
+              <input type="hidden" name="tenantId" value={brief.tenantId} />
+              <input
+                name="messageText"
+                placeholder="Escribe un mensaje operativo sobre este brief..."
+                className="flex-1 rounded-[14px] border border-[color:var(--line)] bg-white px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[color:var(--accent-deep)]"
+              />
+              <button
+                type="submit"
+                className="rounded-[14px] bg-[color:var(--accent-deep)] px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+              >
+                Enviar
+              </button>
+            </form>
+          }
+        />
       </section>
     </div>
   );
