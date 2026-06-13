@@ -1,0 +1,9 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "agent": {
+    "integra": {
+      "model": "nvidia/nemotron-3-ultra-550b-a55b:free"
+    }
+  }
+}
