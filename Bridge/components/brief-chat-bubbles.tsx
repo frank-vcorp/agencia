@@ -168,9 +168,6 @@ function ChatGroup({ group }: { group: BubbleGroup }) {
 
   return (
     <div className={`flex flex-col gap-1 ${isRight ? "items-end" : "items-start"}`}>
-      <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-        {group.actorLabel}
-      </p>
       <div className={`flex max-w-[88%] flex-col gap-1 ${isRight ? "items-end" : "items-start"}`}>
         {group.messages.map((msg, index) => {
           const isFirst = index === 0;
