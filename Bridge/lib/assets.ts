@@ -375,7 +375,7 @@ export async function getAssetsForDefaultTenant(): Promise<AssetWorkspace[]> {
   return getAssetsByTenant(tenantId);
 }
 
-export async function getAssetsByTenant(tenantId: string): Promise<AssetWorkspace[]> {
+export async function getAssetsByTenant(tenantId: string, clientId?: string): Promise<AssetWorkspace[]> {
   const params = new URLSearchParams({
     select:
       "id,tenant_id,client_id,project_id,quotation_id,quotation_version_id,brief_id," +
@@ -383,6 +383,9 @@ export async function getAssetsByTenant(tenantId: string): Promise<AssetWorkspac
     tenant_id: `eq.${tenantId}`,
     order: "created_at.desc"
   });
+  if (clientId) {
+    params.set("client_id", `eq.${clientId}`);
+  }
   const rows = await postgrest<AssetRow[]>(`assets?${params.toString()}`, { method: "GET" });
   const assets = rows.map(normalizeAssetRow);
 
@@ -638,7 +641,7 @@ export async function getProjectsByTenant(tenantId: string): Promise<
 
 /**
  * Lista clientes de un tenant.
- * Retorna array con id, name, legal_name, status, primary_contact_name, primary_contact_email, primary_contact_whatsapp, primary_contact_channel, notes.
+ * Retorna array con id, name, legal_name, status, primary_contact_name, primary_contact_email, primary_contact_whatsapp, primary_contact_channel, notes, created_at.
  */
 export async function getClientsByTenant(tenantId: string): Promise<
   Array<{
@@ -651,10 +654,11 @@ export async function getClientsByTenant(tenantId: string): Promise<
     primary_contact_whatsapp: string | null;
     primary_contact_channel: string | null;
     notes: string | null;
+    created_at: string;
   }>
 > {
   const params = new URLSearchParams({
-    select: "id,name,legal_name,status,primary_contact_name,primary_contact_email,primary_contact_whatsapp,primary_contact_channel,notes",
+    select: "id,name,legal_name,status,primary_contact_name,primary_contact_email,primary_contact_whatsapp,primary_contact_channel,notes,created_at",
     tenant_id: `eq.${tenantId}`,
     deleted_at: "is.null",
     order: "created_at.desc"
@@ -669,6 +673,7 @@ export async function getClientsByTenant(tenantId: string): Promise<
     primary_contact_whatsapp: string | null;
     primary_contact_channel: string | null;
     notes: string | null;
+    created_at: string;
   }[]>(`clients?${params.toString()}`, { method: "GET" });
   return rows;
 }
@@ -677,7 +682,7 @@ export async function getClientsByTenant(tenantId: string): Promise<
  * Lista briefs de un tenant.
  * Retorna array con id, tenant_id, client_id, project_id, status, source_channel, current_version_number, active_version_id, created_at, updated_at.
  */
-export async function getBriefsByTenant(tenantId: string): Promise<
+export async function getBriefsByTenant(tenantId: string, clientId?: string): Promise<
   Array<{
     id: string;
     tenant_id: string;
@@ -697,18 +702,23 @@ export async function getBriefsByTenant(tenantId: string): Promise<
     deleted_at: "is.null",
     order: "updated_at.desc"
   });
-  const rows = await postgrest<{
-    id: string;
-    tenant_id: string;
-    client_id: string | null;
-    project_id: string | null;
-    status: string;
-    source_channel: string;
-    current_version_number: number;
-    active_version_id: string | null;
-    created_at: string;
-    updated_at: string;
-  }[]>(`briefs?${params.toString()}`, { method: "GET" });
+  if (clientId) {
+    params.set("client_id", `eq.${clientId}`);
+  }
+  const rows = await postgrest<
+    Array<{
+      id: string;
+      tenant_id: string;
+      client_id: string | null;
+      project_id: string | null;
+      status: string;
+      source_channel: string;
+      current_version_number: number;
+      active_version_id: string | null;
+      created_at: string;
+      updated_at: string;
+    }>
+  >(`briefs?${params.toString()}`, { method: "GET" });
   return rows;
 }
 

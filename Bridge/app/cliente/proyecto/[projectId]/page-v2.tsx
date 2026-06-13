@@ -8,9 +8,12 @@
  * - Chat de briefing con file upload (ClientBriefChatViewV2)
  * - Documentos y entregables (cotizacion, activos, resultados)
  * - Contactos y seguimiento (leads visibles)
+ *
+ * IMPL-20260612-04
+ * Respaldo: context/SPECs/SPEC_ARCH-20260612-04_fecha_creacion_cliente_panel_detalle.md
  */
 import { ClientBriefChatViewV2 } from "@/components/client-brief-chat-v2";
-import { getClientPortal } from "@/lib/client-portal";
+import { getClientPortal, formatClientCreatedAt } from "@/lib/client-portal";
 import { getOrCreateBriefForProject } from "@/lib/briefing";
 import type {
   ProjectStageItem,
@@ -51,11 +54,15 @@ function stageStatusLabel(status: ProjectStageItem["status"]): string {
 
 function ClientProjectHeader({
   projectName,
+  clientName,
+  clientCreatedAt,
   stages,
   nextAction,
   completionPct
 }: {
   projectName: string;
+  clientName: string | null;
+  clientCreatedAt: string | null;
   stages: ProjectStatusSummary["stages"];
   nextAction: NextClientAction;
   completionPct: number;
@@ -65,6 +72,7 @@ function ClientProjectHeader({
     stages.findIndex((s) => s.active)
   );
   const activeStage = stages[activeIndex] ?? stages[0];
+  const formattedClientCreatedAt = formatClientCreatedAt(clientCreatedAt);
 
   return (
     <header className="sticky top-0 z-30 border-b border-[color:var(--line)] bg-white/95 backdrop-blur">
@@ -77,6 +85,17 @@ function ClientProjectHeader({
             <h1 className="mt-0.5 truncate font-[family-name:var(--font-heading)] text-lg font-bold tracking-tight md:text-xl">
               {projectName}
             </h1>
+            {(clientName || formattedClientCreatedAt) && (
+              <p
+                className="mt-1 truncate text-[10px] uppercase tracking-[0.18em] text-[color:var(--muted)]"
+                data-testid="client-since"
+              >
+                {clientName ? `Cliente: ${clientName}` : "Cliente"}
+                {formattedClientCreatedAt
+                  ? ` · Desde ${formattedClientCreatedAt}`
+                  : " · Fecha no disponible"}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
@@ -391,6 +410,8 @@ export default async function ClientProjectPageV2({ params }: ClientProjectPageV
   ]);
 
   const projectName = portal.projectStatusSummary.projectName ?? "Tu proyecto";
+  const clientName = portal.projectStatusSummary.clientName;
+  const clientCreatedAt = portal.projectStatusSummary.clientCreatedAt;
   const stages = portal.projectStatusSummary.stages;
   const nextAction = portal.nextClientAction;
   const completedStages = stages.filter((s) => s.status === "completado").length;
@@ -400,6 +421,8 @@ export default async function ClientProjectPageV2({ params }: ClientProjectPageV
     <div className="-mx-4 -mt-6 min-h-screen bg-[color:var(--background)] sm:-mx-6 lg:-mx-8">
       <ClientProjectHeader
         projectName={projectName}
+        clientName={clientName}
+        clientCreatedAt={clientCreatedAt}
         stages={stages}
         nextAction={nextAction}
         completionPct={completionPct}

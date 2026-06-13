@@ -3,6 +3,8 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260508-21_cliente_pwa_resultados_y_leads_v1.md
  * IMPL-20260528-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
+ * IMPL-20260612-04
+ * Respaldo: context/SPECs/SPEC_ARCH-20260612-04_fecha_creacion_cliente_panel_detalle.md
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 
@@ -34,6 +36,7 @@ export type ProjectStageItem = {
 export type ProjectStatusSummary = {
   projectName: string | null;
   clientName: string | null;
+  clientCreatedAt: string | null;
   stages: ProjectStageItem[];
   briefContextNote: string | null;
 };
@@ -280,6 +283,7 @@ type ProjectRow = {
 type ClientRow = {
   id: string;
   name: string;
+  created_at: string | null;
 };
 
 type QuotationRow = {
@@ -377,7 +381,7 @@ async function fetchMostRecentProject(tenantId: string): Promise<ProjectRow | nu
 
 async function fetchClientById(tenantId: string, clientId: string): Promise<ClientRow | null> {
   const params = new URLSearchParams({
-    select: "id,name",
+    select: "id,name,created_at",
     tenant_id: `eq.${tenantId}`,
     id: `eq.${clientId}`,
     limit: "1"
@@ -454,6 +458,32 @@ function formatTimestamp(iso: string): string {
   }
 }
 
+/**
+ * Formatea la fecha de creación de un cliente en formato corto `DD/MMM/YY`
+ * localizado a es-MX y zona horaria America/Mexico_City.
+ *
+ * Retorna null si la fecha es null/undefined o si la cadena no es un ISO
+ * válido, para que las vistas puedan mostrar un fallback "Fecha no disponible"
+ * sin romper el layout.
+ *
+ * IMPL-20260612-04
+ */
+export function formatClientCreatedAt(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return null;
+  try {
+    return new Intl.DateTimeFormat("es-MX", {
+      day: "2-digit",
+      month: "short",
+      year: "2-digit",
+      timeZone: "America/Mexico_City"
+    }).format(parsed);
+  } catch {
+    return null;
+  }
+}
+
 // ─── Función principal ────────────────────────────────────────────────────────
 
 /**
@@ -485,6 +515,7 @@ export async function getClientPortal(
     projectStatusSummary: {
       projectName: null,
       clientName: null,
+      clientCreatedAt: null,
       stages: deriveBriefStages(null, false),
       briefContextNote: null
     },
@@ -528,6 +559,7 @@ export async function getClientPortal(
 
   let projectName: string | null = null;
   let clientName: string | null = null;
+  let clientCreatedAt: string | null = null;
 
   if (brief?.project_id) {
     const project = await fetchProjectById(tenantId, brief.project_id);
@@ -536,11 +568,13 @@ export async function getClientPortal(
       if (project.client_id) {
         const client = await fetchClientById(tenantId, project.client_id);
         clientName = client?.name ?? null;
+        clientCreatedAt = client?.created_at ?? null;
       }
     }
   } else if (brief?.client_id) {
     const client = await fetchClientById(tenantId, brief.client_id);
     clientName = client?.name ?? null;
+    clientCreatedAt = client?.created_at ?? null;
   }
 
   // ─── Estado del brief en 3 etapas para el cliente ──────────────────────────
@@ -665,6 +699,7 @@ export async function getClientPortal(
     projectStatusSummary: {
       projectName,
       clientName,
+      clientCreatedAt,
       stages,
       briefContextNote
     },

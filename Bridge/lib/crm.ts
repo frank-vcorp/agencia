@@ -354,7 +354,7 @@ export async function getLeadsForDefaultTenant(): Promise<Lead[]> {
   return getLeadsByTenant(tenantId);
 }
 
-export async function getLeadsByTenant(tenantId: string): Promise<Lead[]> {
+export async function getLeadsByTenant(tenantId: string, clientId?: string): Promise<Lead[]> {
   const params = new URLSearchParams({
     select:
       "id,tenant_id,client_id,project_id,name,source_channel,requested_service," +
@@ -363,6 +363,9 @@ export async function getLeadsByTenant(tenantId: string): Promise<Lead[]> {
     deleted_at: "is.null",
     order: "created_at.desc"
   });
+  if (clientId) {
+    params.set("client_id", `eq.${clientId}`);
+  }
   const rows = await postgrest<LeadRow[]>(`leads?${params.toString()}`, { method: "GET" });
   return rows.map(normalizeLeadRow);
 }

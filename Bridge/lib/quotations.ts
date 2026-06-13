@@ -443,8 +443,15 @@ export async function getTenantIdBySlug(slug: string): Promise<string | null> {
 /**
  * IMPL-20260526-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
+ * IMPL-ARCH-20260612-05
+ * Respaldo: context/SPECs/SPEC_ARCH-20260612-05_gestion_clientes_crud_detalle_entidades_relacionadas.md
+ * Acepta filtro opcional `clientId` para alimentar la pestaña de cotizaciones
+ * dentro de la vista de detalle del cliente.
  */
-export async function getQuotationsByTenant(tenantId: string): Promise<
+export async function getQuotationsByTenant(
+  tenantId: string,
+  clientId?: string
+): Promise<
   Array<{
     id: string;
     tenant_id: string;
@@ -462,6 +469,9 @@ export async function getQuotationsByTenant(tenantId: string): Promise<
     tenant_id: `eq.${tenantId}`,
     order: "created_at.desc"
   });
+  if (clientId) {
+    params.set("client_id", `eq.${clientId}`);
+  }
 
   return postgrest<
     Array<{
@@ -478,6 +488,18 @@ export async function getQuotationsByTenant(tenantId: string): Promise<
   >(`quotations?${params.toString()}`, {
     method: "GET"
   });
+}
+
+/**
+ * Helper semántico para el listado de cotizaciones filtrado por cliente.
+ * Útil para la pestaña de cotizaciones dentro del detalle de cliente.
+ * IMPL-ARCH-20260612-05
+ */
+export async function getQuotationsByClient(
+  tenantId: string,
+  clientId: string
+): ReturnType<typeof getQuotationsByTenant> {
+  return getQuotationsByTenant(tenantId, clientId);
 }
 
 /**
