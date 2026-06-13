@@ -31,13 +31,18 @@ import { submitBriefAction } from "@/app/cliente/brief/[projectId]/actions";
 
 const VIKA_CHECKLIST_LABELS: Record<keyof StructuredBriefSummary, string> = {
   giroYProductoHeroe: "Giro y producto heroe",
+  personaPerfil: "Perfil del dueño",
+  historiaNegocio: "Historia del negocio",
+  administracionNegocio: "Administración del negocio",
   madurez: "Madurez del negocio",
   localFisico: "Local fisico o a domicilio",
   logo: "Logo o marca grafica",
   audience: "Lo que te hace unico (diferenciador)",
   restrictions: "Objeciones frecuentes del cliente",
+  publicidadPrevia: "Publicidad previa intentada",
   presupuesto: "Presupuesto mensual",
   cta: "Accion esperada del cliente (CTA)",
+  planesFuturo: "Planes a futuro (6-12 meses)",
   historiaYContexto: "Historia y contexto (opcional)",
   projectObjective: "Objetivo del proyecto",
   expectedResult: "Resultado esperado",
@@ -63,13 +68,18 @@ const VIKA_CHECKLIST_LABELS: Record<keyof StructuredBriefSummary, string> = {
 
 const VIKA_CHECKLIST_FIELDS: Array<keyof StructuredBriefSummary> = [
   "giroYProductoHeroe",
+  "personaPerfil",
+  "historiaNegocio",
+  "administracionNegocio",
   "madurez",
   "localFisico",
   "logo",
   "audience",
   "restrictions",
+  "publicidadPrevia",
   "presupuesto",
-  "cta"
+  "cta",
+  "planesFuturo"
 ];
 
 const VIKA_NARRATIVE_FIELD: keyof StructuredBriefSummary = "historiaYContexto";
@@ -110,7 +120,12 @@ function buildSummaryPatchSeed(): StructuredBriefSummary {
     presupuesto: "",
     localFisico: "",
     giroYProductoHeroe: "",
-    historiaYContexto: ""
+    historiaYContexto: "",
+    personaPerfil: "",
+    historiaNegocio: "",
+    administracionNegocio: "",
+    publicidadPrevia: "",
+    planesFuturo: ""
   };
   return base;
 }

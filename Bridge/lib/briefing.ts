@@ -19,41 +19,58 @@ import { resolveTenantIdBySlug } from "./tenant";
 /**
  * IMPL-20260611-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
- * Payload de 8 puntos obligatorios + narrativa opcional emitido por Vika al cierre.
+ * IMPL-20260612-01
+ * Respaldo: ARCH-20260612-01 — Checklist 13 puntos obligatorios + fase narrativa dual.
+ * Payload de 13 puntos obligatorios + narrativa emitido por Vika al cierre.
  */
 export type VikaBriefData = {
   giro_y_producto_heroe: string;
+  persona_perfil: string;
+  historia_negocio: string;
+  administracion_negocio: string;
   madurez: string;
   local_fisico: string;
   logo: string;
   diferenciador: string;
   objeciones: string;
+  publicidad_previa: string;
   presupuesto: string;
   cta_deseado: string;
+  planes_futuro: string;
   historia_y_contexto?: string;
 };
 
 export const VIKA_BRIEF_FIELDS = [
   "giro_y_producto_heroe",
+  "persona_perfil",
+  "historia_negocio",
+  "administracion_negocio",
   "madurez",
   "local_fisico",
   "logo",
   "diferenciador",
   "objeciones",
+  "publicidad_previa",
   "presupuesto",
-  "cta_deseado"
+  "cta_deseado",
+  "planes_futuro"
 ] as const satisfies ReadonlyArray<keyof VikaBriefData>;
 
 export function emptyVikaBriefData(): VikaBriefData {
   return {
     giro_y_producto_heroe: "",
+    persona_perfil: "",
+    historia_negocio: "",
+    administracion_negocio: "",
     madurez: "",
     local_fisico: "",
     logo: "",
     diferenciador: "",
     objeciones: "",
+    publicidad_previa: "",
     presupuesto: "",
     cta_deseado: "",
+    planes_futuro: "",
     historia_y_contexto: ""
   };
 }
@@ -61,29 +78,40 @@ export function emptyVikaBriefData(): VikaBriefData {
 /**
  * IMPL-20260611-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
+ * IMPL-20260612-01
+ * Respaldo: ARCH-20260612-01 — Checklist 13 puntos obligatorios.
  *
- * Mapeo entre las 8 claves de Vika (usadas en el chat) y los campos del
+ * Mapeo entre las 13 claves de Vika (usadas en el chat) y los campos del
  * resumen estructurado que las almacenan en el jsonb existente.
  * `diferenciador` viaja en `audience` y `objeciones` en `restrictions` por
  * la regla de mapeo del contrato (ver `mapVikaBriefDataToStructuredSummary`).
+ * Los 5 campos nuevos (persona_perfil, historia_negocio, administracion_negocio,
+ * publicidad_previa, planes_futuro) se conservan en el jsonb existente sin migración.
  */
 const VIKA_CHECKLIST_TO_SUMMARY_KEY: ReadonlyArray<{
   vikaKey: string;
   summaryKey: keyof StructuredBriefSummary;
 }> = [
   { vikaKey: "giro_y_producto_heroe", summaryKey: "giroYProductoHeroe" },
+  { vikaKey: "persona_perfil", summaryKey: "personaPerfil" },
+  { vikaKey: "historia_negocio", summaryKey: "historiaNegocio" },
+  { vikaKey: "administracion_negocio", summaryKey: "administracionNegocio" },
   { vikaKey: "madurez", summaryKey: "madurez" },
   { vikaKey: "local_fisico", summaryKey: "localFisico" },
   { vikaKey: "logo", summaryKey: "logo" },
   { vikaKey: "diferenciador", summaryKey: "audience" },
   { vikaKey: "objeciones", summaryKey: "restrictions" },
+  { vikaKey: "publicidad_previa", summaryKey: "publicidadPrevia" },
   { vikaKey: "presupuesto", summaryKey: "presupuesto" },
-  { vikaKey: "cta_deseado", summaryKey: "cta" }
+  { vikaKey: "cta_deseado", summaryKey: "cta" },
+  { vikaKey: "planes_futuro", summaryKey: "planesFuturo" }
 ];
 
 /**
  * IMPL-20260611-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
+ * IMPL-20260612-01
+ * Respaldo: ARCH-20260612-01 — Checklist 13 puntos obligatorios.
  *
  * Renderiza el bloque "PROGRESO ACTUAL DE LA CONVERSACIÓN" que se inyecta en
  * el System Prompt de Vika para que el modelo NO repita preguntas ya
@@ -115,8 +143,11 @@ export function renderVikaProgressBlock(summary: StructuredBriefSummary): string
 /**
  * IMPL-20260611-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
- * Mapea el JSON de 8 puntos emitido por Vika a los campos del resumen estructurado.
- * Los 3 campos nuevos (madurez, logo, presupuesto) se conservan en el jsonb existente.
+ * IMPL-20260612-01
+ * Respaldo: ARCH-20260612-01 — Checklist 13 puntos obligatorios.
+ * Mapea el JSON de 13 puntos emitido por Vika a los campos del resumen estructurado.
+ * Los 5 campos nuevos (personaPerfil, historiaNegocio, administracionNegocio,
+ * publicidadPrevia, planesFuturo) se conservan en el jsonb existente.
  */
 export function mapVikaBriefDataToStructuredSummary(
   vika: Partial<VikaBriefData>
@@ -124,27 +155,66 @@ export function mapVikaBriefDataToStructuredSummary(
   const get = (key: keyof VikaBriefData): string => (typeof vika[key] === "string" ? (vika[key] as string).trim() : "");
 
   const giro = get("giro_y_producto_heroe");
-  const diferenciador = get("diferenciador");
-  const objeciones = get("objeciones");
-  const cta = get("cta_deseado");
+  const personaPerfil = get("persona_perfil");
+  const historiaNegocio = get("historia_negocio");
+  const administracionNegocio = get("administracion_negocio");
   const madurez = get("madurez");
   const logo = get("logo");
   const presupuesto = get("presupuesto");
   const localFisico = get("local_fisico");
+  const diferenciador = get("diferenciador");
+  const objeciones = get("objeciones");
+  const publicidadPrevia = get("publicidad_previa");
+  const cta = get("cta_deseado");
+  const planesFuturo = get("planes_futuro");
   const historia = get("historia_y_contexto");
 
   const patch: Partial<StructuredBriefSummary> = {
+    personaPerfil,
+    historiaNegocio,
+    administracionNegocio,
     madurez,
     logo,
     presupuesto,
     localFisico,
     giroYProductoHeroe: giro,
+    publicidadPrevia,
+    planesFuturo,
     historiaYContexto: historia
   };
 
   if (giro) {
+    patch.giroYProductoHeroe = giro;
     patch.mainOffer = giro;
     patch.projectObjective = giro;
+  }
+
+  if (personaPerfil) {
+    patch.personaPerfil = personaPerfil;
+  }
+
+  if (historiaNegocio) {
+    patch.historiaNegocio = historiaNegocio;
+  }
+
+  if (administracionNegocio) {
+    patch.administracionNegocio = administracionNegocio;
+  }
+
+  if (madurez) {
+    patch.madurez = madurez;
+  }
+
+  if (logo) {
+    patch.logo = logo;
+  }
+
+  if (presupuesto) {
+    patch.presupuesto = presupuesto;
+  }
+
+  if (localFisico) {
+    patch.localFisico = localFisico;
   }
 
   if (diferenciador) {
@@ -155,8 +225,20 @@ export function mapVikaBriefDataToStructuredSummary(
     patch.restrictions = objeciones;
   }
 
+  if (publicidadPrevia) {
+    patch.publicidadPrevia = publicidadPrevia;
+  }
+
   if (cta) {
     patch.cta = cta;
+  }
+
+  if (planesFuturo) {
+    patch.planesFuturo = planesFuturo;
+  }
+
+  if (historia) {
+    patch.historiaYContexto = historia;
   }
 
   return patch;
@@ -321,6 +403,9 @@ export type StructuredBriefSummary = {
    * IMPL-20260611-01
    * Campos del flujo Vika (8 puntos) que viajan en el jsonb existente.
    * No requieren migración de Supabase.
+   * IMPL-20260612-01
+   * 5 campos nuevos del checklist 13 puntos: personaPerfil, historiaNegocio,
+   * administracionNegocio, publicidadPrevia, planesFuturo.
    */
   madurez: string;
   logo: string;
@@ -328,6 +413,11 @@ export type StructuredBriefSummary = {
   localFisico: string;
   giroYProductoHeroe: string;
   historiaYContexto: string;
+  personaPerfil: string;
+  historiaNegocio: string;
+  administracionNegocio: string;
+  publicidadPrevia: string;
+  planesFuturo: string;
 };
 
 export type BriefMessage = {
@@ -552,7 +642,12 @@ export const emptyStructuredBriefSummary = (): StructuredBriefSummary => ({
   presupuesto: "",
   localFisico: "",
   giroYProductoHeroe: "",
-  historiaYContexto: ""
+  historiaYContexto: "",
+  personaPerfil: "",
+  historiaNegocio: "",
+  administracionNegocio: "",
+  publicidadPrevia: "",
+  planesFuturo: ""
 });
 
 export function normalizeSummary(input: Partial<StructuredBriefSummary> | null | undefined): StructuredBriefSummary {
@@ -664,16 +759,17 @@ export function buildFinalSummaryText(summary: StructuredBriefSummary): string {
     summary.presupuesto && `Presupuesto mensual: ${summary.presupuesto}.`,
     summary.localFisico && `Local fisico: ${summary.localFisico}.`,
     summary.giroYProductoHeroe && `Giro y producto heroe: ${summary.giroYProductoHeroe}.`,
-    summary.historiaYContexto && `Historia y contexto: ${summary.historiaYContexto}.`
+    summary.historiaYContexto && `Historia y contexto: ${summary.historiaYContexto}.`,
+    summary.personaPerfil && `Perfil del dueño: ${summary.personaPerfil}.`,
+    summary.historiaNegocio && `Historia del negocio: ${summary.historiaNegocio}.`,
+    summary.administracionNegocio && `Administración: ${summary.administracionNegocio}.`,
+    summary.publicidadPrevia && `Publicidad previa: ${summary.publicidadPrevia}.`,
+    summary.planesFuturo && `Planes a futuro: ${summary.planesFuturo}.`
   ].filter(Boolean);
 
   return lines.join(" ");
 }
 
-/**
- * IMPL-20260528-02
- * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260528-04_brief_chat_portal_cliente_v1.md
- */
 function cleanHeuristicValue(value: string): string {
   return value.replace(/\s+/g, " ").trim().replace(/^[,.:;\-\s]+/, "").replace(/[.?!\s]+$/, "");
 }
@@ -739,52 +835,52 @@ type StageQuestionConfig = {
 const VISIBLE_QUESTION_BY_FIELD: Record<keyof StructuredBriefSummary, StageQuestionConfig | null> = {
   projectObjective: {
     key: "projectObjective",
-    question: "\u00bfQu\u00e9 resultado concreto te gustar\u00eda conseguir con este proyecto?",
+    question: "¿Qué resultado concreto te gustaría conseguir con este proyecto?",
     clarification:
-      "Me refiero al cambio que te gustar\u00eda lograr con esta iniciativa: por ejemplo vender m\u00e1s, generar m\u00e1s leads, conseguir reuniones o lanzar una nueva oferta. \u00bfQu\u00e9 resultado quieres mover primero?"
+      "Me refiero al cambio que te gustaría lograr con esta iniciativa: por ejemplo vender más, generar más leads, conseguir reuniones o lanzar una nueva oferta. ¿Qué resultado quieres mover primero?"
   },
   expectedResult: null,
   businessContext: {
     key: "businessContext",
-    question: "\u00bfC\u00f3mo est\u00e1 hoy tu negocio o esta l\u00ednea de servicio, y qu\u00e9 contexto deber\u00edamos considerar?",
+    question: "¿Cómo está hoy tu negocio o esta línea de servicio, y qué contexto deberíamos considerar?",
     clarification:
-      "Aqu\u00ed me ayuda entender el punto de partida: por ejemplo si ya vendes esto, si es algo nuevo, si tienes audiencia activa o si vienes de una baja en ventas. \u00bfC\u00f3mo est\u00e1 hoy ese frente del negocio?"
+      "Aquí me ayuda entender el punto de partida: por ejemplo si ya vendes esto, si es algo nuevo, si tienes audiencia activa o si vienes de una baja en ventas. ¿Cómo está hoy ese frente del negocio?"
   },
   requestReason: {
     key: "requestReason",
-    question: "\u00bfPor qu\u00e9 te importa mover esto ahora y qu\u00e9 dispar\u00f3 esta necesidad?",
+    question: "¿Por qué te importa mover esto ahora y qué disparó esta necesidad?",
     clarification:
-      "Busco entender qu\u00e9 activ\u00f3 este pedido ahora: por ejemplo una meta comercial, una ca\u00edda en resultados, una campa\u00f1a que viene o una oportunidad puntual. \u00bfQu\u00e9 lo deton\u00f3?"
+      "Busco entender qué activó este pedido ahora: por ejemplo una meta comercial, una caída en resultados, una campaña que viene o una oportunidad puntual. ¿Qué lo detonó?"
   },
   mainOffer: {
     key: "mainOffer",
-    question: "\u00bfCu\u00e1l es el servicio o producto principal que quieres mover primero?",
+    question: "¿Cuál es el servicio o producto principal que quieres mover primero?",
     clarification:
-      "Me refiero a lo que quieres vender o impulsar primero en esta conversaci\u00f3n. Puede ser un servicio, un producto, una promoci\u00f3n, una membres\u00eda o una oferta puntual. \u00bfQu\u00e9 quieres mover exactamente?"
+      "Me refiero a lo que quieres vender o impulsar primero en esta conversación. Puede ser un servicio, un producto, una promoción, una membresía o una oferta puntual. ¿Qué quieres mover exactamente?"
   },
   audience: {
     key: "audience",
-    question: "\u00bfA qu\u00e9 tipo de personas o empresas quieres llegar primero?",
+    question: "¿A qué tipo de personas o empresas quieres llegar primero?",
     clarification:
-      "Aqu\u00ed me sirve ubicar a qui\u00e9n quieres atraer: por ejemplo due\u00f1os de negocio, madres j\u00f3venes, pacientes, equipos comerciales o empresas de cierto tama\u00f1o. \u00bfQui\u00e9n es ese p\u00fablico principal?"
+      "Aquí me sirve ubicar a quién quieres atraer: por ejemplo dueños de negocio, madres jóvenes, pacientes, equipos comerciales o empresas de cierto tamaño. ¿Quién es ese público principal?"
   },
   platform: {
     key: "platform",
-    question: "\u00bfEn qu\u00e9 canal o plataforma quieres mover esta acci\u00f3n primero?",
+    question: "¿En qué canal o plataforma quieres mover esta acción primero?",
     clarification:
-      "Me refiero al lugar donde quieres activar esto primero: por ejemplo Instagram, WhatsApp, landing, sitio web, email o anuncios. \u00bfD\u00f3nde quieres moverlo?"
+      "Me refiero al lugar donde quieres activar esto primero: por ejemplo Instagram, WhatsApp, landing, sitio web, email o anuncios. ¿Dónde quieres moverlo?"
   },
   deliverable: {
     key: "deliverable",
-    question: "\u00bfQu\u00e9 pieza o soluci\u00f3n necesitas que preparemos para mover esa acci\u00f3n?",
+    question: "¿Qué pieza o solución necesitas que preparemos para mover esa acción?",
     clarification:
-      "Aqu\u00ed quiero entender qu\u00e9 necesitas producir: por ejemplo una landing, anuncios, una secuencia de mensajes, un video, piezas gr\u00e1ficas o una campa\u00f1a completa. \u00bfQu\u00e9 necesitas exactamente?"
+      "Aquí quiero entender qué necesitas producir: por ejemplo una landing, anuncios, una secuencia de mensajes, un video, piezas gráficas o una campaña completa. ¿Qué necesitas exactamente?"
   },
   cta: {
     key: "cta",
-    question: "\u00bfQu\u00e9 acci\u00f3n te gustar\u00eda que haga la persona al ver esta pieza?",
+    question: "¿Qué acción te gustaría que haga la persona al ver esta pieza?",
     clarification:
-      "Me refiero a la respuesta que esperas provocar: por ejemplo escribirte, agendar, comprar, pedir cotizaci\u00f3n o registrarse. \u00bfQu\u00e9 acci\u00f3n quieres empujar?"
+      "Me refiero a la respuesta que esperas provocar: por ejemplo escribirte, agendar, comprar, pedir cotización o registrarse. ¿Qué acción quieres empujar?"
   },
   tone: null,
   restrictions: null,
@@ -796,52 +892,82 @@ const VISIBLE_QUESTION_BY_FIELD: Record<keyof StructuredBriefSummary, StageQuest
   structuringConfidence: null,
   recommendedProductSlotKey: {
     key: "recommendedProductSlotKey",
-    question: "Con lo que hemos hablado, \u00bfqu\u00e9 tipo de soluci\u00f3n sientes que encaja mejor con lo que necesitas ahora?",
+    question: "Con lo que hemos hablado, ¿qué tipo de solución sientes que encaja mejor con lo que necesitas ahora?",
     clarification:
-      "Estoy buscando confirmar qu\u00e9 clase de soluci\u00f3n te har\u00eda m\u00e1s sentido hoy: por ejemplo campa\u00f1a, presencia digital, contenido o lanzamiento. Si prefieres, tambi\u00e9n puedes decirme qu\u00e9 esperas que resolvamos primero."
+      "Estoy buscando confirmar qué clase de solución te haría más sentido hoy: por ejemplo campaña, presencia digital, contenido o lanzamiento. Si prefieres, también puedes decirme qué esperas que resolvamos primero."
   },
   recommendedProductConfidence: null,
   commercialFitReason: {
     key: "commercialFitReason",
-    question: "\u00bfQu\u00e9 te hace pensar que esta es la direcci\u00f3n correcta para resolver tu caso?",
+    question: "¿Qué te hace pensar que esta es la dirección correcta para resolver tu caso?",
     clarification:
-      "Aqu\u00ed me ayuda entender por qu\u00e9 esta v\u00eda te hace sentido: por ejemplo por velocidad, presupuesto, complejidad del caso o porque ya intentaste otra cosa. \u00bfQu\u00e9 te hace pensar que esta es la mejor direcci\u00f3n?"
+      "Aquí me ayuda entender por qué esta vía te hace sentido: por ejemplo por velocidad, presupuesto, complejidad del caso o porque ya intentaste otra cosa. ¿Qué te hace pensar que esta es la mejor dirección?"
   },
   upsellSignal: null,
   operatorReviewNote: null,
   clientFacingSummary: null,
   madurez: {
     key: "madurez",
-    question: "\u00bfCu\u00e1nto tiempo llevas con el negocio abierto?",
+    question: "¿Cuánto tiempo llevas con el negocio abierto?",
     clarification:
-      "Me interesa saber si apenas est\u00e1s empezando o si ya tienes un tiempo operando. Eso me ayuda a pensar la estrategia adecuada."
+      "Me interesa saber si apenas estás empezando o si ya tienes un tiempo operando. Eso me ayuda a pensar la estrategia adecuada."
   },
   logo: {
     key: "logo",
-    question: "\u00bfTienes un logotipo o usas el nombre del negocio con letras bonitas?",
+    question: "¿Tienes un logotipo o usas el nombre del negocio con letras bonitas?",
     clarification:
-      "Con esto ubico si ya tienes marca gr\u00e1fica lista o si necesitamos contemplarla dentro de la estrategia."
+      "Con esto ubico si ya tienes marca gráfica lista o si necesitamos contemplarla dentro de la estrategia."
   },
   presupuesto: {
     key: "presupuesto",
-    question: "\u00bfDe cu\u00e1nto dinero dispones al mes para invertir en este proyecto?",
+    question: "¿De cuánto dinero dispones al mes para invertir en este proyecto?",
     clarification:
-      "Si no tienes un monto claro, lo anotamos como $0 / Org\u00e1nico y dise\u00f1amos la estrategia en consecuencia."
+      "Si no tienes un monto claro, lo anotamos como $0 / Orgánico y diseñamos la estrategia en consecuencia."
   },
   localFisico: {
     key: "localFisico",
-    question: "\u00bfTienes un local donde la gente te visita o entregas a domicilio?",
+    question: "¿Tienes un local donde la gente te visita o entregas a domicilio?",
     clarification:
       "Con eso decido si conviene mostrar la fachada del local o si la estrategia es 100% digital o a domicilio."
   },
   giroYProductoHeroe: null,
-  historiaYContexto: null
+  historiaYContexto: null,
+  personaPerfil: {
+    key: "personaPerfil",
+    question: "¿Cómo te describirías tú como dueño del negocio?",
+    clarification:
+      "Me ayuda a entender tu estilo: por ejemplo si eres manos a la obra, si delegas, si vienes del lado técnico o comercial. ¿Cómo te ves tú en el día a día?"
+  },
+  historiaNegocio: {
+    key: "historiaNegocio",
+    question: "¿Cómo te animaste a poner el negocio?",
+    clarification:
+      "Me interesa conocer el origen: por ejemplo herencia familiar, detectaste una necesidad, siempre te gustó el rubro, o fue una oportunidad que apareció. Cuéntamelo en tus palabras."
+  },
+  administracionNegocio: {
+    key: "administracionNegocio",
+    question: "¿Cómo administras el día a día? ¿Tienes equipo o estás solo?",
+    clarification:
+      "Quiero entender la operación: por ejemplo 'yo solo hago todo', 'tengo 2 empleados y un socio', 'tercerizo lo operativo'. ¿Cómo está armado tu equipo?"
+  },
+  publicidadPrevia: {
+    key: "publicidadPrevia",
+    question: "¿Has intentado publicidad antes? ¿Qué hiciste y cómo te fue?",
+    clarification:
+      "Me sirve saber si ya probaste algo: por ejemplo 'boost en Instagram $500, pocos resultados', 'flyers en la zona', 'Google Ads un mes', 'nunca he invertido en publicidad'."
+  },
+  planesFuturo: {
+    key: "planesFuturo",
+    question: "¿Qué planes tienes para el negocio en los próximos 6-12 meses?",
+    clarification:
+      "Me ayuda a alinear la estrategia: por ejemplo 'abrir segunda sucursal', 'lanzar producto nuevo', 'franquiciar', 'estabilizar y ordenar', 'crecer 30% en ventas'."
+  }
 };
 
 const STAGE_FIELD_PRIORITY: Record<BriefingStage, Array<keyof StructuredBriefSummary>> = {
-  discovery: ["mainOffer", "projectObjective", "requestReason", "businessContext"],
+  discovery: ["mainOffer", "projectObjective", "requestReason", "businessContext", "personaPerfil", "historiaNegocio", "administracionNegocio"],
   precision: ["audience", "platform", "deliverable", "cta"],
-  commercial_fit: ["recommendedProductSlotKey", "commercialFitReason"]
+  commercial_fit: ["recommendedProductSlotKey", "commercialFitReason", "presupuesto", "planesFuturo", "madurez", "logo", "localFisico", "publicidadPrevia"]
 };
 
 const FIELD_COMPLETION_RULES: Partial<
@@ -862,7 +988,12 @@ const FIELD_COMPLETION_RULES: Partial<
   presupuesto: { minLength: 1, minWords: 1 },
   localFisico: { minLength: 2, minWords: 1 },
   giroYProductoHeroe: { minLength: 4, minWords: 1 },
-  historiaYContexto: { minLength: 4, minWords: 1 }
+  historiaYContexto: { minLength: 4, minWords: 1 },
+  personaPerfil: { minLength: 4, minWords: 1 },
+  historiaNegocio: { minLength: 8, minWords: 2 },
+  administracionNegocio: { minLength: 6, minWords: 1 },
+  publicidadPrevia: { minLength: 4, minWords: 1 },
+  planesFuturo: { minLength: 6, minWords: 1 }
 };
 
 const GENERIC_SUMMARY_VALUES = new Set(["hola", "buenas", "gracias", "si", "no", "ok", "dale", "listo"]);
