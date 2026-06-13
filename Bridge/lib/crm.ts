@@ -7,6 +7,8 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-29_hardening_validacion_cruzada_crm_v1.md
  * IMPL-20260528-01
  * Respaldo: context/SPECs/SPEC_ARCH-20260528-01_papelera_reciclaje_mcp_client_lead_brief_v1.md
+ * IMPL-20260613-02
+ * Respaldo: context/SPECs/SPEC_ARCH-20260505-29_hardening_validacion_cruzada_crm_v1.md (extensión: updateLead)
  */
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 
@@ -449,6 +451,86 @@ export async function updateLeadStatus(leadId: string, status: LeadStatus): Prom
   });
 
   await postgrest<LeadRow[]>(`leads?id=eq.${leadId}`, { method: "PATCH", body });
+}
+
+/**
+ * Campos editables de un lead existente. Todos opcionales — sólo se persisten
+ * los que vengan definidos en el input.
+ * IMPL-20260613-02
+ */
+export type UpdateLeadInput = Partial<CreateLeadInput>;
+
+/**
+ * Actualiza los campos editables de un lead existente y aplica la misma
+ * validación cruzada clientId/projectId que `createLeadForDefaultTenant`.
+ *
+ * Reglas (alineadas con SPEC ARCH‑20260505‑29):
+ * - Si Supabase no está configurado, devuelve null (misma convención que create).
+ * - Si el lead no existe o está soft‑deleted, devuelve null.
+ * - Si `input.clientId` o `input.projectId` están presentes, se valida la
+ *   combinación efectiva (input + valores actuales del lead) contra los datos
+ *   reales del tenant del lead. Si la validación falla, lanza Error con el
+ *   mensaje devuelto por `resolveLeadLinks`.
+ * - Si `input.clientId` o `input.projectId` llegan como `null` o `undefined`,
+ *   se conserva el valor actual del lead para no perder vínculos existentes.
+ * - Sólo se incluyen en el PATCH los campos que cambiaron (más `updated_at`).
+ * IMPL-20260613-02
+ */
+export async function updateLead(leadId: string, input: UpdateLeadInput): Promise<Lead | null> {
+  if (!isSupabaseConfigured) return null;
+
+  // 1) Leer el lead actual para conocer su tenant y los vínculos vigentes.
+  type ExistingLeadLinks = Pick<LeadRow, "id" | "tenant_id" | "client_id" | "project_id">;
+  const existingParams = new URLSearchParams({
+    select: "id,tenant_id,client_id,project_id",
+    id: `eq.${leadId}`,
+    deleted_at: "is.null",
+    limit: "1"
+  });
+  const existingRows = await postgrest<ExistingLeadLinks[]>(
+    `leads?${existingParams.toString()}`,
+    { method: "GET" }
+  );
+  const existing = existingRows[0];
+  if (!existing) return null;
+
+  // 2) Determinar si el caller está tocando los vínculos y validar.
+  const touchesClientId = input.clientId !== undefined;
+  const touchesProjectId = input.projectId !== undefined;
+  let resolvedClientId: string | null = existing.client_id;
+  let resolvedProjectId: string | null = existing.project_id;
+
+  if (touchesClientId || touchesProjectId) {
+    // SPEC: null en el input significa "conservar valor actual" (no perder vínculos).
+    // Undefined nunca llega aquí (sería !touchesX). Un string sobrescribe el valor.
+    const effectiveClientId = input.clientId === null ? existing.client_id : input.clientId ?? existing.client_id;
+    const effectiveProjectId = input.projectId === null ? existing.project_id : input.projectId ?? existing.project_id;
+
+    const linkResult = await resolveLeadLinks(existing.tenant_id, effectiveClientId, effectiveProjectId);
+    if (!linkResult.ok) {
+      throw new Error(linkResult.error);
+    }
+    // Usar los valores resueltos: resolveLeadLinks puede auto‑resolver clientId
+    // desde projectId cuando el caller sólo envía el projectId.
+    resolvedClientId = linkResult.clientId;
+    resolvedProjectId = linkResult.projectId;
+  }
+
+  // 3) Construir payload PATCH sólo con los campos provistos + updated_at.
+  const payload: Record<string, string | null> = {
+    updated_at: new Date().toISOString()
+  };
+  if (input.name !== undefined) payload.name = input.name.trim();
+  if (input.sourceChannel !== undefined) payload.source_channel = input.sourceChannel;
+  if (input.requestedService !== undefined) payload.requested_service = input.requestedService.trim();
+  if (touchesClientId || touchesProjectId) {
+    payload.client_id = resolvedClientId;
+    payload.project_id = resolvedProjectId;
+  }
+
+  const body = JSON.stringify(payload);
+  const rows = await postgrest<LeadRow[]>(`leads?id=eq.${leadId}`, { method: "PATCH", body });
+  return rows[0] ? normalizeLeadRow(rows[0]) : null;
 }
 
 export type AddLeadNoteInput = {

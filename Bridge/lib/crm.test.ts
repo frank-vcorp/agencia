@@ -3,8 +3,10 @@
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-26_crm_ligero_operativo_y_seguimiento_minimo_v1.md
  * IMPL-20260505-27
  * Respaldo: context/SPECs/SPEC_ARCH-20260505-27_vinculacion_explicita_lead_client_project_v1.md
+ * IMPL-20260613-02
+ * Respaldo: context/SPECs/SPEC_ARCH-20260505-29_hardening_validacion_cruzada_crm_v1.md (extensión: updateLead)
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
 import {
   LEAD_SOURCE_CHANNELS,
@@ -307,5 +309,268 @@ describe("crm — resolveLeadLinksFromData", () => {
       expect(r.clientId).toBeNull();
       expect(r.projectId).toBeNull();
     }
+  });
+});
+
+// ─── Slice 29 (extensión): updateLead con validación cruzada ──────────────────
+
+/**
+ * Helper para construir una Response JSON al estilo de Supabase PostgREST.
+ */
+function makeJsonResponse<T>(data: T, status = 200): Promise<Response> {
+  return Promise.resolve(
+    new Response(JSON.stringify(data), {
+      status,
+      headers: { "Content-Type": "application/json" }
+    })
+  );
+}
+
+const TENANT_ID = "00000000-0000-0000-0000-0000000000t1";
+const CLIENT_A_ID = "00000000-0000-0000-0000-0000000000c1";
+const CLIENT_B_ID = "00000000-0000-0000-0000-0000000000c2";
+const PROJECT_IN_A = "00000000-0000-0000-0000-0000000000p1";
+const PROJECT_IN_B = "00000000-0000-0000-0000-0000000000p2";
+const LEAD_ID = "00000000-0000-0000-0000-0000000000l1";
+
+function makeLeadRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: LEAD_ID,
+    tenant_id: TENANT_ID,
+    client_id: null,
+    project_id: null,
+    name: "Lead original",
+    source_channel: "directo",
+    requested_service: "Servicio original",
+    status: "nuevo",
+    next_follow_up_at: null,
+    created_at: "2026-06-13T10:00:00Z",
+    updated_at: "2026-06-13T10:00:00Z",
+    ...overrides
+  };
+}
+
+describe("crm — updateLead (Supabase no configurado)", () => {
+  it("retorna null sin intentar fetch cuando Supabase no está configurado", async () => {
+    vi.resetModules();
+    vi.unstubAllEnvs();
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    const { updateLead } = await import("./crm");
+    const result = await updateLead(LEAD_ID, { name: "Nuevo nombre" });
+
+    expect(result).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+});
+
+describe("crm — updateLead (con Supabase configurado)", () => {
+  let fetchMock: MockInstance;
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://fake.supabase.co");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "fake-anon-key");
+    vi.stubEnv("NEXT_PUBLIC_DEFAULT_TENANT", "vectoria");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "fake-service-key");
+    fetchMock = vi.spyOn(globalThis, "fetch");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("actualiza name, sourceChannel y requestedService sin tocar vínculos", async () => {
+    const { updateLead } = await import("./crm");
+
+    const existing = makeLeadRow({ client_id: CLIENT_A_ID, project_id: PROJECT_IN_A });
+    const updated = makeLeadRow({
+      name: "Lead renombrado",
+      source_channel: "instagram",
+      requested_service: "Lanzamiento Q3",
+      client_id: CLIENT_A_ID,
+      project_id: PROJECT_IN_A,
+      updated_at: "2026-06-13T11:00:00Z"
+    });
+
+    fetchMock
+      .mockReturnValueOnce(makeJsonResponse([existing])) // GET lead actual
+      .mockReturnValueOnce(makeJsonResponse([updated])); // PATCH response
+
+    const result = await updateLead(LEAD_ID, {
+      name: "  Lead renombrado  ",
+      sourceChannel: "instagram",
+      requestedService: "Lanzamiento Q3"
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.name).toBe("Lead renombrado");
+    expect(result?.sourceChannel).toBe("instagram");
+    expect(result?.requestedService).toBe("Lanzamiento Q3");
+    expect(result?.clientId).toBe(CLIENT_A_ID);
+    expect(result?.projectId).toBe(PROJECT_IN_A);
+
+    // Sólo 2 llamadas: GET lead actual + PATCH (sin fetch de clients/projects).
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // Verificar que el PATCH NO incluye client_id ni project_id.
+    const patchCall = fetchMock.mock.calls[1];
+    expect(patchCall[0]).toContain(`/rest/v1/leads?id=eq.${LEAD_ID}`);
+    const init = patchCall[1] as RequestInit;
+    expect(init.method).toBe("PATCH");
+    const body = JSON.parse(init.body as string);
+    expect(body.name).toBe("Lead renombrado");
+    expect(body.source_channel).toBe("instagram");
+    expect(body.requested_service).toBe("Lanzamiento Q3");
+    expect(body.updated_at).toBeTruthy();
+    expect(body).not.toHaveProperty("client_id");
+    expect(body).not.toHaveProperty("project_id");
+  });
+
+  it("actualiza clientId y projectId con validación cruzada correcta", async () => {
+    const { updateLead } = await import("./crm");
+
+    const existing = makeLeadRow({ client_id: null, project_id: null });
+    const updated = makeLeadRow({
+      client_id: CLIENT_B_ID,
+      project_id: PROJECT_IN_B,
+      updated_at: "2026-06-13T11:00:00Z"
+    });
+
+    fetchMock
+      .mockReturnValueOnce(makeJsonResponse([existing])) // GET lead actual
+      .mockReturnValueOnce(makeJsonResponse([{ id: CLIENT_A_ID, name: "Acme", status: "active" }, { id: CLIENT_B_ID, name: "Vectoria", status: "active" }])) // GET clients
+      .mockReturnValueOnce(makeJsonResponse([{ id: PROJECT_IN_A, client_id: CLIENT_A_ID, name: "P-A", status: "active" }, { id: PROJECT_IN_B, client_id: CLIENT_B_ID, name: "P-B", status: "active" }])) // GET projects
+      .mockReturnValueOnce(makeJsonResponse([updated])); // PATCH response
+
+    const result = await updateLead(LEAD_ID, {
+      clientId: CLIENT_B_ID,
+      projectId: PROJECT_IN_B
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.clientId).toBe(CLIENT_B_ID);
+    expect(result?.projectId).toBe(PROJECT_IN_B);
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+
+    // Verificar payload del PATCH incluye client_id y project_id.
+    const patchCall = fetchMock.mock.calls[3];
+    const init = patchCall[1] as RequestInit;
+    expect(init.method).toBe("PATCH");
+    const body = JSON.parse(init.body as string);
+    expect(body.client_id).toBe(CLIENT_B_ID);
+    expect(body.project_id).toBe(PROJECT_IN_B);
+    expect(body.updated_at).toBeTruthy();
+  });
+
+  it("lanza error al intentar asignar un projectId que no pertenece al clientId indicado", async () => {
+    const { updateLead } = await import("./crm");
+
+    const existing = makeLeadRow({ client_id: null, project_id: null });
+
+    fetchMock
+      .mockReturnValueOnce(makeJsonResponse([existing]))
+      .mockReturnValueOnce(makeJsonResponse([{ id: CLIENT_A_ID, name: "Acme", status: "active" }, { id: CLIENT_B_ID, name: "Vectoria", status: "active" }]))
+      .mockReturnValueOnce(makeJsonResponse([{ id: PROJECT_IN_A, client_id: CLIENT_A_ID, name: "P-A", status: "active" }, { id: PROJECT_IN_B, client_id: CLIENT_B_ID, name: "P-B", status: "active" }]));
+
+    // PROJECT_IN_B pertenece a CLIENT_B, no a CLIENT_A.
+    await expect(
+      updateLead(LEAD_ID, { clientId: CLIENT_A_ID, projectId: PROJECT_IN_B })
+    ).rejects.toThrow(/no pertenece/i);
+
+    // No debe haberse ejecutado el PATCH.
+    const calls = fetchMock.mock.calls;
+    const patchCall = calls.find((c) => (c[1] as RequestInit)?.method === "PATCH");
+    expect(patchCall).toBeUndefined();
+  });
+
+  it("lanza error al intentar asignar un clientId inexistente", async () => {
+    const { updateLead } = await import("./crm");
+
+    const existing = makeLeadRow({ client_id: null, project_id: null });
+
+    fetchMock
+      .mockReturnValueOnce(makeJsonResponse([existing]))
+      .mockReturnValueOnce(makeJsonResponse([{ id: CLIENT_A_ID, name: "Acme", status: "active" }])) // sin CLIENT_B_ID
+      .mockReturnValueOnce(makeJsonResponse([{ id: PROJECT_IN_B, client_id: CLIENT_B_ID, name: "P-B", status: "active" }]));
+
+    await expect(
+      updateLead(LEAD_ID, { clientId: "00000000-0000-0000-0000-deadbeef0000" })
+    ).rejects.toThrow(/cliente/i);
+
+    const calls = fetchMock.mock.calls;
+    const patchCall = calls.find((c) => (c[1] as RequestInit)?.method === "PATCH");
+    expect(patchCall).toBeUndefined();
+  });
+
+  it("conserva el clientId actual cuando input.clientId llega como null (no perder vínculos)", async () => {
+    const { updateLead } = await import("./crm");
+
+    const existing = makeLeadRow({ client_id: CLIENT_A_ID, project_id: PROJECT_IN_A });
+    const updated = makeLeadRow({
+      name: "Renombrado",
+      client_id: CLIENT_A_ID,
+      project_id: PROJECT_IN_A,
+      updated_at: "2026-06-13T11:00:00Z"
+    });
+
+    // touchesClientId=true → se revalida la combinación efectiva
+    // (CLIENT_A_ID, PROJECT_IN_A) que sigue siendo válida.
+    fetchMock
+      .mockReturnValueOnce(makeJsonResponse([existing])) // GET lead actual
+      .mockReturnValueOnce(makeJsonResponse([{ id: CLIENT_A_ID, name: "Acme", status: "active" }])) // GET clients
+      .mockReturnValueOnce(makeJsonResponse([{ id: PROJECT_IN_A, client_id: CLIENT_A_ID, name: "P-A", status: "active" }])) // GET projects
+      .mockReturnValueOnce(makeJsonResponse([updated])); // PATCH response
+
+    const result = await updateLead(LEAD_ID, { clientId: null, name: "Renombrado" });
+
+    expect(result).not.toBeNull();
+    expect(result?.name).toBe("Renombrado");
+    expect(result?.clientId).toBe(CLIENT_A_ID);
+    expect(result?.projectId).toBe(PROJECT_IN_A);
+
+    // El PATCH debe incluir client_id=CLIENT_A_ID (el actual, no null)
+    // porque touchesClientId es true.
+    const patchCall = fetchMock.mock.calls[3];
+    const body = JSON.parse((patchCall[1] as RequestInit).body as string);
+    expect(body.client_id).toBe(CLIENT_A_ID);
+    expect(body.project_id).toBe(PROJECT_IN_A);
+  });
+
+  it("devuelve null cuando el lead no existe", async () => {
+    const { updateLead } = await import("./crm");
+
+    fetchMock.mockReturnValueOnce(makeJsonResponse([])); // GET lead actual → vacío
+
+    const result = await updateLead("00000000-0000-0000-0000-000000000fff", {
+      name: "X"
+    });
+
+    expect(result).toBeNull();
+    // Sólo se hizo la consulta inicial; no se intentó PATCH.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("no aplica restricción de unicidad sobre el nombre (el schema no la define)", async () => {
+    // La tabla `leads` no tiene UNIQUE(name, tenant_id) en la migración actual
+    // (ver context/SPECs/SPEC_ARCH-20260505-26). updateLead por tanto NO rechaza
+    // updates de nombre por colisión con otros leads. Este test documenta la
+    // decisión para que un cambio futuro al schema sea consciente de ella.
+    const { updateLead } = await import("./crm");
+
+    const existing = makeLeadRow();
+    const updated = makeLeadRow({ name: "Nombre duplicado", updated_at: "2026-06-13T11:00:00Z" });
+
+    fetchMock
+      .mockReturnValueOnce(makeJsonResponse([existing]))
+      .mockReturnValueOnce(makeJsonResponse([updated]));
+
+    const result = await updateLead(LEAD_ID, { name: "Nombre duplicado" });
+    expect(result).not.toBeNull();
+    expect(result?.name).toBe("Nombre duplicado");
   });
 });
