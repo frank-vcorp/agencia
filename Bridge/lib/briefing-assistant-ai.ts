@@ -348,7 +348,7 @@ INSTRUCCION DE PREGUNTAS:
 - Para los frentes COMPLEMENTARIOS: haz un intento claro de preguntar por cada uno, pero no insistas más de 2 veces si la respuesta es vaga o el cliente no quiere profundizar.
 - Anota lo que el cliente compartió, incluso si es parcial o poco detallado.
 - Si un frente del NUCLEO queda débil después de 2 intentos, marcalo como "pendiente de profundizar" y avanza; el cierre aún puede ocurrir si los otros 4 nucleos están fuertes.
-- El cierre depende exclusivamente de que los 5 frentes del NUCLEO estén suficientemente cubiertos (según el criterio de suficiencia en `isBriefSufficientForClosure`).
+- El cierre depende exclusivamente de que los 5 frentes del NUCLEO estén suficientemente cubiertos (según el criterio de suficiencia en 'isBriefSufficientForClosure').
 - Nunca dejes de preguntar por un frente solo porque creas que ya lo tienes cubierto; permite que el cliente agregue información si lo desea.
 
 [REGLA DE CIERRE OBLIGATORIO]
