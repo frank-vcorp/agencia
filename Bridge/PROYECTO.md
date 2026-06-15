@@ -2,7 +2,7 @@
 
 **Proyecto:** Bridge  
 **ID activo:** ARCH-20260510-11  
-**Fecha de actualizacion:** 2026-06-10  
+**Fecha de actualizacion:** 2026-06-15  
 **Estado general:** Bridge mantiene `ARCH-20260510-11` como corte paraguas de refinamiento operativo. Arquitectura V1 está **95% completada** con los slices del `ARCH-20260529` y `ARCH-20260603` ya implementados y validados. Los slices `ARCH-20260513-01` a `ARCH-20260513-17` quedaron implementados. La migración de contacto estructurado y la migración de configuración SendGrid ya fueron aplicadas en producción. El bloqueador operativo es el **e2e final + registro Jira** del cierre técnico.
 
 ## MICRO-SPRINT COMPLETADO (MCP + MCT + Caso Demostración)
@@ -152,6 +152,7 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 2. Slices posteriores del corte paraguas `ARCH-20260510-11`, una vez liberado el bloqueador operativo.
 3. `ARCH-20260528-07` autorizado: portal cliente por proyecto con brief conversacional como entrada principal; la capa informativa posterior al brief queda fuera de alcance y se tratara en un slice independiente.
 4. **`ARCH-20260612-01` — Checklist 13 puntos obligatorios + regla ejemplos dinámicos + fase narrativa dual** (SPEC: `context/SPECs/SPEC_ARCH-20260612-01_checklist_13_puntos_ejemplos_dinamicos_fase_narrativa_dual_v1.md`, Commit: `4033118`).
+5. **`ARCH-20260615-01` + `ARCH-20260615-02` — Cierre del brief por itinerario y suficiencia (no por los 13 campos completos) + tests del nucleo de suficiencia** (SPEC: `context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md`, Checkpoint: `context/checkpoints/CHECKPOINT_ARCH-20260615-02_tests_nucleo_suficiencia_v1.md`). Sustituye el checklist 13 puntos por un nucleo de 5 frentes (`giroYProductoHeroe`, `audience`, `presupuesto`, `cta`, `historiaYContexto` o `historiaNegocio`). 40/40 tests en `lib/briefing.test.ts` (28 legacy + 12 nuevos).
 
 ### [x] Completado (refinamiento brief cliente - mayo/junio 2026)
 
@@ -168,6 +169,8 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 11. **IMPL-20260610-05** - Endpoint pre-registro vendedor + formulario cliente - commit `dd88ffb`
 12. **IMPL-20260610-06** - Tests + helpers extraídos - checkpoint `CHECKPOINT_IMPL-20260610-06.md` (PR pendiente QA)
 13. **IMPL-20260612-01** - Checklist 13 puntos obligatorios + regla ejemplos dinámicos + fase narrativa dual - commit `4033118` (SPEC: `SPEC_ARCH-20260612-01`)
+14. **IMPL-20260615-01** - Cierre del brief por itinerario y suficiencia (nucleo de 5 frentes) - sustituye al checklist 13 puntos; `VIKA_CLOSURE_CORE_KEYS`, `getBriefItinerarySufficiency`, `isBriefSufficientForClosure`, `shouldForceClosure` refactorizado, `deterministicClosureJson` emite solo claves con valor, doble red de seguridad en `actions.ts`, copy del cliente sin "8 preguntas" ni "13 puntos" (SPEC: `SPEC_ARCH-20260615-01`)
+15. **IMPL-20260615-02** - Tests del nucleo de suficiencia y cierre por itinerario - 12 tests nuevos en `lib/briefing.test.ts` cubriendo `VIKA_CLOSURE_CORE_KEYS`, `getBriefItinerarySufficiency` (happy path, parcial, redundancia narrativa, rechazo de valores genericos), `isBriefSufficientForClosure`, `shouldForceClosure` y JSON parcial en `generateBriefClosure`; test legacy del System Prompt actualizado de "checklist 13 puntos" a "itinerario de suficiencia (5 frentes)" (Checkpoint: `CHECKPOINT_ARCH-20260615-02_tests_nucleo_suficiencia_v1.md`)
 
 ### [ ] Pendiente
 

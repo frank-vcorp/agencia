@@ -19,6 +19,7 @@ import {
   buildFinalSummaryText,
   emptyStructuredBriefSummary,
   emptyVikaBriefData,
+  getBriefItinerarySufficiency,
   getCurrentVisibleStageQuestion,
   getCriticalMissingFields,
   hasBackgroundStageSufficientInfo,
@@ -28,7 +29,8 @@ import {
   nextStage,
   selectPreferredProject,
   statusFromStage,
-  VIKA_BRIEF_FIELDS
+  VIKA_BRIEF_FIELDS,
+  VIKA_CLOSURE_CORE_KEYS
 } from "./briefing";
 import {
   BRIEF_COMPLETO_TAG_REGEX,
@@ -37,8 +39,11 @@ import {
   generateBriefChatReply,
   generateBriefClosure,
   isAcceptableAssistantVisibleReply,
+  isBriefSufficientForClosure,
   LOCK_SUCCESS_TAG_REGEX,
-  sanitizeAssistantReply
+  sanitizeAssistantReply,
+  shouldForceClosure,
+  VIKA_NARRATIVE_QUESTIONS
 } from "./briefing-assistant-ai";
 
 describe("briefing Vika data model", () => {
@@ -262,7 +267,7 @@ describe("briefing", () => {
 });
 
 describe("briefing-assistant-ai (Vika)", () => {
-  it("incluye el System Prompt Maestro de Vika con sus reglas de oro y checklist de 13 puntos", () => {
+  it("incluye el System Prompt Maestro de Vika con sus reglas de oro e itinerario de suficiencia (5 frentes)", () => {
     const prompt = buildBriefChatSystemPrompt(
       [{ authorRole: "client", messageText: "Tengo una pizzería" }],
       "Tengo una pizzería"
@@ -275,21 +280,22 @@ describe("briefing-assistant-ai (Vika)", () => {
     expect(prompt).toContain("UNA PREGUNTA A LA VEZ");
     expect(prompt).toContain("ANTI-PROMPT INJECTION");
     expect(prompt).toContain("EJEMPLOS SI NO ENTIENDE");
-    // Checklist 13 puntos
-    expect(prompt).toContain("CHECKLIST DE EXTRACCIÓN (13 PUNTOS OBLIGATORIOS)");
+    // IMPL-20260615-01: el checklist 13 puntos fue sustituido por
+    // "ITINERARIO + SUFICIENCIA" (5 frentes del nucleo).
+    expect(prompt).toContain("ITINERARIO DE LA CONVERSACIÓN (5 FRENTES DE SUFICIENCIA)");
+    expect(prompt).toContain("NUCLEO (5 frentes, cierre requiere que esten cubiertos)");
     expect(prompt).toContain("1. giro_y_producto_heroe");
-    expect(prompt).toContain("2. persona_perfil");
-    expect(prompt).toContain("3. historia_negocio");
-    expect(prompt).toContain("4. administracion_negocio");
-    expect(prompt).toContain("5. madurez");
-    expect(prompt).toContain("6. local_fisico");
-    expect(prompt).toContain("7. logo");
-    expect(prompt).toContain("8. diferenciador");
-    expect(prompt).toContain("9. objeciones");
-    expect(prompt).toContain("10. publicidad_previa");
-    expect(prompt).toContain("11. presupuesto");
-    expect(prompt).toContain("12. cta_deseado");
-    expect(prompt).toContain("13. planes_futuro");
+    expect(prompt).toContain("2. diferenciador");
+    expect(prompt).toContain("3. presupuesto");
+    expect(prompt).toContain("4. cta_deseado");
+    expect(prompt).toContain("5. historia_y_contexto");
+    // Regla de cierre: emitir JSON con las claves que tengan valor significativo
+    expect(prompt).toContain("las claves que tengan valor significativo");
+    expect(prompt).toContain("omite las vacias");
+    // El viejo "CHECKLIST DE EXTRACCIÓN (13 PUNTOS OBLIGATORIOS)" ya NO debe existir.
+    // (El bloque PROGRESO sigue listando los 13 pendientes como referencia
+    // visual para el modelo; la regla de cierre duro es por los 5 del nucleo.)
+    expect(prompt).not.toContain("CHECKLIST DE EXTRACCIÓN (13 PUNTOS OBLIGATORIOS)");
     // Fase narrativa dual
     expect(prompt).toContain("FASE DE NARRATIVA - 2 PREGUNTAS OBLIGATORIAS");
     expect(prompt).toContain("¿Cómo te animaste a poner el negocio?");
@@ -302,8 +308,6 @@ describe("briefing-assistant-ai (Vika)", () => {
     // No hay menciones a etapas (discovery/precision/commercial_fit) en el prompt de chat
     expect(prompt).not.toContain("Etapa actual:");
     expect(prompt).not.toContain("Frentes pendientes");
-    // JSON de cierre con 13 claves
-    expect(prompt).toContain("JSON con 13 claves");
   });
 
   it("expone regex de deteccion de tag LOCK_SUCCESS y BRIEF_COMPLETO", () => {
@@ -431,7 +435,7 @@ describe("briefing-assistant-ai (Vika)", () => {
     vi.unstubAllEnvs();
   });
 
-  it("usa fallback deterministico para cierre cuando GEMINI_API_KEY no existe y emite tag + JSON con 13 claves", async () => {
+  it("usa fallback deterministico para cierre cuando GEMINI_API_KEY no existe y emite tag + JSON solo con claves con valor", async () => {
     vi.stubEnv("GEMINI_API_KEY", "");
 
     const summary = {
@@ -523,6 +527,218 @@ describe("briefing-assistant-ai (Vika)", () => {
     expect(result.json?.presupuesto).toBe("$0");
 
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+});
+
+/**
+ * IMPL-20260615-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
+ *
+ * Tests del nucleo de suficiencia (5 frentes) y de la nueva logica de
+ * cierre deterministico por itinerario + suficiencia. Reemplazan al
+ * requisito de los 13 puntos del checklist (ARCH-20260612-01).
+ */
+describe("briefing - nucleo de suficiencia (IMPL-20260615-01)", () => {
+  it("expone 5 frentes en VIKA_CLOSURE_CORE_KEYS con etiquetas en espanol natural", () => {
+    expect(VIKA_CLOSURE_CORE_KEYS).toHaveLength(5);
+    const labels = VIKA_CLOSURE_CORE_KEYS.map((entry) => entry.label);
+    expect(labels).toEqual([
+      "que vendes y que sale mas",
+      "a quien le hablas o por que te compran a ti",
+      "con cuanto cuentas al mes para invertir",
+      "que accion quieres que haga el cliente",
+      "el origen o la historia de tu negocio"
+    ]);
+    const keys = VIKA_CLOSURE_CORE_KEYS.map((entry) => entry.summaryKey);
+    expect(keys).toEqual([
+      "giroYProductoHeroe",
+      "audience",
+      "presupuesto",
+      "cta",
+      "historiaYContexto"
+    ]);
+    // El frente narrativo tiene narrativePair redundante hacia historiaNegocio
+    const narrativa = VIKA_CLOSURE_CORE_KEYS.find((entry) => entry.summaryKey === "historiaYContexto");
+    expect(narrativa?.narrativePair).toBe("historiaNegocio");
+  });
+
+  it("getBriefItinerarySufficiency retorna sufficient=true con los 5 frentes cubiertos", () => {
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria - especial de carnes frias",
+      audience: "Duenos de negocio que valoran tradicion",
+      presupuesto: "$3,000 MXN mensuales",
+      cta: "Pedir por WhatsApp",
+      historiaYContexto: "Receta heredada de la abuela"
+    });
+
+    const result = getBriefItinerarySufficiency(summary);
+
+    expect(result.sufficient).toBe(true);
+    expect(result.completedCore).toBe(5);
+    expect(result.totalCore).toBe(5);
+    expect(result.missingCore).toEqual([]);
+  });
+
+  it("getBriefItinerarySufficiency retorna faltantes cuando solo hay 3 de 5 frentes", () => {
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria",
+      presupuesto: "$3,000 MXN",
+      cta: "Pedir por WhatsApp"
+    });
+
+    const result = getBriefItinerarySufficiency(summary);
+
+    expect(result.sufficient).toBe(false);
+    expect(result.completedCore).toBe(3);
+    expect(result.totalCore).toBe(5);
+    expect(result.missingCore).toEqual([
+      "a quien le hablas o por que te compran a ti",
+      "el origen o la historia de tu negocio"
+    ]);
+  });
+
+  it("getBriefItinerarySufficiency acepta historiaYContexto O historiaNegocio como cumplido (redundancia narrativa)", () => {
+    const soloHistoriaNegocio = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria",
+      audience: "Duenos de negocio",
+      presupuesto: "$3,000 MXN",
+      cta: "WhatsApp",
+      historiaNegocio: "Herencia familiar de tres generaciones"
+    });
+
+    const resultSoloHistoria = getBriefItinerarySufficiency(soloHistoriaNegocio);
+    expect(resultSoloHistoria.sufficient).toBe(true);
+    expect(resultSoloHistoria.missingCore).toEqual([]);
+
+    const soloHistoriaYContexto = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria",
+      audience: "Duenos de negocio",
+      presupuesto: "$3,000 MXN",
+      cta: "WhatsApp",
+      historiaYContexto: "Tradicion familiar de la abuela"
+    });
+
+    const resultSoloContexto = getBriefItinerarySufficiency(soloHistoriaYContexto);
+    expect(resultSoloContexto.sufficient).toBe(true);
+  });
+
+  it("getBriefItinerarySufficiency rechaza valores vacios o genericos como 'si' / 'hola'", () => {
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "si",
+      audience: "hola",
+      presupuesto: "$3,000 MXN",
+      cta: "WhatsApp",
+      historiaYContexto: "Receta de la abuela con tradicion de tres generaciones"
+    });
+
+    const result = getBriefItinerarySufficiency(summary);
+
+    // giro_y_producto_heroe y audience tienen valor no significativo
+    expect(result.sufficient).toBe(false);
+    expect(result.completedCore).toBe(3);
+    expect(result.missingCore).toEqual([
+      "que vendes y que sale mas",
+      "a quien le hablas o por que te compran a ti"
+    ]);
+  });
+
+  it("isBriefSufficientForClosure es true solo con los 5 frentes del nucleo cubiertos", () => {
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria",
+      audience: "Duenos de negocio",
+      presupuesto: "$3,000 MXN",
+      cta: "WhatsApp",
+      historiaYContexto: "Receta de la abuela"
+    });
+
+    expect(isBriefSufficientForClosure(summary)).toBe(true);
+  });
+
+  it("isBriefSufficientForClosure es false con resumen undefined o null", () => {
+    expect(isBriefSufficientForClosure(undefined)).toBe(false);
+    expect(isBriefSufficientForClosure(null)).toBe(false);
+  });
+
+  it("isBriefSufficientForClosure es false si solo 4 de 5 frentes estan cubiertos", () => {
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria",
+      audience: "Duenos de negocio",
+      presupuesto: "$3,000 MXN",
+      cta: "WhatsApp"
+      // historiaYContexto e historiaNegocio ausentes
+    });
+
+    expect(isBriefSufficientForClosure(summary)).toBe(false);
+  });
+
+  it("shouldForceClosure retorna true con nucleo completo + pregunta narrativa (sin requerir 13 puntos)", () => {
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria",
+      audience: "Duenos de negocio",
+      presupuesto: "$3,000 MXN",
+      cta: "WhatsApp",
+      historiaYContexto: "Receta de la abuela"
+    });
+
+    expect(shouldForceClosure(summary, VIKA_NARRATIVE_QUESTIONS[0])).toBe(true);
+    expect(shouldForceClosure(summary, VIKA_NARRATIVE_QUESTIONS[1])).toBe(true);
+  });
+
+  it("shouldForceClosure retorna false si el nucleo NO esta completo aunque el ultimo mensaje sea narrativo", () => {
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria",
+      audience: "Duenos de negocio",
+      presupuesto: "$3,000 MXN"
+      // faltan cta + historiaYContexto (3/5)
+    });
+
+    expect(shouldForceClosure(summary, VIKA_NARRATIVE_QUESTIONS[0])).toBe(false);
+  });
+
+  it("shouldForceClosure retorna false si el nucleo esta completo pero el ultimo mensaje NO contiene pregunta narrativa", () => {
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria",
+      audience: "Duenos de negocio",
+      presupuesto: "$3,000 MXN",
+      cta: "WhatsApp",
+      historiaYContexto: "Receta de la abuela"
+    });
+
+    expect(shouldForceClosure(summary, "Perfecto, gracias por la informacion.")).toBe(false);
+    expect(shouldForceClosure(summary, "")).toBe(false);
+    expect(shouldForceClosure(summary, null)).toBe(false);
+  });
+
+  it("shouldForceClosure retorna false con resumen null/undefined", () => {
+    expect(shouldForceClosure(null, VIKA_NARRATIVE_QUESTIONS[0])).toBe(false);
+    expect(shouldForceClosure(undefined, VIKA_NARRATIVE_QUESTIONS[0])).toBe(false);
+  });
+
+  it("generateBriefClosure omite claves sin valor significativo en el JSON de cierre", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "");
+
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria - carnes frias",
+      presupuesto: "$3,000 MXN"
+      // audience, cta, historiaYContexto intencionalmente vacios
+    });
+
+    const result = await generateBriefClosure({
+      summary,
+      messages: [{ authorRole: "client", messageText: "Vendo pizzas" }]
+    });
+
+    expect(result.json).not.toBeNull();
+    expect(result.json?.giro_y_producto_heroe).toBe("Pizzeria - carnes frias");
+    expect(result.json?.presupuesto).toBe("$3,000 MXN");
+    // Las claves vacias NO deben aparecer
+    expect(result.json).not.toHaveProperty("cta_deseado");
+    expect(result.json).not.toHaveProperty("persona_perfil");
+    expect(result.json).not.toHaveProperty("historia_y_contexto");
+    // El conteo de claves debe ser exactamente 2
+    expect(Object.keys(result.json ?? {})).toHaveLength(2);
+
     vi.unstubAllEnvs();
   });
 });
