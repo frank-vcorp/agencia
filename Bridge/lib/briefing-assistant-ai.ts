@@ -321,24 +321,35 @@ Tu objetivo es auditar a dueños de micro-negocios locales (estéticas, mecánic
 - Si el cliente indica domicilio, online, digital o trabajo a domicilio: preguntar "¿Dónde publicas actualmente? ¿En Instagram, Facebook, WhatsApp, TikTok?"
 - Si ya mencionó una plataforma o ubicación, no volver a preguntar.
 
-[ITINERARIO DE LA CONVERSACIÓN (5 FRENTES DE SUFICIENCIA)]
-A diferencia de un interrogatorio, esta conversacion sigue un ITINERARIO
-comercial. Recorre los 5 frentes del NUCLEO en orden natural, sin forzar
-al cliente a responder 13 preguntas. Si el cliente ya dio informacion
-suficiente en un frente, marcalo como cubierto y avanza. Si un frente
-queda debil o pendiente, no insistas mas de 2 veces: capturalo asi y
-deja que el operador lo refine despues.
+[ITINERARIO DE LA CONVERSACIÓN (8 FRENTES TOTALES - 5 NUCLEO + 3 COMPLEMENTARIOS)]
+Esta conversacion explora los 8 frentes comerciales relevantes para entender el negocio de manera natural.
+Recorre todos los frentes, haciendo al menos un intento de preguntar por cada uno, pero priorizando el NUCLEO para determinar el cierre.
 
-NUCLEO (5 frentes, cierre requiere que esten cubiertos):
+NUCLEO (5 frentes, cierre requiere que esten suficientemente cubiertos):
 1. giro_y_producto_heroe: que vende y que sale mas.
 2. diferenciador (audience): a quien le habla y por que le compran a el.
 3. presupuesto: monto mensual asignado o "$0 / Organico" si no hay.
 4. cta_deseado: que accion quiere que haga la persona (WhatsApp, llamada, visita).
 5. historia_y_contexto: el origen o la historia del negocio (cubre tambien historia_negocio).
 
-FRENTES COMPLEMENTARIOS (opcionales, capturalos si surgen naturalmente; NO bloquean el cierre):
-- persona_perfil, administracion_negocio, madurez, local_fisico, logo,
-  objeciones, publicidad_previa, planes_futuro.
+FRENTES COMPLEMENTARIOS (3 frentes, se preguntan pero NO bloquean el cierre):
+- persona_perfil: cómo se describe el dueño como persona.
+- administracion_negocio: cómo administra el día a día, equipo.
+- madurez: tiempo operando.
+- local_fisico: local a la calle vs a domicilio.
+- logo: tiene marca gráfica o solo el nombre.
+- objeciones: qué duda tiene el cliente antes de pagar.
+- publicidad_previa: si intentó publicidad, qué y cómo le fue.
+- planes_futuro: planes para el negocio en 6-12 meses.
+
+INSTRUCCION DE PREGUNTAS:
+- Pregunta por todos los 8 frentes de manera natural durante la conversación.
+- Para los frentes del NUCLEO: busca información suficiente para considerar el frente cubierto (no necesariamente perfecto).
+- Para los frentes COMPLEMENTARIOS: haz un intento claro de preguntar por cada uno, pero no insistas más de 2 veces si la respuesta es vaga o el cliente no quiere profundizar.
+- Anota lo que el cliente compartió, incluso si es parcial o poco detallado.
+- Si un frente del NUCLEO queda débil después de 2 intentos, marcalo como "pendiente de profundizar" y avanza; el cierre aún puede ocurrir si los otros 4 nucleos están fuertes.
+- El cierre depende exclusivamente de que los 5 frentes del NUCLEO estén suficientemente cubiertos (según el criterio de suficiencia en `isBriefSufficientForClosure`).
+- Nunca dejes de preguntar por un frente solo porque creas que ya lo tienes cubierto; permite que el cliente agregue información si lo desea.
 
 [REGLA DE CIERRE OBLIGATORIO]
 Cuando el bloque [PROGRESO ACTUAL DE LA CONVERSACIÓN] muestre los 5 frentes del NUCLEO cubiertos (✓),
@@ -604,9 +615,10 @@ export function shouldForceClosure(
  * IMPL-20260611-06
  * Respaldo: cierre deterministico + texto canonico de despedida
  *
- * Compone la respuesta final del chat cuando se detecta la condicion de
- * cierre deterministico. Emite la despedida canonica + tag de bloqueo +
- * JSON de 13 claves a partir del resumen. No consulta a Gemini.
+ * Lista de todos los campos de `StructuredBriefSummary` que tracked en el brief.
+ * Aunque se recopilan todos los campos, solo los 5 frentes del NUCLEO son
+ * requeridos para el cierre del chat (ver `isBriefSufficientForClosure`).
+ * El orden y mapeo coincide con `VIKA_CHECKLIST_TO_SUMMARY_KEY` en briefing.ts.
  */
 function buildForcedClosureReply(summary: BriefSummary): BriefChatReply {
   const json = deterministicClosureJson(summary);
