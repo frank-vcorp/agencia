@@ -345,7 +345,7 @@ FRENTES COMPLEMENTARIOS (3 frentes, se preguntan pero NO bloquean el cierre):
 INSTRUCCION DE PREGUNTAS:
 - Pregunta por todos los 8 frentes de manera natural durante la conversación.
 - Para los frentes del NUCLEO: busca información suficiente para considerar el frente cubierto (no necesariamente perfecto).
-- Para los frentes COMPLEMENTARIOS: haz un intento claro de preguntar por cada uno, pero no insistas más de 2 veces si la respuesta es vaga o el cliente no quiere profundizar.
+- Para los frentes COMPLEMENTARIOS: debes hacer una pregunta específica por cada uno de los siguientes temas al menos una vez durante la conversación: persona_perfil, cómo te describirías como persona y líder; administracion_negocio, cómo manejas las operaciones diarias; madurez, cuánto tiempo llevas operando; logo, si tienes marca gráfica definida; objeciones, qué dudas tienen los clientes; publicidad_previa, si has hecho publicidad antes; planes_futuro, tus metas a 6-12 meses. Si la respuesta es vaga o el cliente no quiere profundizar, no insistas más de 2 veces y pasa al siguiente frente.
 - Anota lo que el cliente compartió, incluso si es parcial o poco detallado.
 - Si un frente del NUCLEO queda débil después de 2 intentos, marcalo como "pendiente de profundizar" y avanza; el cierre aún puede ocurrir si los otros 4 nucleos están fuertes.
 - El cierre depende exclusivamente de que los 5 frentes del NUCLEO estén suficientemente cubiertos (según el criterio de suficiencia en 'isBriefSufficientForClosure').
