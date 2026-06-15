@@ -1,6 +1,13 @@
 "use client";
 
 /**
+ * IMPL-20260615-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
+ *  - Copy del cliente actualizado: ya no promete "8 preguntas" ni
+ *    "13 puntos". Refleja la nueva filosofia: el chat cierra cuando Vika
+ *    considere que ya hay info suficiente para armar la propuesta, no
+ *    cuando se completa un checklist rigido.
+ *
  * IMPL-20260611-04
  * Respaldo: fix critico Vika repregunta + textarea pierde foco.
  *   - El textarea ahora mantiene el foco: autoFocus al montar, foco tras
@@ -41,7 +48,8 @@ type OptimisticClientMessage = BriefMessage & {
   optimisticKey?: string;
 };
 
-const VIKA_INTRO_TEXT = "Tengo 8 preguntas para entender tu negocio. \u00a1Empecemos!";
+const VIKA_INTRO_TEXT =
+  "Platicame de tu negocio y al final te hare algunas preguntas clave para que el equipo arme tu propuesta. \u00a1Empecemos!";
 
 function closureHumanSummary(summary: StructuredBriefSummary): string {
   const lines = [
@@ -359,7 +367,7 @@ export function ClientBriefChatView({ brief, projectId }: ClientBriefChatViewPro
       <section className="panel rounded-[22px] px-4 py-3">
         <p className="text-sm font-semibold text-[color:var(--ink)]">Como trabajamos esta conversacion</p>
         <p className="mt-2 text-sm text-[color:var(--muted)]">
-          Vika te hara 8 preguntas para entender tu negocio y tu presupuesto. Al cerrar el brief, nuestro equipo recibira el resumen y te contactara por WhatsApp.
+          Vika te hara algunas preguntas sobre tu negocio, tus clientes y tu presupuesto. Cuando considere que ya tenemos lo necesario para armar una propuesta util, cerramos el brief y nuestro equipo te contacta por WhatsApp.
         </p>
       </section>
     </div>

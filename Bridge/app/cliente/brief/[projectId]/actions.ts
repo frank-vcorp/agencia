@@ -1,6 +1,15 @@
 "use server";
 
 /**
+ * IMPL-20260615-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
+ *  - Doble red de seguridad: despues de aplicar el patch del resumen y
+ *    re-leer la version, re-evaluamos `isBriefSufficientForClosure`. Si la
+ *    suficiencia se cumple, **forzamos** la despedida canonica sin
+ *    depender del tag que el modelo haya (o no) emitido. Esto elimina el
+ *    caso donde Vika "se queda callada" o emite texto sin tag a pesar de
+ *    que la conversacion ya esta completa.
+ *
  * IMPL-20260611-07
  * Respaldo: fix Bug 3 - Cierre deterministico nunca se activaba.
  *   - Despues de persistir el mensaje del cliente, inferimos un patch
@@ -43,9 +52,12 @@ import {
 import {
   BRIEF_COMPLETO_TAG_REGEX,
   LOCK_SUCCESS_TAG_REGEX,
+  VIKA_NARRATIVE_QUESTIONS,
+  VIKA_CLOSING_HUMAN_TEXT,
   extractJsonObject,
   generateBriefChatReply,
-  generateBriefClosure
+  generateBriefClosure,
+  isBriefSufficientForClosure
 } from "@/lib/briefing-assistant-ai";
 
 /**
@@ -93,11 +105,12 @@ export async function sendClientMessageAction(
   }
 
   // IMPL-20260611-07 (Bug 3): inferir y persistir un patch del resumen
-  // estructurado a partir del mensaje del cliente. Esto llena los 8 campos
-  // del checklist de Vika conforme el cliente responde, para que
-  // `shouldForceClosure` pueda detectar el cierre deterministico cuando
-  // todos los puntos esten completos + el ultimo mensaje del asistente
-  // contenga una pregunta narrativa canonica.
+  // estructurado a partir del mensaje del cliente. Esto llena los campos
+  // del nucleo de Vika conforme el cliente responde, para que
+  // `shouldForceClosure` / `isBriefSufficientForClosure` pueda detectar el
+  // cierre deterministico cuando los 5 frentes del nucleo esten completos.
+  // IMPL-20260615-01: ya no son "8 campos" sino los 5 del nucleo de
+  // suficiencia; ver `VIKA_CLOSURE_CORE_KEYS`.
   const summaryPatch = inferBriefSummaryPatchFromClientMessage(
     currentVersion.stage,
     currentVersion.structuredSummary,
@@ -110,6 +123,58 @@ export async function sendClientMessageAction(
     if (brief?.currentVersion && brief.currentVersion.id === versionId) {
       currentVersion = brief.currentVersion;
     }
+  }
+
+  // IMPL-20260615-01: doble red de seguridad ANTES de llamar a Gemini.
+  // Si la suficiencia ya esta cumplida y el ultimo mensaje del asistente
+  // fue una pregunta narrativa, podemos cerrar sin gastar una llamada al
+  // modelo. Esto cubre el caso donde la IA "se queda callada" o donde el
+  // resumen se lleno por la heuristica pero el modelo aun no respondio.
+  const previousAssistantMessage = [...(currentVersion.messages ?? [])]
+    .reverse()
+    .find((message) => message.authorRole === "assistant")?.messageText ?? null;
+
+  const sufficiencyAlreadyMet =
+    isBriefSufficientForClosure(currentVersion.structuredSummary) &&
+    Boolean(previousAssistantMessage) &&
+    VIKA_NARRATIVE_QUESTIONS.some((question) =>
+      (previousAssistantMessage ?? "").includes(question.replace(/^\u00bf|\?$/g, "").trim())
+    );
+
+  if (sufficiencyAlreadyMet) {
+    // Construimos la despedida canonica + JSON solo con claves con valor.
+    const closureJson = extractClosureJsonFromSummary(currentVersion.structuredSummary);
+    const visibleReply = buildForcedClosureVisibleReply(closureJson);
+
+    await appendBriefMessage({
+      briefId,
+      versionId,
+      authorRole: "assistant",
+      actorLabel: "Bridge briefing",
+      messageText: visibleReply,
+      stage: currentVersion.stage
+    });
+
+    const giro = closureJson.giro_y_producto_heroe;
+    const clientSummary = giro
+      ? `Tu negocio: ${giro}.\n` +
+        `Te distingue: ${closureJson.diferenciador || "por definir"}.\n` +
+        `Lo que te frena: ${closureJson.objeciones || "por definir"}.\n` +
+        `Presupuesto mensual: ${closureJson.presupuesto || "por definir"}.\n` +
+        `Accion que esperas: ${closureJson.cta_deseado || "por definir"}.`
+      : "";
+
+    const patch = mapVikaBriefDataToStructuredSummary(closureJson);
+    await updateBriefSummary(
+      { briefId, versionId },
+      { ...patch, clientFacingSummary: clientSummary },
+      { finalSummaryTextOverride: visibleReply }
+    );
+
+    await submitBriefForOperatorReview({ briefId, versionId });
+    revalidatePath(`/cliente/brief/${projectId}`);
+    revalidatePath(`/cliente/proyecto/${projectId}`);
+    return;
   }
 
   const aiReply = await generateBriefChatReply({
@@ -190,6 +255,60 @@ export async function sendClientMessageAction(
 
   revalidatePath(`/cliente/brief/${projectId}`);
   revalidatePath(`/cliente/proyecto/${projectId}`);
+}
+
+/**
+ * IMPL-20260615-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
+ *
+ * Helper local para construir el JSON de cierre a partir del resumen
+ * estructurado, emitiendo SOLO las claves con valor significativo (mismo
+ * principio que `deterministicClosureJson` en `briefing-assistant-ai.ts`
+ * pero expuesto a `actions.ts` para la doble red de seguridad).
+ */
+function extractClosureJsonFromSummary(summary: import("@/lib/briefing").StructuredBriefSummary): Record<string, string> {
+  const candidatePairs: Array<[string, string]> = [
+    ["giro_y_producto_heroe", summary.giroYProductoHeroe || summary.mainOffer || summary.projectObjective || ""],
+    ["persona_perfil", summary.personaPerfil || ""],
+    ["historia_negocio", summary.historiaNegocio || ""],
+    ["administracion_negocio", summary.administracionNegocio || ""],
+    ["madurez", summary.madurez || ""],
+    ["local_fisico", summary.localFisico || ""],
+    ["logo", summary.logo || ""],
+    ["diferenciador", summary.audience || ""],
+    ["objeciones", summary.restrictions || ""],
+    ["publicidad_previa", summary.publicidadPrevia || ""],
+    ["presupuesto", summary.presupuesto || ""],
+    ["cta_deseado", summary.cta || ""],
+    ["planes_futuro", summary.planesFuturo || ""],
+    ["historia_y_contexto", summary.historiaYContexto || ""]
+  ];
+
+  const json: Record<string, string> = {};
+  for (const [key, value] of candidatePairs) {
+    const trimmed = value.trim();
+    if (trimmed) {
+      json[key] = trimmed;
+    }
+  }
+  return json;
+}
+
+/**
+ * IMPL-20260615-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
+ *
+ * Compone el mensaje visible de cierre (despedida canonica + tags + JSON
+ * parcial) que el server action persiste como respuesta del asistente
+ * cuando la doble red de seguridad detecta suficiencia.
+ */
+function buildForcedClosureVisibleReply(closureJson: Record<string, string>): string {
+  return [
+    VIKA_CLOSING_HUMAN_TEXT,
+    "[SYS_ACTION: LOCK_SUCCESS]",
+    "[BRIEF_COMPLETO]",
+    JSON.stringify(closureJson, null, 2)
+  ].join("\n");
 }
 
 /**

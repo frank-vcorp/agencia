@@ -17,10 +17,18 @@ import { getTenantIdentityContextByTenantId, resolveActorTrace } from "./identit
 import { resolveTenantIdBySlug } from "./tenant";
 
 /**
+ * IMPL-20260615-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
+ * Núcleo de suficiencia para el cierre deterministico del brief. Reemplaza
+ * al requisito rigido de los 13 campos (ARCH-20260612-01) por 5 frentes
+ * comerciales esenciales. Si el cliente da informacion significativa en
+ * estos 5 frentes, el equipo ya puede armar una propuesta util y el chat
+ * puede cerrarse (no se necesita el checkbox al 100%).
+ *
  * IMPL-20260611-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
  * IMPL-20260612-01
- * Respaldo: ARCH-20260612-01 — Checklist 13 puntos obligatorios + fase narrativa dual.
+ * Respaldo: ARCH-20260612-01 — Checklist 13 puntos obligatorios.
  * Payload de 13 puntos obligatorios + narrativa emitido por Vika al cierre.
  */
 export type VikaBriefData = {
@@ -72,6 +80,83 @@ export function emptyVikaBriefData(): VikaBriefData {
     cta_deseado: "",
     planes_futuro: "",
     historia_y_contexto: ""
+  };
+}
+
+/**
+ * IMPL-20260615-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
+ *
+ * Núcleo de suficiencia para el cierre del brief. Reemplaza al requisito de
+ * los 13 campos del checklist de Vika (ARCH-20260612-01). Cada entrada es:
+ *   - `summaryKey`: campo del `StructuredBriefSummary` que se evalua.
+ *   - `label`:      etiqueta en espanol natural para mostrar al cliente o al
+ *                   operador que un frente del nucleo esta pendiente.
+ *
+ * `historiaNarrativa` es un frente "o": se cumple si `historiaYContexto`
+ * **o** `historiaNegocio` tienen valor significativo (redundancia
+ * intencional para no castigar al cliente que solo contesto una narrativa).
+ */
+export const VIKA_CLOSURE_CORE_KEYS: ReadonlyArray<{
+  summaryKey: keyof StructuredBriefSummary;
+  label: string;
+  narrativePair?: keyof StructuredBriefSummary;
+}> = [
+  { summaryKey: "giroYProductoHeroe", label: "que vendes y que sale mas" },
+  { summaryKey: "audience", label: "a quien le hablas o por que te compran a ti" },
+  { summaryKey: "presupuesto", label: "con cuanto cuentas al mes para invertir" },
+  { summaryKey: "cta", label: "que accion quieres que haga el cliente" },
+  {
+    summaryKey: "historiaYContexto",
+    label: "el origen o la historia de tu negocio",
+    narrativePair: "historiaNegocio"
+  }
+];
+
+/**
+ * IMPL-20260615-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
+ *
+ * Evalua si el resumen estructurado cubre los 5 frentes del nucleo de
+ * suficiencia. Es funcion pura, deterministica, sin dependencias externas.
+ * Usa `hasMeaningfulSummaryValue` (reglas de longitud/palabras existentes)
+ * para que un valor generico ("si", "hola") no cuente como cubierto.
+ */
+export function getBriefItinerarySufficiency(summary: StructuredBriefSummary): {
+  sufficient: boolean;
+  missingCore: string[];
+  completedCore: number;
+  totalCore: number;
+} {
+  const missingCore: string[] = [];
+  let completedCore = 0;
+
+  for (const coreKey of VIKA_CLOSURE_CORE_KEYS) {
+    const primaryValue = summary[coreKey.summaryKey] ?? "";
+    const hasPrimary = hasMeaningfulSummaryValue(coreKey.summaryKey, primaryValue);
+
+    if (hasPrimary) {
+      completedCore += 1;
+      continue;
+    }
+
+    if (coreKey.narrativePair) {
+      const pairValue = summary[coreKey.narrativePair] ?? "";
+      const hasPair = hasMeaningfulSummaryValue(coreKey.narrativePair, pairValue);
+      if (hasPair) {
+        completedCore += 1;
+        continue;
+      }
+    }
+
+    missingCore.push(coreKey.label);
+  }
+
+  return {
+    sufficient: missingCore.length === 0,
+    missingCore,
+    completedCore,
+    totalCore: VIKA_CLOSURE_CORE_KEYS.length
   };
 }
 

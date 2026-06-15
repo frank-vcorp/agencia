@@ -19,7 +19,7 @@
 import {
   buildFinalSummaryText,
   emptyStructuredBriefSummary,
-  hasMeaningfulSummaryValue,
+  getBriefItinerarySufficiency,
   renderVikaProgressBlock,
   type BriefMessage,
   type StructuredBriefSummary
@@ -105,29 +105,22 @@ export const VIKA_NARRATIVE_QUESTIONS: readonly string[] = [
 ];
 
 /**
+ * IMPL-20260615-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
+ *
+ * La regla de cierre deterministico ya NO depende de los 13 campos del
+ * checklist de Vika. Se importa `getBriefItinerarySufficiency` desde
+ * `briefing.ts` (exporta `VIKA_CLOSURE_CORE_KEYS` con los 5 frentes del
+ * nucleo) y se aplica via `isBriefSufficientForClosure`.
+ *
  * IMPL-20260611-06
  * Respaldo: cierre deterministico + texto canonico de despedida
  *
  * Lista de campos de `StructuredBriefSummary` que Vika debe llenar como parte
- * de los 13 puntos obligatorios del checklist. Se replica aqui (en lugar de
- * importarse desde briefing.ts) para evitar acoplamiento adicional entre
- * modulos. El orden y mapeo coincide con `VIKA_CHECKLIST_TO_SUMMARY_KEY`.
+ * de los 13 puntos obligatorios del checklist. OBSOLETO desde IMPL-20260615-01
+ * (el cierre ya no exige los 13, basta con los 5 frentes del nucleo via
+ * `VIKA_CLOSURE_CORE_KEYS`). Conservado solo por trazabilidad historica.
  */
-const VIKA_CHECKLIST_SUMMARY_KEYS: ReadonlyArray<keyof BriefSummary> = [
-  "giroYProductoHeroe",
-  "personaPerfil",
-  "historiaNegocio",
-  "administracionNegocio",
-  "madurez",
-  "localFisico",
-  "logo",
-  "audience",
-  "restrictions",
-  "publicidadPrevia",
-  "presupuesto",
-  "cta",
-  "planesFuturo"
-];
 
 const MAX_CHAT_REPLY_WORDS = 110;
 const BRIEF_CHAT_RECOVERY_REPLY =
@@ -268,6 +261,19 @@ export function isAcceptableAssistantVisibleReply(rawReply: string, finishReason
 }
 
 /**
+ * IMPL-20260615-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
+ *  - El System Prompt Maestro pasa de "13 puntos obligatorios" a
+ *    "ITINERARIO + SUFICIENCIA". El chat cierra cuando el cliente ha dado
+ *    informacion significativa en los 5 frentes del nucleo, NO cuando un
+ *    checklist de 13 preguntas este al 100%. Esto es coherente con la
+ *    filosofia de brief conversacional y elimina la friccion del cliente
+ *    que siente que lo estan interrogando.
+ *  - `shouldForceClosure` se apoya en `getBriefItinerarySufficiency` y
+ *    ya no exige los 13 campos del `VIKA_CHECKLIST_SUMMARY_KEYS`.
+ *  - `deterministicClosureJson` emite solo las claves con valor
+ *    significativo, no fuerza 13 claves.
+ *
  * IMPL-20260611-06
  * Respaldo: cierre deterministico + texto canonico de despedida
  *  - El System Prompt Maestro de Vika ahora contiene la despedida canonica
@@ -282,6 +288,8 @@ export function isAcceptableAssistantVisibleReply(rawReply: string, finishReason
  * System Prompt Maestro de Vika segun la Especificacion Tecnica.
  * Copiado verbatim de la SPEC (seccion 3 - [Sistema Prompt Maestro]).
  * IMPL-20260612-01: Checklist 13 puntos + regla ejemplos dinámicos + fase narrativa dual.
+ * IMPL-20260615-01: Sustituye el checklist 13 por "ITINERARIO + SUFICIENCIA"
+ *   (5 frentes del nucleo). El chat cierra por suficiencia, no por conteo.
  *
  * Reglas clave:
  * 1. PROHIBIDO JARGON (Target, KPI, Lead Magnet, CTA, Conversion).
@@ -289,8 +297,9 @@ export function isAcceptableAssistantVisibleReply(rawReply: string, finishReason
  * 3. UNA PREGUNTA A LA VEZ.
  * 4. ANTI-PROMPT INJECTION: volver amablemente al brief.
  * 5. EJEMPLOS SI NO ENTIENDE: 2 ejemplos simples contextuales + 1 reintento.
- * 6. CHECKLIST de 13 puntos obligatorios antes del cierre.
- * 7. FASE NARRATIVA: 2 preguntas abiertas al completar los 13 puntos.
+ * 6. ITINERARIO + SUFICIENCIA: 5 frentes comerciales del nucleo. Cuando
+ *    esten cubiertos, se puede cerrar (NO se requieren 13 preguntas).
+ * 7. FASE NARRATIVA: 2 preguntas abiertas al cubrir el itinerario.
  * 8. IMPL-20260611-06: Texto canonico de despedida (no se permite variacion).
  */
 const VIKA_MASTER_PROMPT = `Eres Vika, una Consultora de Negocios y Marketing Local empática, muy accesible y directa.
@@ -305,31 +314,34 @@ Tu objetivo es auditar a dueños de micro-negocios locales (estéticas, mecánic
 
 [LÓGICA DE CONTROL Y FILTRO DE CALIDAD]
 - EXTRACCIÓN DE PRESUPUESTO: Indaga con tacto el MONTO que el cliente tiene destinado invertir al mes. Si dicen "no sé", dales opciones ("¿Hablamos de $1,000, $3,000 o más?"). Si dicen que por ahora no tienen, anótalo sin problemas y avanza.
-- CALIDAD DE DATOS: Si el usuario da respuestas vagas (Ej: "vendo comida y está buena"), repregunta forzando el detalle ("¿qué tipo de comida, qué la hace diferente, receta secreta?"). No avances al siguiente punto si la respuesta no tiene valor comercial.
+- CALIDAD DE DATOS: Si el usuario da respuestas vagas (Ej: "vendo comida y está buena"), repregunta forzando el detalle ("¿qué tipo de comida, qué la hace diferente, receta secreta?"). No avances al siguiente frente si la respuesta no tiene valor comercial.
 
 [CONDICIONAL DE LOCAL]
 - Si el cliente indica que tiene local físico, taller o negocio presencial: preguntar "¿Dónde queda tu negocio? ¿En qué colonia o calle?"
 - Si el cliente indica domicilio, online, digital o trabajo a domicilio: preguntar "¿Dónde publicas actualmente? ¿En Instagram, Facebook, WhatsApp, TikTok?"
 - Si ya mencionó una plataforma o ubicación, no volver a preguntar.
 
-[CHECKLIST DE EXTRACCIÓN (13 PUNTOS OBLIGATORIOS)]
-Valida en tu memoria interna los siguientes puntos:
-1. giro_y_producto_heroe (Qué vende y qué sale más)
-2. persona_perfil (Cómo se describe como dueño)
-3. historia_negocio (Cómo se animó a poner el negocio)
-4. administracion_negocio (Cómo administra el día a día, equipo)
-5. madurez (Tiempo operando)
-6. local_fisico (Local a la calle vs a domicilio)
-7. logo (Tiene marca gráfica o solo el nombre)
-8. diferenciador (Por qué le compran a él)
-9. objeciones (Qué duda tiene el cliente antes de pagar)
-10. publicidad_previa (Si intentó publicidad, qué y cómo le fue)
-11. presupuesto (Monto mensual asignado o $0 si no tienen)
-12. cta_deseado (WhatsApp, llamada, visita directa)
-13. planes_futuro (Planes para el negocio en 6-12 meses)
+[ITINERARIO DE LA CONVERSACIÓN (5 FRENTES DE SUFICIENCIA)]
+A diferencia de un interrogatorio, esta conversacion sigue un ITINERARIO
+comercial. Recorre los 5 frentes del NUCLEO en orden natural, sin forzar
+al cliente a responder 13 preguntas. Si el cliente ya dio informacion
+suficiente en un frente, marcalo como cubierto y avanza. Si un frente
+queda debil o pendiente, no insistas mas de 2 veces: capturalo asi y
+deja que el operador lo refine despues.
+
+NUCLEO (5 frentes, cierre requiere que esten cubiertos):
+1. giro_y_producto_heroe: que vende y que sale mas.
+2. diferenciador (audience): a quien le habla y por que le compran a el.
+3. presupuesto: monto mensual asignado o "$0 / Organico" si no hay.
+4. cta_deseado: que accion quiere que haga la persona (WhatsApp, llamada, visita).
+5. historia_y_contexto: el origen o la historia del negocio (cubre tambien historia_negocio).
+
+FRENTES COMPLEMENTARIOS (opcionales, capturalos si surgen naturalmente; NO bloquean el cierre):
+- persona_perfil, administracion_negocio, madurez, local_fisico, logo,
+  objeciones, publicidad_previa, planes_futuro.
 
 [REGLA DE CIERRE OBLIGATORIO]
-Cuando el bloque [PROGRESO ACTUAL DE LA CONVERSACIÓN] muestre las 13 preguntas completadas (✓),
+Cuando el bloque [PROGRESO ACTUAL DE LA CONVERSACIÓN] muestre los 5 frentes del NUCLEO cubiertos (✓),
 haz UNA pregunta abierta de la [FASE DE NARRATIVA]. Cuando el cliente responda,
 en tu siguiente turno despídete EXACTAMENTE con este texto (sin variaciones):
 
@@ -338,17 +350,18 @@ en tu siguiente turno despídete EXACTAMENTE con este texto (sin variaciones):
 Inmediatamente después, sin texto intermedio, emite:
 [SYS_ACTION: LOCK_SUCCESS]
 [BRIEF_COMPLETO]
-{JSON con 13 claves}
+{JSON con las claves que tengan valor significativo}
 
 NO agregues más texto, NO hagas más preguntas, NO pidas confirmación.
+Emite SOLO las claves con valor real; omite las vacias (no llenes con placeholders).
 
-Si el bloque [PROGRESO ACTUAL] muestra preguntas pendientes, avanza SOLO a la siguiente pendiente. NO repitas preguntas ya marcadas con ✓.
+Si el bloque [PROGRESO ACTUAL] muestra frentes pendientes, avanza SOLO al siguiente pendiente. NO repitas preguntas ya marcadas con ✓.
 
 [FASE DE NARRATIVA - 2 PREGUNTAS OBLIGATORIAS]
-1. "¿Cómo te animaste a poner el negocio?" (captura historia_negocio)
+1. "¿Cómo te animaste a poner el negocio?" (captura historia_negocio o historia_y_contexto)
 2. "¿Qué ha sido lo más difícil?" (captura profundidad emocional/contexto)
 
-(Al completar los 13 puntos, escoge UNA de las dos preguntas narrativas, relajando la plática. Deja que el usuario responda libremente. No insistas si es cortante. La segunda pregunta narrativa es opcional si el cliente ya dio contexto rico en la primera.)`;
+(Al cubrir los 5 frentes del NUCLEO, escoge UNA de las dos preguntas narrativas, relajando la plática. Deja que el usuario responda libremente. No insistas si es cortante. La segunda pregunta narrativa es opcional si el cliente ya dio contexto rico en la primera.)`;
 
 const VIKA_OPENING_QUESTION =
   "¡Hola! Para armar tu estrategia, cuéntame: ¿De qué es tu negocio y qué es lo que más se vende?";
@@ -374,7 +387,7 @@ export function buildBriefChatSystemPrompt(
     clientMessage,
     "",
     "[INSTRUCCION DE FORMATO]",
-    "Durante la conversacion, responde solo con texto visible para el cliente (sin JSON, sin markdown, sin bloques de codigo, sin etiquetas internas). Una sola pregunta por turno. EXCEPCION: cuando cierres el brief, SI debes emitir los tags [SYS_ACTION: LOCK_SUCCESS] y [BRIEF_COMPLETO] y el JSON de 13 claves como se indico en [REGLA DE CIERRE OBLIGATORIO]."
+    "Durante la conversacion, responde solo con texto visible para el cliente (sin JSON, sin markdown, sin bloques de codigo, sin etiquetas internas). Una sola pregunta por turno. EXCEPCION: cuando cierres el brief, SI debes emitir los tags [SYS_ACTION: LOCK_SUCCESS] y [BRIEF_COMPLETO] y el JSON con las claves que tengan valor significativo (omite las vacias) como se indico en [REGLA DE CIERRE OBLIGATORIO]."
   ].join("\n");
 }
 
@@ -451,7 +464,7 @@ function buildBriefClosurePrompt(input: GenerateBriefClosureInput): string {
     "[INSTRUCCION DE CIERRE]",
     "Debes cerrar la conversacion de manera humana y tecnica.",
     `Despide al cliente confirmando que el equipo de expertos analizara la informacion para disenar la estrategia. NO prometas generacion automatica de campanas.`,
-    "Al final, OBLIGATORIAMENTE emite el tag [SYS_ACTION: LOCK_SUCCESS], seguido SIEMPRE del tag [BRIEF_COMPLETO] y el objeto JSON con la informacion recolectada con EXACTAMENTE estas 13 claves:",
+    "Al final, OBLIGATORIAMENTE emite el tag [SYS_ACTION: LOCK_SUCCESS], seguido SIEMPRE del tag [BRIEF_COMPLETO] y el objeto JSON con la informacion que tenga valor significativo. SOLO incluye las claves que NO esten vacias; omite las que no se capturaron. Usa estas claves (las que apliquen):",
     '{"giro_y_producto_heroe":"","persona_perfil":"","historia_negocio":"","administracion_negocio":"","madurez":"","local_fisico":"","logo":"","diferenciador":"","objeciones":"","publicidad_previa":"","presupuesto":"","cta_deseado":"","planes_futuro":"","historia_y_contexto":""}',
     "",
     "[HISTORIAL COMPLETO]",
@@ -478,34 +491,85 @@ function buildDeterministicBriefClosure(input: GenerateBriefClosureInput): Brief
   };
 }
 
+/**
+ * IMPL-20260615-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
+ *
+ * Emite el JSON de cierre del brief. A diferencia de versiones anteriores
+ * que forzaban 13 claves (algunas vacias), aqui SOLO se incluyen las claves
+ * con valor significativo. Esto refleja honestamente lo que se capturo y
+ * reduce ruido en el payload persistido.
+ *
+ * `mapVikaBriefDataToStructuredSummary` ya tolera campos faltantes, por lo
+ * que un JSON parcial se persiste sin errores.
+ */
 function deterministicClosureJson(summary: BriefSummary): Record<string, string> {
-  return {
-    giro_y_producto_heroe: summary.giroYProductoHeroe || summary.mainOffer || summary.projectObjective || "",
-    persona_perfil: summary.personaPerfil || "",
-    historia_negocio: summary.historiaNegocio || "",
-    administracion_negocio: summary.administracionNegocio || "",
-    madurez: summary.madurez || "",
-    local_fisico: summary.localFisico || "",
-    logo: summary.logo || "",
-    diferenciador: summary.audience || "",
-    objeciones: summary.restrictions || "",
-    publicidad_previa: summary.publicidadPrevia || "",
-    presupuesto: summary.presupuesto || "",
-    cta_deseado: summary.cta || "",
-    planes_futuro: summary.planesFuturo || "",
-    historia_y_contexto: summary.historiaYContexto || ""
-  };
+  const candidatePairs: Array<[string, string]> = [
+    ["giro_y_producto_heroe", summary.giroYProductoHeroe || summary.mainOffer || summary.projectObjective || ""],
+    ["persona_perfil", summary.personaPerfil || ""],
+    ["historia_negocio", summary.historiaNegocio || ""],
+    ["administracion_negocio", summary.administracionNegocio || ""],
+    ["madurez", summary.madurez || ""],
+    ["local_fisico", summary.localFisico || ""],
+    ["logo", summary.logo || ""],
+    ["diferenciador", summary.audience || ""],
+    ["objeciones", summary.restrictions || ""],
+    ["publicidad_previa", summary.publicidadPrevia || ""],
+    ["presupuesto", summary.presupuesto || ""],
+    ["cta_deseado", summary.cta || ""],
+    ["planes_futuro", summary.planesFuturo || ""],
+    ["historia_y_contexto", summary.historiaYContexto || ""]
+  ];
+
+  const json: Record<string, string> = {};
+  for (const [key, value] of candidatePairs) {
+    const trimmed = value.trim();
+    if (trimmed) {
+      json[key] = trimmed;
+    }
+  }
+  return json;
 }
 
 /**
+ * IMPL-20260615-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
+ *
+ * Determina si la conversacion del brief ya cumplio la SUFICIENCIA
+ * necesaria para cerrarse. Es la "primera mitad" del predicado de cierre
+ * deterministico: los 5 frentes del nucleo deben estar cubiertos.
+ *
+ * Se exporta separada de `shouldForceClosure` para que `actions.ts` pueda
+ * usarla como red de seguridad: si el modelo no emite el tag de cierre
+ * pero la suficiencia ya esta cumplida, el server action puede forzar la
+ * despedida canonica sin volver a llamar a Gemini.
+ */
+export function isBriefSufficientForClosure(
+  summary: BriefSummary | undefined | null
+): boolean {
+  if (!summary) {
+    return false;
+  }
+  return getBriefItinerarySufficiency(summary).sufficient;
+}
+
+/**
+ * IMPL-20260615-01
+ * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
+ *  - Antes: requeria los 13 campos del checklist (ARCH-20260612-01).
+ *  - Ahora: requiere que los 5 frentes del NUCLEO de suficiencia esten
+ *    cubiertos (ver `getBriefItinerarySufficiency`). Esto refleja la
+ *    filosofia de "itinerario + suficiencia" y no obliga al cliente a
+ *    responder 13 preguntas para cerrar el chat.
+ *
  * IMPL-20260611-06
  * Respaldo: cierre deterministico + texto canonico de despedida
  *
  * Determina si el codigo debe forzar la despedida canonica de Vika sin
  * volver a llamar al modelo. Retorna `true` cuando se cumplen las DOS
  * condiciones:
- *  1. Los 13 campos del checklist de Vika ya tienen un valor significativo
- *     segun `hasMeaningfulSummaryValue`.
+ *  1. Los 5 frentes del nucleo de suficiencia estan cubiertos
+ *     (`isBriefSufficientForClosure`).
  *  2. El ultimo mensaje del asistente contiene una de las preguntas
  *     narrativas canonicas de la [FASE DE NARRATIVA], lo que indica que
  *     el cliente respondio y estamos en el turno del cierre.
@@ -521,11 +585,7 @@ export function shouldForceClosure(
     return false;
   }
 
-  const allFieldsComplete = VIKA_CHECKLIST_SUMMARY_KEYS.every((summaryKey) =>
-    hasMeaningfulSummaryValue(summaryKey, summary[summaryKey] ?? "")
-  );
-
-  if (!allFieldsComplete) {
+  if (!isBriefSufficientForClosure(summary)) {
     return false;
   }
 
