@@ -148,10 +148,10 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 
 ### [~] Planificado
 
-1. Cierre operativo final del corte `ARCH-20260510-11`: corrida e2e final de punta a punta y trazabilidad Jira del cierre tecnico `20260526-06..09`.
 2. Slices posteriores del corte paraguas `ARCH-20260510-11`, una vez liberado el bloqueador operativo.
-3. `ARCH-20260528-07` autorizado: portal cliente por proyecto con brief conversacional como entrada principal; la capa informativa posterior al brief queda fuera de alcance y se tratara en un slice independiente.
+
 4. **`ARCH-20260612-01` — Checklist 13 puntos obligatorios + regla ejemplos dinámicos + fase narrativa dual** (SPEC: `context/SPECs/SPEC_ARCH-20260612-01_checklist_13_puntos_ejemplos_dinamicos_fase_narrativa_dual_v1.md`, Commit: `4033118`).
+
 5. **`ARCH-20260615-01` + `ARCH-20260615-02` — Cierre del brief por itinerario y suficiencia (no por los 13 campos completos) + tests del nucleo de suficiencia** (SPEC: `context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md`, Checkpoint: `context/checkpoints/CHECKPOINT_ARCH-20260615-02_tests_nucleo_suficiencia_v1.md`). Sustituye el checklist 13 puntos por un nucleo de 5 frentes (`giroYProductoHeroe`, `audience`, `presupuesto`, `cta`, `historiaYContexto` o `historiaNegocio`). 40/40 tests en `lib/briefing.test.ts` (28 legacy + 12 nuevos).
 
 ### [x] Completado (refinamiento brief cliente - mayo/junio 2026)
@@ -171,6 +171,12 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 13. **IMPL-20260612-01** - Checklist 13 puntos obligatorios + regla ejemplos dinámicos + fase narrativa dual - commit `4033118` (SPEC: `SPEC_ARCH-20260612-01`)
 14. **IMPL-20260615-01** - Cierre del brief por itinerario y suficiencia (nucleo de 5 frentes) - sustituye al checklist 13 puntos; `VIKA_CLOSURE_CORE_KEYS`, `getBriefItinerarySufficiency`, `isBriefSufficientForClosure`, `shouldForceClosure` refactorizado, `deterministicClosureJson` emite solo claves con valor, doble red de seguridad en `actions.ts`, copy del cliente sin "8 preguntas" ni "13 puntos" (SPEC: `SPEC_ARCH-20260615-01`)
 15. **IMPL-20260615-02** - Tests del nucleo de suficiencia y cierre por itinerario - 12 tests nuevos en `lib/briefing.test.ts` cubriendo `VIKA_CLOSURE_CORE_KEYS`, `getBriefItinerarySufficiency` (happy path, parcial, redundancia narrativa, rechazo de valores genericos), `isBriefSufficientForClosure`, `shouldForceClosure` y JSON parcial en `generateBriefClosure`; test legacy del System Prompt actualizado de "checklist 13 puntos" a "itinerario de suficiencia (5 frentes)" (Checkpoint: `CHECKPOINT_ARCH-20260615-02_tests_nucleo_suficiencia_v1.md`)
+
+### [x] Completado (e2e final y portal por proyecto - junio 2026)
+
+1. Cierre operativo final del corte `ARCH-20260510-11`: corrida e2e final de punta a punta (sin Jira) del cierre tecnico `20260526-06..09`, con evidencia de QA e INFRA. (Checkpoint: `context/checkpoints/CHECKPOINT_IMPL-20260615-07_e2e_flow_cliente_piloto_e2e_v1.md`, Commit: `d7a9f03`)
+
+2. `ARCH-20260528-07` autorizado: portal cliente por proyecto con brief conversacional como entrada principal; la capa informativa posterior al brief queda fuera de alcance y se tratara en un slice independiente. (Checkpoint: `context/checkpoints/CHECKPOINT_IMPL-20260615-07_e2e_flow_cliente_piloto_e2e_v1.md`, Commit: `d7a9f03`)
 
 ### [ ] Pendiente
 
