@@ -280,10 +280,10 @@ describe("briefing-assistant-ai (Vika)", () => {
     expect(prompt).toContain("UNA PREGUNTA A LA VEZ");
     expect(prompt).toContain("ANTI-PROMPT INJECTION");
     expect(prompt).toContain("EJEMPLOS SI NO ENTIENDE");
-    // IMPL-20260615-01: el checklist 13 puntos fue sustituido por
+    // IMPL-20260615-01: el checklist 13 puntos fue sustituido por "ITINERARIO DE LA CONVERSACIÓN (8 FRENTES TOTALES - 5 NUCLEO + 3 COMPLEMENTARIOS)".
     // "ITINERARIO + SUFICIENCIA" (5 frentes del nucleo).
-    expect(prompt).toContain("ITINERARIO DE LA CONVERSACIÓN (5 FRENTES DE SUFICIENCIA)");
-    expect(prompt).toContain("NUCLEO (5 frentes, cierre requiere que esten cubiertos)");
+    expect(prompt).toContain("ITINERARIO DE LA CONVERSACIÓN (8 FRENTES TOTALES - 5 NUCLEO + 3 COMPLEMENTARIOS)");
+    expect(prompt).toContain("NUCLEO (5 frentes, cierre requiere que esten suficientemente cubiertos)");
     expect(prompt).toContain("1. giro_y_producto_heroe");
     expect(prompt).toContain("2. diferenciador");
     expect(prompt).toContain("3. presupuesto");

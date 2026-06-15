@@ -175,8 +175,22 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 ### [x] Completado (e2e final y portal por proyecto - junio 2026)
 
 1. Cierre operativo final del corte `ARCH-20260510-11`: corrida e2e final de punta a punta (sin Jira) del cierre tecnico `20260526-06..09`, con evidencia de QA e INFRA. (Checkpoint: `context/checkpoints/CHECKPOINT_IMPL-20260615-07_e2e_flow_cliente_piloto_e2e_v1.md`, Commit: `d7a9f03`)
-
 2. `ARCH-20260528-07` autorizado: portal cliente por proyecto con brief conversacional como entrada principal; la capa informativa posterior al brief queda fuera de alcance y se tratara en un slice independiente. (Checkpoint: `context/checkpoints/CHECKPOINT_IMPL-20260615-07_e2e_flow_cliente_piloto_e2e_v1.md`, Commit: `d7a9f03`)
+
+### [x] Completado (mejoramiento de brief cliente - junio 2026)
+
+1. Mejora del System Prompt Maestro de Vika para preguntar por todos los 8 frentes comerciales pero permitir cierre con 5 núcleo suficientes: (IMPL-20260615-08)
+   - Vika ahora pregunta por los 8 frentes totales (5 núcleo + 3 complementarios) durante la conversación
+   - Para los 5 frentes núcleo (giro_y_producto_heroe, audiencia, presupuesto, cta_deseado, historia_y_contexto): busca información suficiente para considerar el frente cubierto
+   - Para los 3 frentes complementarios (persona_perfil, administracion_negocio, madurez, logo, objeciones, publicidad_previa, planes_futuro): **debe hacer una pregunta específica por cada uno de los siguientes temas al menos una vez durante la conversación**: persona_perfil, cómo te describirías como persona y líder; administracion_negocio, cómo manejas las operaciones diarias; madurez, cuánto tiempo llevas operando; logo, si tienes marca gráfica definida; objeciones, qué dudas tienen los clientes; publicidad_previa, si has hecho publicidad antes; planes_futuro, tus metas a 6-12 meses. Si la respuesta es vaga o el cliente no quiere profundizar, no insistas más de 2 veces y pasa al siguiente frente.
+   - El cierre depende exclusivamente de que los 5 frentes núcleo estén suficientemente cubiertos (según `isBriefSufficientForClosure()`)
+   - Todas las preguntas originales de Vika permanecen intactas (apertura, condicional de local, narrativa, reglas de oro)
+   - Corregido error de sintaxis (backticks mal escapados) que causaba fallos en TypeScript
+   - Instrucción hecha más explícita para garantizar que se pregunte por todos los frentes complementarios
+   - Tests actualizados y verificados: 40/40 passing en lib/briefing.test.ts
+   - Build exitoso: pnpm run build completed without errors
+   - Checkpoint: `context/checkpoints/CHECKPOINT_IMPL-20260615-08_mejoramiento_brief_cliente_vika_v2.md`
+   - Commit: `5b57222`
 
 ### [ ] Pendiente
 
