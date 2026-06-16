@@ -46,14 +46,15 @@ import {
   detectFrontsAskedFromHistory,
   getBriefByProjectId,
   inferBriefSummaryPatchFromClientMessage,
+  isNarrativeQuestionAskedInMessage,
   mapVikaBriefDataToStructuredSummary,
   submitBriefForOperatorReview,
-  updateBriefSummary
+  updateBriefSummary,
+  VIKA_NARRATIVE_QUESTION
 } from "@/lib/briefing";
 import {
   BRIEF_COMPLETO_TAG_REGEX,
   LOCK_SUCCESS_TAG_REGEX,
-  VIKA_NARRATIVE_QUESTIONS,
   VIKA_CLOSING_HUMAN_TEXT,
   extractJsonObject,
   generateBriefChatReply,
