@@ -443,7 +443,7 @@ export default async function BriefsPage() {
             Verificacion del cierre conversacional. Se detecta el tag <code>[SYS_ACTION: LOCK_SUCCESS]</code> automaticamente.
           </p>
 
-          <ul className="mt-5 space-y-2">
+          <ul className="mt-3 space-y-1">
             {VIKA_CHECKLIST_FIELDS.map((field) => {
               const value = summary[field];
               const filled = Boolean(
@@ -453,28 +453,30 @@ export default async function BriefsPage() {
               return (
                 <li
                   key={field}
-                  className={`flex items-center justify-between gap-3 rounded-[18px] px-4 py-3 ring-1 ${
+                  className={`flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 ring-1 ${
                     filled
                       ? "bg-emerald-50 ring-emerald-200"
                       : "bg-white/80 ring-[color:var(--line)]"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
                     <span
-                      className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
+                      className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
                         filled ? "bg-emerald-600 text-white" : "bg-stone-200 text-stone-500"
                       }`}
                     >
                       {filled ? "OK" : "—"}
                     </span>
-                    <div>
-                      <p className="text-sm font-medium">{VIKA_CHECKLIST_LABELS[field]}</p>
-                      <p className="text-xs text-[color:var(--muted)]">{filled ? value : "Pendiente de capturar en conversacion."}</p>
-                    </div>
+                    <p className="truncate text-[11px] font-medium leading-tight">
+                      {VIKA_CHECKLIST_LABELS[field]}
+                      <span className="ml-1.5 font-normal text-[color:var(--muted)]">
+                        {filled ? value : "—"}
+                      </span>
+                    </p>
                   </div>
                   {isPresupuesto && filled ? (
                     <span
-                      className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] ${
                         presupuestoState.tone === "organic"
                           ? "bg-amber-100 text-amber-900"
                           : "bg-emerald-100 text-emerald-900"
@@ -487,7 +489,7 @@ export default async function BriefsPage() {
               );
             })}
             <li
-              className={`flex items-center justify-between gap-3 rounded-[18px] px-4 py-3 ring-1 ${
+              className={`flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 ring-1 ${
                 typeof summary[VIKA_NARRATIVE_FIELD] === "string" &&
                 summary[VIKA_NARRATIVE_FIELD] &&
                 summary[VIKA_NARRATIVE_FIELD].trim().length > 0
@@ -495,9 +497,9 @@ export default async function BriefsPage() {
                   : "bg-white/80 ring-[color:var(--line)]"
               }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-2">
                 <span
-                  className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
+                  className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
                 typeof summary[VIKA_NARRATIVE_FIELD] === "string" &&
                 summary[VIKA_NARRATIVE_FIELD] &&
                 summary[VIKA_NARRATIVE_FIELD].trim().length > 0
@@ -507,12 +509,12 @@ export default async function BriefsPage() {
                 >
                   {typeof summary[VIKA_NARRATIVE_FIELD] === "string" && summary[VIKA_NARRATIVE_FIELD] && summary[VIKA_NARRATIVE_FIELD].trim().length > 0 ? "OK" : "—"}
                 </span>
-                <div>
-                  <p className="text-sm font-medium">{VIKA_CHECKLIST_LABELS[VIKA_NARRATIVE_FIELD]}</p>
-                  <p className="text-xs text-[color:var(--muted)]">
-                    {summary[VIKA_NARRATIVE_FIELD] || "Narrativa opcional. Se captura al cierre si el cliente la comparte."}
-                  </p>
-                </div>
+                <p className="truncate text-[11px] font-medium leading-tight">
+                  {VIKA_CHECKLIST_LABELS[VIKA_NARRATIVE_FIELD]}
+                  <span className="ml-1.5 font-normal text-[color:var(--muted)]">
+                    {summary[VIKA_NARRATIVE_FIELD] || "Narrativa opcional"}
+                  </span>
+                </p>
               </div>
             </li>
           </ul>
