@@ -490,7 +490,7 @@ function buildPlainTextChatTurn(
 }
 
 async function requestGeminiContent(prompt: string, apiKey: string, responseMimeType?: "application/json") {
-  const model = "gemini-2.5-flash-lite";
+  const model = "gemini-flash-lite-latest";
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   console.log(`[vika-chat][gemini] llamando a modelo: ${model}`);

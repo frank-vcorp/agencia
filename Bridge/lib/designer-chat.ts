@@ -81,7 +81,7 @@ export async function callGemini(
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-flash-lite-latest",
       systemInstruction: buildSystemPrompt(assetContext)
     });
 
