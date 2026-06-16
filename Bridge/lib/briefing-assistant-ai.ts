@@ -632,8 +632,13 @@ export function shouldForceClosure(
     return false;
   }
 
+  // Normalizar el mensaje del asistente y las preguntas canonicas
+  // quitando TODOS los signos de interrogacion para hacer match flexible.
+  const normalizeForMatch = (text: string): string =>
+    text.replace(/[\u00bf\u003F\u003F]/g, "").trim().toLowerCase();
+  const normalizedForMatch = normalizeForMatch(normalizedLastMessage);
   return VIKA_NARRATIVE_QUESTIONS.some((question) =>
-    normalizedLastMessage.includes(question.replace(/^\u00bf|\?$/g, "").trim())
+    normalizedForMatch.includes(normalizeForMatch(question))
   );
 }
 
