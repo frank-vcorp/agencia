@@ -25,7 +25,6 @@ import {
   getBriefChat,
   type EntityChat
 } from "@/lib/chat";
-import { getTenantIdentityContext } from "@/lib/identity";
 import { submitBriefAction } from "@/app/cliente/brief/[projectId]/actions";
 import { BriefChatBubbles, type ChatBubbleItem } from "@/components/brief-chat-bubbles";
 
@@ -262,11 +261,7 @@ function extractVikaJsonFromMessages(messages: BriefVersion["messages"]): Record
 
 export default async function BriefsPage() {
   const brief = await getBriefWorkspace();
-  const identity = await getTenantIdentityContext();
   const currentVersion = brief?.currentVersion ?? null;
-  const ownerLabel = brief?.container.project?.ownerMembershipId && brief.container.project.ownerMembershipId === identity?.operatorMembership?.id
-    ? identity.operatorMembership.displayName
-    : "Sin owner_membership operativa";
 
   // Chat contextual del brief — IMPL-20260506-33
   const briefChat: EntityChat = brief ? await getBriefChat(brief.id) : { thread: null, messages: [] };
@@ -305,62 +300,9 @@ export default async function BriefsPage() {
                 Flujo Vika: 8 preguntas obligatorias, conversacion natural, cierre con tag de bloqueo.
               </p>
             </div>
-            <div className="rounded-[24px] bg-[color:var(--accent-soft)] px-4 py-4 text-[color:var(--accent-deep)] ring-1 ring-[color:rgba(200,93,39,0.18)]">
-              <div className="text-[11px] uppercase tracking-[0.22em]">Estado actual</div>
-              <div className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold capitalize">{statusLabel(currentVersion.status)}</div>
-              <p className="mt-2 text-sm leading-6">Canal fuente: {brief.sourceChannel}</p>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-3 md:grid-cols-3">
-            <div className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Operator membership</div>
-              <div className="mt-2 font-medium">{identity?.operatorMembership?.displayName ?? "Operador demo pendiente"}</div>
-              <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">{identity?.operatorMembership?.email ?? "Sin membership activa de operador."}</p>
-            </div>
-            <div className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Client membership</div>
-              <div className="mt-2 font-medium">{identity?.clientMembership?.displayName ?? "Cliente demo pendiente"}</div>
-              <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">{identity?.clientMembership?.email ?? "Sin membership activa de cliente."}</p>
-            </div>
-            <div className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Actor tecnico</div>
-              <div className="mt-2 font-medium">{identity?.serviceAgent?.name ?? "Agente tecnico pendiente"}</div>
-              <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
-                {identity?.serviceAgent?.scopes[0]
-                  ? `${identity.serviceAgent.scopes[0].resourceType} · ${identity.serviceAgent.scopes[0].operation}`
-                  : "Sin scope inicial de briefing."}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-3 md:grid-cols-3">
-            <div className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Client operativo</div>
-              <div className="mt-2 font-medium">{brief.container.client?.name ?? "Cliente demo controlado pendiente"}</div>
-              <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
-                {brief.container.client?.primaryContactChannel ?? brief.container.client?.legalName ?? "El brief aun no tiene contenedor client-project activo."}
-              </p>
-            </div>
-            <div className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Project operativo</div>
-              <div className="mt-2 font-medium">{brief.container.project?.name ?? "Proyecto demo controlado pendiente"}</div>
-              <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
-                {brief.container.project
-                  ? `${brief.container.project.projectType} · ${brief.container.project.status}`
-                  : "Sin project asociado al brief activo."}
-              </p>
-            </div>
-            <div className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Owner del proyecto</div>
-              <div className="mt-2 font-medium">{ownerLabel}</div>
-              <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
-                {brief.container.source === "brief"
-                  ? "Contenedor ligado directamente al caso activo."
-                  : brief.container.source === "tenant_active"
-                    ? "Contenedor demo activo heredado del tenant para iniciar el caso."
-                    : "No existe contenedor demo disponible todavia."}
-              </p>
+            <div className="inline-flex items-center gap-2 rounded-full bg-[color:var(--accent-soft)] px-4 py-2 text-[color:var(--accent-deep)] ring-1 ring-[color:rgba(200,93,39,0.18)]">
+              <span className="text-[10px] uppercase tracking-[0.22em]">Estado actual</span>
+              <span className="font-[family-name:var(--font-heading)] text-sm font-bold capitalize">{statusLabel(currentVersion.status)}</span>
             </div>
           </div>
         </article>
