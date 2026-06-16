@@ -143,7 +143,11 @@ const BRIEF_CHAT_RECOVERY_REPLY =
   "Se interrumpio este turno. Escribeme una vez mas y retomo desde lo que ya compartiste.";
 const TECHNICAL_LEAK_PATTERN =
   /(^|\s)(FOCO|CAPTURADO|PREGUNTAS|SIGUIENTE_ACCION|summaryPatch|missingPriorityFields|stageHasSufficientInfo|redirectNote)\s*:/i;
-const RELIABLE_VISIBLE_FINISH_REASONS = new Set(["", "STOP"]);
+const RELIABLE_VISIBLE_FINISH_REASONS = new Set([
+  "",
+  "STOP",
+  "MAX_TOKENS" // IMPL-20260615-27: gemini-2.5-flash-lite puede cortar por tokens
+]);
 const DANGLING_REPLY_ENDING_PATTERN = /(?:\.{3}|\u2026|[,;:\-\/(])\s*$/;
 
 function formatConversationHistory(messages: FinalBriefMessageInput[], limit = 50): string {
