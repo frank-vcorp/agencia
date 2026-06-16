@@ -618,48 +618,21 @@ export function shouldForceClosure(
     return false;
   }
 
-  // IMPL-20260615-15: Condiciones para forzar el cierre deterministico.
+  // IMPL-20260615-18: Condiciones para forzar el cierre deterministico.
   // El cierre ocurre cuando:
   //  1. Los 13 frentes obligatorios fueron preguntados (frontsAsked cubre los 13).
-  //  2. El ultimo mensaje del asistente contiene una pregunta narrativa canonica.
+  //  2. NO requerimos pregunta narrativa final - si los 13 frentes estan,
+  //     cerramos directamente. La "narrativa" ya fue capturada en historia_y_contexto.
   //
-  // NOTA: Ya no dependemos de `isBriefSufficientForClosure` aqui. La deteccion
-  // por palabras clave de los frentes preguntados (detectFrontsAskedFromHistory)
-  // es mas robusta que la deteccion de "valor significativo" en el summary,
-  // que puede fallar por sinomimos o lenguaje informal del cliente.
+  // Tolerancia: si solo 10-12 de los 13 fueron detectados, cerramos SOLO si
+  // el ultimo mensaje del asistente contiene una pregunta narrativa.
 
   if (!areAllRequiredFrontsAsked(summary)) {
     return false;
   }
 
-  const normalizedLastMessage = (lastAssistantMessage ?? "").trim();
-
-  if (!normalizedLastMessage) {
-    return false;
-  }
-
-  // Normalizar el mensaje del asistente y las preguntas canonicas
-  // quitando TODOS los signos de interrogacion para hacer match flexible.
-  const normalizeForMatch = (text: string): string =>
-    text.replace(/[\u00bf\u003F\u003F]/g, "").trim().toLowerCase();
-  const normalizedForMatch = normalizeForMatch(normalizedLastMessage);
-  const hasNarrativeQuestion = VIKA_NARRATIVE_QUESTIONS.some((question) =>
-    normalizedForMatch.includes(normalizeForMatch(question))
-  );
-
-  if (!hasNarrativeQuestion) {
-    return false;
-  }
-
-  // Doble check: si la deteccion por palabras clave fallo para algun frente,
-  // pero la pregunta narrativa ya esta presente, aun asi permitimos el cierre
-  // si al menos 10 de los 13 frentes fueron preguntados (tolerancia minima).
-  const askedCount = (summary.frontsAsked ?? []).length;
-  if (askedCount >= 10) {
-    return true;
-  }
-
-  return false;
+  // Si los 13 frentes estan, cerramos directamente sin requerir pregunta narrativa.
+  return true;
 }
 
 /**
