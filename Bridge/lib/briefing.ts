@@ -170,95 +170,40 @@ export function areAllRequiredFrontsAsked(summary: StructuredBriefSummary): bool
  * en cada mensaje. Si una palabra clave aparece en un mensaje del asistente,
  * se marca ese frente como preguntado.
  *
- * Esto es un fallback para cuando Vika no actualiza explicitamente el campo
- * `frontsAsked` en su respuesta.
+ * IMPL-20260615-24: REEMPLAZADO por deteccion de tags explicitos.
+ * Vika ahora emite [FRONT_ASKED: nombre] y [FRONT_COMPLETED: nombre]
+ * en sus mensajes. Esta funcion parsea esos tags directamente.
  */
 export function detectFrontsAskedFromHistory(
   assistantMessages: ReadonlyArray<{ messageText: string }>
 ): string[] {
   const asked = new Set<string>();
-
-  const frontKeywords: Record<string, string[]> = {
-    giro_y_producto_heroe: [
-      "que vendes", "que vende", "producto", "ofreces", "servicio", "a que se dedica",
-      "que es tu negocio", "de que es tu negocio", "lo que mas se vende", "que sale mas",
-      "que preparaciones", "que tipo de"
-    ],
-    audience: [
-      "a quien le hablas", "a quien le vende", "cliente ideal", "publico", "audiencia",
-      "a quien le diriges", "por que te compran", "por que le compran", "tu cliente",
-      "diferenciador", "que te hace unico", "lo que te hace unico", "tipo de gente",
-      "quien es la gente", "quien te compra", "quien te busca", "quienes son tus clientes",
-      "que los prefieren", "que los prefieran"
-    ],
-    presupuesto: [
-      "presupuesto", "cuanto cuentas", "cuanto tienes", "invertir", "mensual",
-      "con cuanto cuentas", "monto", "cuanto puedes invertir", "3000", "5000", "10000",
-      "tienes pensado invertir", "monto en mente", "cuanto te gustaria invertir",
-      "podriamos ayudarte", "conoces tu negocio", "para que mas gente conozca"
-    ],
-    cta_deseado: [
-      "que accion", "que quieres que haga", "contactar", "whatsapp", "llamar", "visitar",
-      "escribir por", "mensaje", "como te contactan", "accion del cliente", "cta",
-      "que te gustaria que hiciera", "que hagan cuando", "que te manden", "que pasen",
-      "que visiten", "que vayan"
-    ],
-    historia_y_contexto: [
-      "como empezaste", "como inicio", "origen", "historia del negocio", "como nacio",
-      "por que empezaste", "como empezo", "historia", "contexto", "como se fundo",
-      "como te animaste", "que te motivo"
-    ],
-    persona_perfil: [
-      "como te describirias", "como te describes", "eres de los que", "estilo de liderazgo",
-      "como eres como dueno", "como dueno de negocio", "metido en todo", "delegar",
-      "lider", "tu perfil", "como te defines", "que tipo de dueno"
-    ],
-    administracion_negocio: [
-      "como manejas", "como administras", "equipo", "solo trabajas", "operaciones",
-      "dia a dia", "como operas", "quien te ayuda", "tienes empleados", "como gestionas",
-      "como trabajas", "tercerizas", "como te organizas", "tienes gente",
-      "chica que me ayuda", "gente que me ayuda", "sola", "solo", "tienes apoyo"
-    ],
-    madurez: [
-      "cuanto tiempo llevas", "cuanto tiempo tienes", "cuanto tiempo llevas operando",
-      "anos operando", "meses operando", "cuando empezaste", "cuando abriste",
-      "cuanto llevas con", "experiencia", "antiguedad", "tiempo en el mercado"
-    ],
-    local_fisico: [
-      "donde queda", "en que colonia", "en que calle", "donde publicas", "en que plataforma",
-      "donde esta tu negocio", "ubicacion", "direccion", "local fisico", "a domicilio",
-      "donde se ubica"
-    ],
-    logo: [
-      "tienes logo", "tienes marca", "marca grafica", "logo", "identidad visual",
-      "diseño de marca", "imagen de marca", "diseno grafico", "tienes una marca"
-    ],
-    objeciones: [
-      "objeciones", "dudas", "que duda", "que objecion", "preocupacion", "resistencia",
-      "que les preocupa", "que no te compran", "por que no compran", "que dudas tienen",
-      "que miedo tienen", "que dudas o preocupaciones", "que le preocupa a la gente",
-      "que es lo que mas le preocupa"
-    ],
-    publicidad_previa: [
-      "publicidad", "has hecho publicidad", "has anunciado", "promocionado",
-      "marketing", "anuncios", "has intentado", "has probado", "has invertido en publicidad",
-      "publicidad previa", "has gastado en publicidad", "facebook ads", "google ads",
-      "instagram ads", "volantes", "folletos", "has hecho alguna campana"
-    ],
-    planes_futuro: [
-      "planes", "metas", "futuro", "a futuro", "donde te ves", "en 6 meses", "en 12 meses",
-      "proyeccion", "objetivo a futuro", "planes para el negocio", "donde quieres llegar",
-      "como te imaginas", "suenos para el", "metas para tu negocio", "vision de futuro",
-      "quiero tener", "quiero abrir", "quiero expandir", "planes para el futuro"
-    ]
-  };
+  const validFronts = new Set([
+    "giro_y_producto_heroe",
+    "audience",
+    "presupuesto",
+    "cta_deseado",
+    "historia_y_contexto",
+    "persona_perfil",
+    "administracion_negocio",
+    "madurez",
+    "local_fisico",
+    "logo",
+    "objeciones",
+    "publicidad_previa",
+    "planes_futuro"
+  ]);
 
   for (const msg of assistantMessages) {
-    const text = (msg.messageText ?? "").toLowerCase();
+    const text = msg.messageText ?? "";
     if (!text) continue;
 
-    for (const [front, keywords] of Object.entries(frontKeywords)) {
-      if (keywords.some((kw) => text.includes(kw))) {
+    // Detectar tags [FRONT_ASKED: nombre] y [FRONT_COMPLETED: nombre]
+    const tagRegex = /\[(?:FRONT_ASKED|FRONT_COMPLETED):\s*([a-z_]+)\s*\]/g;
+    let match;
+    while ((match = tagRegex.exec(text)) !== null) {
+      const front = match[1];
+      if (validFronts.has(front)) {
         asked.add(front);
       }
     }

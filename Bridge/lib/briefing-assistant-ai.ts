@@ -88,6 +88,20 @@ export type BriefClosureResult = {
  */
 export const LOCK_SUCCESS_TAG_REGEX = /\[SYS_ACTION: LOCK_SUCCESS\]/;
 export const BRIEF_COMPLETO_TAG_REGEX = /\[BRIEF_COMPLETO\]/;
+
+/**
+ * IMPL-20260615-24
+ * Tags que Vika emite para marcar explicitamente los frentes preguntados
+ * y completados. Esto reemplaza la deteccion fragil por palabras clave.
+ *
+ * - [FRONT_ASKED: nombre_frente] se emite cuando Vika hace la pregunta.
+ * - [FRONT_COMPLETED: nombre_frente] se emite cuando el cliente respondio
+ *   satisfactoriamente.
+ *
+ * El nombre_frente es uno de los 13 valores de VIKA_REQUIRED_FRONTS.
+ */
+export const FRONT_ASKED_TAG_REGEX = /\[FRONT_ASKED:\s*([a-z_]+)\s*\]/g;
+export const FRONT_COMPLETED_TAG_REGEX = /\[FRONT_COMPLETED:\s*([a-z_]+)\s*\]/g;
 export const VIKA_CLOSING_HUMAN_TEXT =
   "¡Qué gran historia! Mi equipo ya tiene toda esta información. La analizaremos a detalle y te contactaremos por WhatsApp con los pasos a seguir. ¡Mucho éxito!";
 
@@ -353,8 +367,8 @@ FRENTES COMPLEMENTARIOS (8 frentes, DEBEN preguntarse para permitir el cierre):
 - publicidad_previa: si intentó publicidad, qué y cómo le fue.
 - planes_futuro: planes para el negocio en 6-12 meses.
 
-INSTRUCCION DE PREGUNTAS (OBLIGATORIA - IMPL-20260615-10):
-- DEBES preguntar por los 13 frentes OBLIGATORIOS antes de intentar cerrar la conversación.
+INSTRUCCION DE PREGUNTAS (OBLIGATORIA - IMPL-20260615-24):
+- DEBES preguntar por los 13 frentes OBLIGATORIOS antes de intentar cerrar la conversacion.
 - Los 13 frentes obligatorios son:
   1. giro_y_producto_heroe: que vende y que sale mas.
   2. audience (diferenciador): a quien le habla y por que le compran a el.
@@ -370,8 +384,33 @@ INSTRUCCION DE PREGUNTAS (OBLIGATORIA - IMPL-20260615-10):
   12. publicidad_previa: si ha hecho publicidad antes, que hizo y como le fue.
   13. planes_futuro: metas para el negocio en 6-12 meses.
 - REGLA DE REINTENTOS: Si la respuesta del cliente es vaga o no tiene valor comercial, repregunta UNA SOLA VEZ con 2 ejemplos simples contextuales. Despues de ese unico reintento, anota lo que haya dicho (aunque sea ambiguo) y avanza al siguiente frente.
-- NO intentes cerrar NUNCA hasta que los 13 frentes esten en frontsAsked.
+- NO intentes cerrar NUNCA hasta que los 13 frentes esten marcados.
 - Cuando respondan a administracion_negocio mencionando que tiene equipo o trabaja solo, haz INMEDIATAMENTE la subpregunta de sistema/libreta.
+
+MARCADO EXPLICITO DE FRENTES (OBLIGATORIO - IMPL-20260615-24):
+- Cada vez que hagas una pregunta que cubra UNO de los 13 frentes, DEBES emitir
+  al FINAL de tu mensaje (despues del texto visible) el tag:
+  [FRONT_ASKED: nombre_frente]
+  donde nombre_frente es el slug del frente preguntado.
+- Despues de que el cliente responda a esa pregunta, en tu SIGUIENTE turno,
+  emite al inicio de tu mensaje (antes del texto visible) el tag:
+  [FRONT_COMPLETED: nombre_frente]
+  para confirmar que el frente fue contestado.
+- Si repreguntas con ejemplos (1 vez) y el cliente responde, marca como
+  COMPLETED en tu siguiente turno.
+- Los nombres validos son EXACTAMENTE:
+  giro_y_producto_heroe, audience, presupuesto, cta_deseado, historia_y_contexto,
+  persona_perfil, administracion_negocio, madurez, local_fisico, logo,
+  objeciones, publicidad_previa, planes_futuro
+- EJEMPLO de formato completo de tu respuesta al preguntar:
+  "¡Excelente! ¿Cómo te organizas en el dia a dia? ¿Trabajas solo?
+  [FRONT_ASKED: administracion_negocio]"
+- EJEMPLO de formato completo de tu respuesta despues de que el cliente contesto:
+  "[FRONT_COMPLETED: administracion_negocio]
+  Entendido. Y para llevar el control de tu negocio..."
+
+IMPORTANTE: Estos tags son INVISIBLES para el cliente. El sistema los procesa
+automaticamente. Tu texto visible debe ser natural y conversacional como siempre.
 
 [REGLA DE CIERRE OBLIGATORIO]
 SOLO cuando el bloque [PROGRESO ACTUAL DE LA CONVERSACIÓN] muestre los 13 frentes obligatorios marcados como preguntados (los 5 del NUCLEO cubiertos con suficiente informacion Y los 8 complementarios restantes preguntados al menos una vez),
