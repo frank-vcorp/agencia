@@ -879,4 +879,4 @@ export async function generateBriefClosure(
   } catch {
     return fallback;
   }
-}
+}// cache invalidation 1781621228
