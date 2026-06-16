@@ -162,6 +162,76 @@ export function areAllRequiredFrontsAsked(summary: StructuredBriefSummary): bool
 }
 
 /**
+ * IMPL-20260615-40
+ * Respaldo: CHK_2026-06-16_0815_implementacion_pregunta_narrativa_fija_v1
+ *
+ * Determina si el cliente dio una respuesta significativa a la pregunta
+ * narrativa fija. Rechaza null, vacio, y respuestas de una sola palabra
+ * generica ("si", "no", "nada"). Aplica las mismas reglas que
+ * `hasMeaningfulSummaryValue` para evitar que un valor vacio cuente como
+ * contestado.
+ */
+export function hasMeaningfulNarrativeAnswer(answer: string | null | undefined): boolean {
+  if (typeof answer !== "string") {
+    return false;
+  }
+
+  const normalized = answer.trim();
+
+  if (!normalized) {
+    return false;
+  }
+
+  if (GENERIC_SUMMARY_VALUES.has(normalized.toLowerCase())) {
+    return false;
+  }
+
+  // Mismo umbral minimo que un campo narrativo: al menos 4 chars y 1 palabra real
+  if (normalized.length < 4) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * IMPL-20260615-40
+ * Respaldo: CHK_2026-06-16_0815_implementacion_pregunta_narrativa_fija_v1
+ *
+ * Detecta si un mensaje del asistente contiene la pregunta narrativa fija
+ * (`VIKA_NARRATIVE_QUESTION`). Se usa en `actions.ts` y `shouldForceClosure`
+ * para saber si Vika ya hizo la pregunta y estamos esperando/evaluando la
+ * respuesta del cliente. La deteccion ignora capitalizacion, acentos y
+ * espacios redundantes para tolerar variantes menores que el modelo pueda
+ * emitir (ej. "entendido. ¿que ha sido lo mas dificil de tu negocio?").
+ */
+export function isNarrativeQuestionAskedInMessage(messageText: string | null | undefined): boolean {
+  if (typeof messageText !== "string" || !messageText) {
+    return false;
+  }
+
+  const normalized = messageText
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[¿?]/g, "") // quitar signos de interrogacion
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Normalizar la pregunta canonica al mismo formato y quitar el "?" final
+  // para permitir match dentro de mensajes que agregan contexto despues
+  // (ej. "...de tu negocio?")
+  const canonical = VIKA_NARRATIVE_QUESTION
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[¿?]/g, "")
+    .trim();
+
+  return normalized.includes(canonical);
+}
+
+/**
  * IMPL-20260615-10
  * Detecta automaticamente que frentes ya fueron preguntados por Vika
  * basandose en el historial de mensajes del asistente.
@@ -603,7 +673,7 @@ export type StructuredBriefSummary = {
   publicidadPrevia: string;
   planesFuturo: string;
   /**
-   * IMPL-20260615-10
+   * IMPL-20260615-40
    * Tracking de los frentes comerciales por los que Vika ya preguntó.
    * El cierre NO procede hasta que los 8 frentes estén marcados aquí.
    * Valores posibles: 'giro_y_producto_heroe', 'audience', 'presupuesto',
@@ -612,6 +682,18 @@ export type StructuredBriefSummary = {
    *   'objeciones', 'publicidad_previa', 'planes_futuro'
    */
   frontsAsked?: string[];
+  /**
+   * IMPL-20260615-40
+   * Pregunta narrativa fija que Vika hace como ULTIMO frente obligatorio.
+   * Se persiste como evidencia de que se preguntó. Vacia si aun no se ha hecho.
+   */
+  narrativeQuestionAsked?: string;
+  /**
+   * IMPL-20260615-40
+   * Respuesta del cliente a la pregunta narrativa. El cierre deterministico
+   * requiere que tenga valor significativo. Vacia si aun no se ha capturado.
+   */
+  narrativeAnswer?: string;
 };
 
 export type BriefMessage = {
@@ -807,6 +889,17 @@ type MutationContext = {
   versionId: string;
 };
 
+/**
+ * IMPL-20260615-40
+ * Respaldo: CHK_2026-06-16_0815_implementacion_pregunta_narrativa_fija_v1
+ *
+ * Pregunta narrativa fija que Vika hace como ULTIMO frente obligatorio
+ * antes del cierre. Es UNA SOLA pregunta (no variantes) para evitar que
+ * el modelo se confunda o se la salte. La respuesta se persiste en
+ * `narrativeAnswer` y el cierre requiere que tenga valor significativo.
+ */
+export const VIKA_NARRATIVE_QUESTION = "¿Qué ha sido lo más difícil?";
+
 export const emptyStructuredBriefSummary = (): StructuredBriefSummary => ({
   projectObjective: "",
   expectedResult: "",
@@ -842,7 +935,16 @@ export const emptyStructuredBriefSummary = (): StructuredBriefSummary => ({
   administracionNegocio: "",
   publicidadPrevia: "",
   planesFuturo: "",
-  frontsAsked: []
+  frontsAsked: [],
+  /**
+   * IMPL-20260615-40: campos persistidos de la pregunta narrativa fija.
+   * - `narrativeQuestionAsked`: la pregunta que Vika hizo (siempre la misma:
+   *   VIKA_NARRATIVE_QUESTION). Se persiste como evidencia de que se preguntó.
+   * - `narrativeAnswer`: la respuesta del cliente. El cierre deterministico
+   *   requiere que tenga valor significativo.
+   */
+  narrativeQuestionAsked: "",
+  narrativeAnswer: ""
 });
 
 export function normalizeSummary(input: Partial<StructuredBriefSummary> | null | undefined): StructuredBriefSummary {
@@ -859,6 +961,12 @@ export function normalizeSummary(input: Partial<StructuredBriefSummary> | null |
       // ademas de strings. Antes, normalizeSummary descartaba silenciosamente
       // cualquier array del patch, lo que rompia el tracking de frentes
       // preguntados al persistir el resumen via mergeStructuredBriefSummary.
+      // IMPL-20260615-40: preservar campos null (narrativeQuestionAsked y
+      // narrativeAnswer) sin convertirlos a string vacio, para distinguir
+      // "aun no preguntada" de "respondio con vacio".
+      if (nextValue === null) {
+        return [key, null];
+      }
       if (typeof nextValue === "string") {
         return [key, nextValue.trim()];
       }
@@ -1831,14 +1939,19 @@ async function updateVersionRecord(versionId: string, patch: Partial<BriefVersio
   });
 }
 
-export async function getBriefWorkspace(tenantSlug = supabaseEnv.defaultTenant): Promise<BriefRecord | null> {
+export async function getBriefWorkspace(
+  tenantSlug = supabaseEnv.defaultTenant,
+  briefId?: string
+): Promise<BriefRecord | null> {
   const tenant = await getTenantRecord(tenantSlug);
 
   if (!tenant) {
     return null;
   }
 
-  const briefRow = await getLatestBriefRow(tenant.id);
+  const briefRow = briefId
+    ? await getBriefRowByIdForTenant(tenant.id, briefId)
+    : await getLatestBriefRow(tenant.id);
 
   if (!briefRow) {
     return null;
@@ -2002,6 +2115,20 @@ async function getBriefRowById(briefId: string): Promise<BriefRow | null> {
   const params = new URLSearchParams({
     select: "id,tenant_id,client_id,project_id,status,source_channel,current_version_number,active_version_id,created_at,updated_at",
     id: `eq.${briefId}`,
+    limit: "1"
+  });
+  const rows = await postgrest<BriefRow[]>(`briefs?${params.toString()}`, {
+    method: "GET"
+  });
+
+  return rows[0] ?? null;
+}
+
+async function getBriefRowByIdForTenant(tenantId: string, briefId: string): Promise<BriefRow | null> {
+  const params = new URLSearchParams({
+    select: "id,tenant_id,client_id,project_id,status,source_channel,current_version_number,active_version_id,created_at,updated_at",
+    id: `eq.${briefId}`,
+    tenant_id: `eq.${tenantId}`,
     limit: "1"
   });
   const rows = await postgrest<BriefRow[]>(`briefs?${params.toString()}`, {

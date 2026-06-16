@@ -16,8 +16,11 @@ import {
   areAllRequiredFrontsAsked,
   detectFrontsAskedFromHistory,
   emptyStructuredBriefSummary,
+  hasMeaningfulNarrativeAnswer,
+  isNarrativeQuestionAskedInMessage,
   mergeStructuredBriefSummary,
   normalizeSummary,
+  VIKA_NARRATIVE_QUESTION,
   VIKA_REQUIRED_FRONTS
 } from "./briefing";
 import {
@@ -190,15 +193,24 @@ describe("flujo de cierre del chat de Vika con tags explicitos (IMPL-20260615-33
     expect(areAllRequiredFrontsAsked(summary)).toBe(false);
   });
 
-  it("shouldForceClosure retorna true con conversacion completa de 13 frentes + narrativa", () => {
+  it("shouldForceClosure retorna true con conversacion completa de 13 frentes + narrativa respondida (IMPL-20260615-40)", () => {
     const conversation = buildTaqueriaConversationWithTags();
     const assistantMessages = conversation
       .filter((m) => m.authorRole === "assistant")
       .map((m) => ({ messageText: m.messageText }));
 
     const detected = detectFrontsAskedFromHistory(assistantMessages);
+    // IMPL-20260615-40: la narrativa es el ULTIMO frente obligatorio.
+    // El cliente respondio "atender a los clientes y mantener la calidad"
+    // y la pregunta narrativa fija esta en el ultimo mensaje del asistente.
+    const lastClientMessage = conversation
+      .filter((m) => m.authorRole === "client")
+      .at(-1)!.messageText;
+
     const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
-      frontsAsked: detected
+      frontsAsked: detected,
+      narrativeQuestionAsked: VIKA_NARRATIVE_QUESTION,
+      narrativeAnswer: lastClientMessage
     });
 
     // El ultimo mensaje del asistente es la pregunta narrativa
@@ -207,7 +219,29 @@ describe("flujo de cierre del chat de Vika con tags explicitos (IMPL-20260615-33
       .at(-1)!.messageText;
 
     expect(areAllRequiredFrontsAsked(summary)).toBe(true);
+    expect(hasMeaningfulNarrativeAnswer(summary.narrativeAnswer)).toBe(true);
     expect(shouldForceClosure(summary, lastAssistantMessage)).toBe(true);
+  });
+
+  it("shouldForceClosure retorna false con conversacion completa de 13 frentes pero narrativeAnswer=null (IMPL-20260615-40)", () => {
+    const conversation = buildTaqueriaConversationWithTags();
+    const assistantMessages = conversation
+      .filter((m) => m.authorRole === "assistant")
+      .map((m) => ({ messageText: m.messageText }));
+
+    const detected = detectFrontsAskedFromHistory(assistantMessages);
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      frontsAsked: detected,
+      narrativeQuestionAsked: VIKA_NARRATIVE_QUESTION
+      // narrativeAnswer omitido -> null por default
+    });
+
+    const lastAssistantMessage = conversation
+      .filter((m) => m.authorRole === "assistant")
+      .at(-1)!.messageText;
+
+    expect(areAllRequiredFrontsAsked(summary)).toBe(true);
+    expect(shouldForceClosure(summary, lastAssistantMessage)).toBe(false);
   });
 
   it("shouldForceClosure retorna false si la conversacion va por la mitad (8 frentes)", () => {
@@ -328,18 +362,22 @@ describe("IMPL-20260615-31: System Prompt declara explicitamente la regla de cie
     expect(prompt).toContain("[BRIEF_COMPLETO]");
   });
 
-  it("el prompt obliga a emitir [FRONT_ASKED] y [FRONT_COMPLETED] en cada turno", () => {
+  it("el prompt NO contiene la seccion de marcado explicito de frentes (IMPL-20260615-40)", () => {
+    // IMPL-20260615-40: la instruccion de emitir [FRONT_ASKED] y
+    // [FRONT_COMPLETED] se elimino del prompt porque la deteccion ahora
+    // es por persistencia en summary + la pregunta narrativa fija.
+    // Los regex se conservan para retrocompatibilidad (mensajes antiguos
+    // pueden contenerlos todavia).
     const prompt = buildBriefChatSystemPrompt(
       [{ authorRole: "client", messageText: "Vendo tacos" }],
       "Vendo tacos"
     );
 
-    // La seccion de marcado explicito debe existir
-    expect(prompt).toContain("MARCADO EXPLICITO DE FRENTES (OBLIGATORIO");
-    expect(prompt).toContain("[FRONT_ASKED: nombre_frente]");
-    expect(prompt).toContain("[FRONT_COMPLETED: nombre_frente]");
-    // La frase critica: NUNCA cerrar hasta que los 13 frentes esten marcados
-    expect(prompt).toContain("NO intentes cerrar NUNCA hasta que los 13 frentes esten marcados");
+    expect(prompt).not.toContain("MARCADO EXPLICITO DE FRENTES");
+    expect(prompt).not.toContain("[FRONT_ASKED: nombre_frente]");
+    expect(prompt).not.toContain("[FRONT_COMPLETED: nombre_frente]");
+    // La frase critica nueva: la narrativa es el ULTIMO frente obligatorio
+    expect(prompt).toContain("PREGUNTA NARRATIVA ES EL ULTIMO FRENTE OBLIGATORIO");
   });
 });
 
@@ -362,5 +400,122 @@ describe("regex de tags exported (IMPL-20260615-24)", () => {
     const sample = "Despedida canonica\n[SYS_ACTION: LOCK_SUCCESS]\n[BRIEF_COMPLETO]";
     expect(LOCK_SUCCESS_TAG_REGEX.test(sample)).toBe(true);
     expect(BRIEF_COMPLETO_TAG_REGEX.test(sample)).toBe(true);
+  });
+});
+
+describe("IMPL-20260615-40: pregunta narrativa fija como ultimo frente de cierre", () => {
+  it("VIKA_NARRATIVE_QUESTION es exactamente la pregunta canonica sin variaciones", () => {
+    expect(VIKA_NARRATIVE_QUESTION).toBe("¿Qué ha sido lo más difícil?");
+  });
+
+  it("emptyStructuredBriefSummary inicializa narrativeQuestionAsked y narrativeAnswer en null", () => {
+    const base = emptyStructuredBriefSummary();
+    expect(base.narrativeQuestionAsked).toBeNull();
+    expect(base.narrativeAnswer).toBeNull();
+  });
+
+  it("hasMeaningfulNarrativeAnswer rechaza null, undefined, vacio y genericos", () => {
+    expect(hasMeaningfulNarrativeAnswer(null)).toBe(false);
+    expect(hasMeaningfulNarrativeAnswer(undefined)).toBe(false);
+    expect(hasMeaningfulNarrativeAnswer("")).toBe(false);
+    expect(hasMeaningfulNarrativeAnswer("   ")).toBe(false);
+    expect(hasMeaningfulNarrativeAnswer("si")).toBe(false);
+    expect(hasMeaningfulNarrativeAnswer("no")).toBe(false);
+    expect(hasMeaningfulNarrativeAnswer("hola")).toBe(false);
+    expect(hasMeaningfulNarrativeAnswer("ok")).toBe(false);
+  });
+
+  it("hasMeaningfulNarrativeAnswer acepta respuestas con sustancia (longitud y palabras)", () => {
+    expect(hasMeaningfulNarrativeAnswer("atender a los clientes y mantener la calidad")).toBe(true);
+    expect(hasMeaningfulNarrativeAnswer("Lidiar con los proveedores que no cumplen con los tiempos")).toBe(true);
+    expect(hasMeaningfulNarrativeAnswer("Conseguir clientes nuevos en temporada baja")).toBe(true);
+  });
+
+  it("isNarrativeQuestionAskedInMessage detecta la pregunta narrativa canonica", () => {
+    expect(isNarrativeQuestionAskedInMessage("¿Qué ha sido lo más difícil?")).toBe(true);
+    expect(isNarrativeQuestionAskedInMessage("Para terminar, ¿qué ha sido lo más difícil de tener tu negocio?")).toBe(true);
+    expect(isNarrativeQuestionAskedInMessage("entendido.   ¿que ha sido lo MAS dificil?")).toBe(true);
+  });
+
+  it("isNarrativeQuestionAskedInMessage rechaza mensajes sin la pregunta", () => {
+    expect(isNarrativeQuestionAskedInMessage(null)).toBe(false);
+    expect(isNarrativeQuestionAskedInMessage(undefined)).toBe(false);
+    expect(isNarrativeQuestionAskedInMessage("")).toBe(false);
+    expect(isNarrativeQuestionAskedInMessage("¿Cómo te animaste a poner el negocio?")).toBe(false);
+    expect(isNarrativeQuestionAskedInMessage("¿Cuánto tiempo llevas operando?")).toBe(false);
+    expect(isNarrativeQuestionAskedInMessage("Cuéntame de tu negocio")).toBe(false);
+  });
+
+  it("normalizeSummary preserva narrativeQuestionAsked y narrativeAnswer (incluyendo null)", () => {
+    // Caso 1: patch con ambos campos string
+    const patch1 = {
+      giroYProductoHeroe: "Tacos",
+      narrativeQuestionAsked: VIKA_NARRATIVE_QUESTION,
+      narrativeAnswer: "atender a los clientes y mantener la calidad"
+    };
+    const n1 = normalizeSummary(patch1);
+    expect(n1.narrativeQuestionAsked).toBe(VIKA_NARRATIVE_QUESTION);
+    expect(n1.narrativeAnswer).toBe("atender a los clientes y mantener la calidad");
+
+    // Caso 2: patch con explicit null (debe preservarse, no convertirse a "")
+    const patch2 = {
+      giroYProductoHeroe: "Tacos",
+      narrativeQuestionAsked: null
+    };
+    const n2 = normalizeSummary(patch2);
+    expect(n2.narrativeQuestionAsked).toBeNull();
+    expect(n2.narrativeAnswer).toBeNull();
+
+    // Caso 3: input null -> defaults
+    const n3 = normalizeSummary(null);
+    expect(n3.narrativeQuestionAsked).toBeNull();
+    expect(n3.narrativeAnswer).toBeNull();
+  });
+
+  it("mergeStructuredBriefSummary conserva los campos de narrativa al persistir", () => {
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Tacos",
+      narrativeQuestionAsked: VIKA_NARRATIVE_QUESTION,
+      narrativeAnswer: "atender a los clientes y mantener la calidad"
+    });
+
+    expect(summary.narrativeQuestionAsked).toBe(VIKA_NARRATIVE_QUESTION);
+    expect(summary.narrativeAnswer).toBe("atender a los clientes y mantener la calidad");
+    expect(hasMeaningfulNarrativeAnswer(summary.narrativeAnswer)).toBe(true);
+  });
+
+  it("shouldForceClosure detecta la pregunta narrativa en el historial aunque no este persistida en summary", () => {
+    // Caso real: Vika hizo la pregunta en su ultimo mensaje, el cliente
+    // respondio, y `actions.ts` aun no ha persistido narrativeAnswer.
+    // En este caso, shouldForceClosure debe seguir retornando false
+    // (porque narrativeAnswer es null) pero debe aceptar la pregunta
+    // como "ya hecha" si estuviera persistida.
+    const conversation = buildTaqueriaConversationWithTags();
+    const assistantMessages = conversation
+      .filter((m) => m.authorRole === "assistant")
+      .map((m) => ({ messageText: m.messageText }));
+
+    const detected = detectFrontsAskedFromHistory(assistantMessages);
+
+    // Sin persistir nada de narrativa
+    const summarySinNarrativa = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      frontsAsked: detected
+    });
+    expect(shouldForceClosure(summarySinNarrativa, conversation.at(-2)?.messageText ?? null)).toBe(false);
+
+    // Persistiendo solo narrativeQuestionAsked (sin respuesta)
+    const summarySinRespuesta = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      frontsAsked: detected,
+      narrativeQuestionAsked: VIKA_NARRATIVE_QUESTION
+    });
+    expect(shouldForceClosure(summarySinRespuesta, conversation.at(-2)?.messageText ?? null)).toBe(false);
+
+    // Caso completo: pregunta persistida + respuesta persistida + pregunta en historial
+    const summaryCompleto = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      frontsAsked: detected,
+      narrativeQuestionAsked: VIKA_NARRATIVE_QUESTION,
+      narrativeAnswer: conversation.at(-1)?.messageText ?? null
+    });
+    expect(shouldForceClosure(summaryCompleto, conversation.at(-2)?.messageText ?? null, conversation)).toBe(true);
   });
 });

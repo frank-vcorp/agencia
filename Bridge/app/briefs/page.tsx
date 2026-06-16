@@ -1,4 +1,6 @@
 /**
+ * IMPL-20260615-39
+ * Respaldo: PROYECTO.md (UI listado de briefs)
  * IMPL-20260611-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260611-01_alineacion_chat_vika_a_especificacion_tecnica_v1.md
  * IMPL-20260603-02
@@ -7,11 +9,15 @@
  * Respaldo: context/CLIENTS_Y_PROJECTS_V1.md, context/SPECs/SPEC_ARCH-20260505-22_clients_y_projects_v1.md, context/SPECs/SPEC_ARCH-20260505-21_memberships_users_y_actor_efectivo_v1.md, context/IDENTIDAD_Y_MEMBERSHIPS_V1.md, context/SPECs/SPEC_ARCH-20260505-19_agente_briefing_persistido_y_revision_humana.md, PROYECTO.md
  */
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 
 import {
   appendClientBriefMessage,
   createDerivedBriefVersion,
+  getBriefsByTenant,
   getBriefWorkspace,
+  getTenantIdBySlug,
+  emptyStructuredBriefSummary,
   reviewBriefVersion,
   submitBriefForOperatorReview,
   updateBriefSummary,
@@ -26,7 +32,9 @@ import {
   type EntityChat
 } from "@/lib/chat";
 import { submitBriefAction } from "@/app/cliente/brief/[projectId]/actions";
+import { executeDeleteBrief } from "@/lib/entity-delete";
 import { BriefChatBubbles, type ChatBubbleItem } from "@/components/brief-chat-bubbles";
+import { supabaseEnv } from "@/lib/supabase";
 
 const VIKA_CHECKLIST_LABELS: Partial<Record<keyof StructuredBriefSummary, string>> = {
   giroYProductoHeroe: "Giro y producto heroe",
@@ -91,43 +99,9 @@ function isVikaField(value: string): value is (typeof VIKA_BRIEF_FIELDS)[number]
 }
 
 function buildSummaryPatchSeed(): StructuredBriefSummary {
-  const base: StructuredBriefSummary = {
-    projectObjective: "",
-    expectedResult: "",
-    businessContext: "",
-    requestReason: "",
-    mainOffer: "",
-    audience: "",
-    platform: "",
-    deliverable: "",
-    cta: "",
-    tone: "",
-    restrictions: "",
-    references: "",
-    urgency: "",
-    messageCore: "",
-    gaps: "",
-    contradictions: "",
-    structuringConfidence: "",
-    recommendedProductSlotKey: "",
-    recommendedProductConfidence: "",
-    commercialFitReason: "",
-    upsellSignal: "",
-    operatorReviewNote: "",
-    clientFacingSummary: "",
-    madurez: "",
-    logo: "",
-    presupuesto: "",
-    localFisico: "",
-    giroYProductoHeroe: "",
-    historiaYContexto: "",
-    personaPerfil: "",
-    historiaNegocio: "",
-    administracionNegocio: "",
-    publicidadPrevia: "",
-    planesFuturo: ""
-  };
-  return base;
+  // IMPL-20260615-40: usar emptyStructuredBriefSummary para evitar
+  // duplicar campos y olvidar los nuevos (narrativeQuestionAsked, narrativeAnswer)
+  return emptyStructuredBriefSummary();
 }
 
 async function saveSummaryAction(formData: FormData) {
@@ -217,6 +191,42 @@ async function addBriefChatMessageAction(formData: FormData) {
   revalidatePath("/briefs");
 }
 
+async function deleteBriefAction(formData: FormData) {
+  "use server";
+
+  const tenantId = String(formData.get("tenantId") ?? "").trim();
+  const briefId = String(formData.get("briefId") ?? "").trim();
+  const confirmationText = String(formData.get("confirmationText") ?? "").trim();
+  const requestedByLabel = String(formData.get("requestedByLabel") ?? "operador").trim();
+  const approvedByLabel = String(formData.get("approvedByLabel") ?? "operador").trim();
+  const reason = String(formData.get("reason") ?? "otro").trim();
+
+  if (!tenantId || !briefId) {
+    revalidatePath("/briefs");
+    return;
+  }
+
+  const previewConfirmationText = `ELIMINAR BRIEF ${briefId}`;
+
+  if (confirmationText !== previewConfirmationText) {
+    revalidatePath("/briefs");
+    return;
+  }
+
+  await executeDeleteBrief(
+    tenantId,
+    briefId,
+    requestedByLabel,
+    approvedByLabel,
+    reason,
+    confirmationText,
+    previewConfirmationText
+  );
+
+  revalidatePath("/briefs");
+  revalidatePath(`/briefs?id=${briefId}`);
+}
+
 function statusLabel(status: BriefVersion["status"] | null) {
   if (!status) {
     return "Sin version activa";
@@ -259,9 +269,20 @@ function extractVikaJsonFromMessages(messages: BriefVersion["messages"]): Record
   return null;
 }
 
-export default async function BriefsPage() {
-  const brief = await getBriefWorkspace();
+export default async function BriefsPage({
+  searchParams
+}: {
+  searchParams: Promise<{ id?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const requestedId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const tenantId = await getTenantIdBySlug(supabaseEnv.defaultTenant).catch(() => null);
+
+  const brief = await getBriefWorkspace(supabaseEnv.defaultTenant, requestedId || undefined);
   const currentVersion = brief?.currentVersion ?? null;
+
+  // Listado completo de briefs del tenant — IMPL-20260615-39
+  const briefsList = tenantId ? await getBriefsByTenant(tenantId).catch(() => []) : [];
 
   // Chat contextual del brief — IMPL-20260506-33
   const briefChat: EntityChat = brief ? await getBriefChat(brief.id) : { thread: null, messages: [] };

@@ -22,7 +22,10 @@ import {
   detectFrontsAskedFromHistory,
   emptyStructuredBriefSummary,
   getBriefItinerarySufficiency,
+  hasMeaningfulNarrativeAnswer,
+  isNarrativeQuestionAskedInMessage,
   renderVikaProgressBlock,
+  VIKA_NARRATIVE_QUESTION,
   type BriefMessage,
   type StructuredBriefSummary
 } from "./briefing";
@@ -106,19 +109,22 @@ export const VIKA_CLOSING_HUMAN_TEXT =
   "¡Qué gran historia! Mi equipo ya tiene toda esta información. La analizaremos a detalle y te contactaremos por WhatsApp con los pasos a seguir. ¡Mucho éxito!";
 
 /**
- * IMPL-20260611-06
- * Respaldo: cierre deterministico + texto canonico de despedida
+ * IMPL-20260615-40
+ * Respaldo: CHK_2026-06-16_0815_implementacion_pregunta_narrativa_fija_v1
  *
- * Preguntas narrativas canonicas de la [FASE DE NARRATIVA] de Vika. Cuando el
- * modelo emite una de estas preguntas significa que los 13 puntos del checklist
- * ya estan completos y solo falta la respuesta del cliente para emitir el
- * cierre. El codigo las usa para detectar el momento exacto en que se debe
- * forzar la despedida sin volver a llamar a Gemini.
+ * Pregunta narrativa fija que Vika hace como ULTIMO frente obligatorio antes
+ * del cierre. Es UNA SOLA pregunta (no variantes) para evitar que el modelo
+ * se confunda o se la salte. La respuesta del cliente se persiste en
+ * `summary.narrativeAnswer` y el cierre deterministico requiere que tenga
+ * valor significativo (`hasMeaningfulNarrativeAnswer`).
+ *
+ * Reemplaza al array `VIKA_NARRATIVE_QUESTIONS` (2 preguntas) de IMPL-20260611-06,
+ * que permitia variabilidad y provocaba que Vika no siempre la emitiera
+ * como ultimo paso. La forma canonica exacta (sin acentos intencionalmente
+ * removidos, signo ¿ invertido, sin espacios redundantes) es la fuente
+ * de verdad para deteccion en `isNarrativeQuestionAskedInMessage`.
  */
-export const VIKA_NARRATIVE_QUESTIONS: readonly string[] = [
-  "¿Cómo te animaste a poner el negocio?",
-  "¿Qué ha sido lo más difícil?"
-];
+export { VIKA_NARRATIVE_QUESTION };
 
 /**
  * IMPL-20260615-01
@@ -357,7 +363,7 @@ Cuando el cliente responda a la pregunta de administracion_negocio (cómo se org
 - Esta subpregunta es REQUERIDA cuando se detecta que tiene equipo o trabaja solo. NO omitasla.
 - La respuesta se acumula en el campo administracion_negocio del resumen.
 
-[ITINERARIO DE LA CONVERSACIÓN (14 PREGUNTAS TOTALES - 1 APERTURA + 1 CONDICIONAL + 13 FRENTES)]
+[ITINERARIO DE LA CONVERSACIÓN (14 PREGUNTAS TOTALES - 1 APERTURA + 13 FRENTES)]
 Esta conversacion explora los 13 frentes comerciales relevantes para entender el negocio de manera natural.
 Recorre TODOS los frentes antes de cerrar. NO permitas cerrar hasta que los 13 frentes hayan sido preguntados al menos una vez.
 
@@ -378,8 +384,8 @@ FRENTES COMPLEMENTARIOS (8 frentes, DEBEN preguntarse para permitir el cierre):
 - publicidad_previa: si intentó publicidad, qué y cómo le fue.
 - planes_futuro: planes para el negocio en 6-12 meses.
 
-INSTRUCCION DE PREGUNTAS (OBLIGATORIA - IMPL-20260615-24):
-- DEBES preguntar por los 13 frentes OBLIGATORIOS antes de intentar cerrar la conversacion.
+INSTRUCCION DE PREGUNTAS (OBLIGATORIA):
+- DEBES preguntar por los 13 frentes OBLIGATORIOS antes de hacer la pregunta narrativa.
 - Los 13 frentes obligatorios son:
   1. giro_y_producto_heroe: que vende y que sale mas.
   2. audience (diferenciador): a quien le habla y por que le compran a el.
@@ -395,7 +401,7 @@ INSTRUCCION DE PREGUNTAS (OBLIGATORIA - IMPL-20260615-24):
   12. publicidad_previa: si ha hecho publicidad antes, que hizo y como le fue.
   13. planes_futuro: metas para el negocio en 6-12 meses.
 - REGLA DE REINTENTOS: Si la respuesta del cliente es vaga o no tiene valor comercial, repregunta UNA SOLA VEZ con 2 ejemplos simples contextuales. Despues de ese unico reintento, anota lo que haya dicho (aunque sea ambiguo) y avanza al siguiente frente.
-- NO intentes cerrar NUNCA hasta que los 13 frentes esten marcados.
+- NO hagas la pregunta narrativa NUNCA hasta que los 13 frentes esten preguntados.
 - Cuando respondan a administracion_negocio mencionando que tiene equipo o trabaja solo, haz INMEDIATAMENTE la subpregunta de sistema/libreta.
 
 REGLA CRITICA - CHEQUEO CONTINUO DE FRENTES (IMPL-20260615-35):
@@ -404,38 +410,25 @@ REGLA CRITICA - CHEQUEO CONTINUO DE FRENTES (IMPL-20260615-35):
 - Si faltan frentes por preguntar, continua con el SIGUIENTE frente pendiente. NO LOS SALTES.
 - Si el cliente ya te dio informacion de un frente sin que preguntaras, marcalo como contestado y avanza al siguiente pendiente.
 - ORDEN SUGERIDO (pero puedes adaptarlo al flujo natural): giro_y_producto_heroe → audience → presupuesto → cta_deseado → historia_y_contexto → persona_perfil → administracion_negocio (+ sistema/libreta) → madurez → local_fisico → logo → objeciones → publicidad_previa → planes_futuro.
-- NUNCA cierres la conversacion sin haber preguntado los 13 frentes.
-- Si llegaste al final de la conversacion y aun no preguntaste un frente, PREGUNTALO antes de cerrar.
+- NUNCA hagas la pregunta narrativa sin haber preguntado los 13 frentes.
+- Si llegaste al final de la conversacion y aun no preguntaste un frente, PREGUNTALO antes de hacer la narrativa.
 
-MARCADO EXPLICITO DE FRENTES (OBLIGATORIO - IMPL-20260615-24):
-- Cada vez que hagas una pregunta que cubra UNO de los 13 frentes, DEBES emitir
-  al FINAL de tu mensaje (despues del texto visible) el tag:
-  [FRONT_ASKED: nombre_frente]
-  donde nombre_frente es el slug del frente preguntado.
-- Despues de que el cliente responda a esa pregunta, en tu SIGUIENTE turno,
-  emite al inicio de tu mensaje (antes del texto visible) el tag:
-  [FRONT_COMPLETED: nombre_frente]
-  para confirmar que el frente fue contestado.
-- Si repreguntas con ejemplos (1 vez) y el cliente responde, marca como
-  COMPLETED en tu siguiente turno.
-- Los nombres validos son EXACTAMENTE:
-  giro_y_producto_heroe, audience, presupuesto, cta_deseado, historia_y_contexto,
-  persona_perfil, administracion_negocio, madurez, local_fisico, logo,
-  objeciones, publicidad_previa, planes_futuro
-- EJEMPLO de formato completo de tu respuesta al preguntar:
-  "¡Excelente! ¿Cómo te organizas en el dia a dia? ¿Trabajas solo?
-  [FRONT_ASKED: administracion_negocio]"
-- EJEMPLO de formato completo de tu respuesta despues de que el cliente contesto:
-  "[FRONT_COMPLETED: administracion_negocio]
-  Entendido. Y para llevar el control de tu negocio..."
+[REGLA DE CIERRE OBLIGATORIO - CRITICO (IMPL-20260615-40)]
+===>> LA PREGUNTA NARRATIVA ES EL ULTIMO FRENTE OBLIGATORIO. FLUJO EXACTO:
 
-IMPORTANTE: Estos tags son INVISIBLES para el cliente. El sistema los procesa
-automaticamente. Tu texto visible debe ser natural y conversacional como siempre.
+1. PRIMERO: Recorre los 13 frentes comerciales (no los saltes, no los repitas).
 
-[REGLA DE CIERRE OBLIGATORIO - CRITICO]
-===>> CUANDO LA TABLA [PROGRESO ACTUAL] MUESTRE TODOS LOS 13 FRENTES MARCADOS CON ✓, DEBES:
-1. Si ya hiciste la pregunta narrativa y el cliente ya respondio a ella, EN TU SIGUIENTE TURNO:
-   - Despídete con EXACTAMENTE este texto (sin variaciones, sin agregar mas preguntas):
+2. CUANDO TODOS LOS 13 FRENTES HAYAN SIDO PREGUNTADOS AL MENOS UNA VEZ:
+   - En tu siguiente turno, haz EXACTAMENTE esta pregunta (sin variaciones, sin agregar mas preguntas antes o despues):
+   
+   "¿Qué ha sido lo más difícil?"
+   
+   - Esta es la UNICA pregunta narrativa valida. NO inventes variantes.
+   - NO agregues mas texto introductorio. Solo haz la pregunta y espera.
+
+3. CUANDO EL CLIENTE RESPONDA A "¿Qué ha sido lo más difícil?":
+   - EN TU SIGUIENTE TURNO (sin mas preguntas, sin pedir confirmacion):
+   - Despídete con EXACTAMENTE este texto (verbatim, sin agregar mas preguntas):
    
    "¡Qué gran historia! Mi equipo ya tiene toda esta información. La analizaremos a detalle y te contactaremos por WhatsApp con los pasos a seguir. ¡Mucho éxito!"
    
@@ -443,22 +436,18 @@ automaticamente. Tu texto visible debe ser natural y conversacional como siempre
    [SYS_ACTION: LOCK_SUCCESS]
    [BRIEF_COMPLETO]
    {JSON con las claves que tengan valor significativo}
-   
-   - NO agregues mas texto, NO hagas mas preguntas, NO pidas confirmacion.
 
-2. Si NO has hecho la pregunta narrativa todavia, hazla primero (una de las 2 preguntas narrativas de abajo), espera la respuesta, y LUEGO cierra.
+===>> ESTO ES LO MAS IMPORTANTE:
+- DESPUES de que respondan los 13 frentes, DEBES hacer la pregunta "¿Qué ha sido lo más difícil?".
+- DESPUES de que respondan a esa pregunta, en tu SIGUIENTE turno DEBES cerrar (despedida canonica + tags + JSON).
+- NO HAGAS MAS PREGUNTAS DESPUES DE LA NARRATIVA. EL SIGUIENTE TURNO ES DE CIERRE.
 
-REGLA ABSOLUTA: NO CONTINUES PREGUNTANDO DESPUES DE QUE EL CLIENTE RESPONDA A LA NARRATIVA. SI YA HIZO LA NARRATIVA, EL SIGUIENTE TURNO ES DE CIERRE. NO HAGAS MAS PREGUNTAS.
+Si el bloque [PROGRESO ACTUAL] muestra frentes pendientes, NO hagas la pregunta narrativa todavia. Avanza SOLO al siguiente frente pendiente. NO repitas preguntas ya cubiertas.
 
-===>> ESTO ES LO MAS IMPORTANTE: Cuando el cliente ya contesto a una pregunta narrativa (cualquiera de las 2 de abajo) y tu ya tienes los 13 frentes marcados con ✓, TU SIGUIENTE RESPUESTA DEBE SER EXACTAMENTE EL MENSAJE DE CIERRE. NO MAS PREGUNTAS. <<===
+[FASE DE NARRATIVA - 1 PREGUNTA FIJA OBLIGATORIA (IMPL-20260615-40)]
+"¿Qué ha sido lo más difícil?"
 
-Si el bloque [PROGRESO ACTUAL] muestra frentes pendientes, avanza SOLO al siguiente pendiente. NO repitas preguntas ya marcadas con ✓.
-
-[FASE DE NARRATIVA - 2 PREGUNTAS OBLIGATORIAS]
-1. "¿Cómo te animaste a poner el negocio?" (captura historia_negocio o historia_y_contexto)
-2. "¿Qué ha sido lo más difícil?" (captura profundidad emocional/contexto)
-
-(Al cubrir los 5 frentes del NUCLEO, escoge UNA de las dos preguntas narrativas, relajando la plática. Deja que el usuario responda libremente. No insistas si es cortante. La segunda pregunta narrativa es opcional si el cliente ya dio contexto rico en la primera.)`;
+(Esta es la UNICA pregunta narrativa. Se hace UNA SOLA VEZ, como el ULTIMO paso antes del cierre. Captura profundidad emocional / contexto del negocio. Deja que el cliente responda libremente. No insistas si es cortante, pero espera su respuesta. Sin respuesta, NO cierres.)`;
 
 const VIKA_OPENING_QUESTION =
   "¡Hola! Para armar tu estrategia, cuéntame: ¿De qué es tu negocio y qué es lo que más se vende?";
@@ -662,28 +651,22 @@ export function isBriefSufficientForClosure(
 }
 
 /**
- * IMPL-20260615-01
- * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
- *  - Antes: requeria los 13 campos del checklist (ARCH-20260612-01).
- *  - Ahora: requiere que los 5 frentes del NUCLEO de suficiencia esten
- *    cubiertos (ver `getBriefItinerarySufficiency`). Esto refleja la
- *    filosofia de "itinerario + suficiencia" y no obliga al cliente a
- *    responder 13 preguntas para cerrar el chat.
+ * IMPL-20260615-40
+ * Respaldo: CHK_2026-06-16_0815_implementacion_pregunta_narrativa_fija_v1
  *
- * IMPL-20260611-06
- * Respaldo: cierre deterministico + texto canonico de despedida
+ * Regla de cierre deterministico con la pregunta narrativa fija como ULTIMO
+ * frente obligatorio:
+ *  1. Los 13 frentes del checklist de Vika deben estar preguntados.
+ *  2. La pregunta narrativa fija DEBE haber sido hecha por Vika
+ *     (`narrativeQuestionAsked` no nulo) Y el cliente DEBE haber respondido
+ *     con un valor significativo (`narrativeAnswer` pasa
+ *     `hasMeaningfulNarrativeAnswer`).
+ *  3. El ultimo mensaje del asistente debe contener la pregunta narrativa
+ *     fija (es decir, Vika esta esperando la respuesta o ya la tiene).
  *
- * Determina si el codigo debe forzar la despedida canonica de Vika sin
- * volver a llamar al modelo. Retorna `true` cuando se cumplen las DOS
- * condiciones:
- *  1. Los 5 frentes del nucleo de suficiencia estan cubiertos
- *     (`isBriefSufficientForClosure`).
- *  2. El ultimo mensaje del asistente contiene una de las preguntas
- *     narrativas canonicas de la [FASE DE NARRATIVA], lo que indica que
- *     el cliente respondio y estamos en el turno del cierre.
- *
- * Esta funcion es sincrona y deterministica: no depende del modelo ni de
- * estado externo, solo del resumen y del ultimo mensaje del asistente.
+ * Sin estas 3 condiciones, el cierre NO procede aunque el resumen tenga
+ * datos. Esto resuelve el caso donde Vika "se confunde" y emite la
+ * narrativa antes de tiempo, o se la salta por variabilidad del modelo.
  */
 export function shouldForceClosure(
   summary: BriefSummary | undefined | null,
@@ -699,6 +682,30 @@ export function shouldForceClosure(
   // Cuando emita el tag [SYS_ACTION: LOCK_SUCCESS] el backend confirma el cierre.
   // Aqui solo verificamos que los frentes esten preguntados como red de seguridad.
   if (!areAllRequiredFrontsAsked(summary)) {
+    return false;
+  }
+
+  // IMPL-20260615-40: la pregunta narrativa fija es el ULTIMO frente
+  // obligatorio. Sin respuesta significativa del cliente, NO cerramos.
+  if (!hasMeaningfulNarrativeAnswer(summary.narrativeAnswer)) {
+    return false;
+  }
+
+  // IMPL-20260615-40: el ultimo mensaje del asistente debe contener la
+  // pregunta narrativa fija (o ya haberla emitido en algun turno previo,
+  // evidenciado por `narrativeQuestionAsked` no nulo). Esto evita cerrar
+  // cuando Vika esta en medio de un frente comercial o no ha llegado
+  // todavia a la narrativa.
+  const questionAskedPersisted = Boolean(summary.narrativeQuestionAsked);
+  const questionAskedInLastTurn = isNarrativeQuestionAskedInMessage(lastAssistantMessage);
+  const questionAskedInAnyTurn =
+    questionAskedPersisted ||
+    questionAskedInLastTurn ||
+    (allMessages ?? []).some(
+      (m) => m.authorRole === "assistant" && isNarrativeQuestionAskedInMessage(m.messageText)
+    );
+
+  if (!questionAskedInAnyTurn) {
     return false;
   }
 

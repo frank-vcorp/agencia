@@ -23,14 +23,18 @@ import {
   getCurrentVisibleStageQuestion,
   getCriticalMissingFields,
   hasBackgroundStageSufficientInfo,
+  hasMeaningfulNarrativeAnswer,
   hasMeaningfulSummaryValue,
+  isNarrativeQuestionAskedInMessage,
   mapVikaBriefDataToStructuredSummary,
   mergeStructuredBriefSummary,
   nextStage,
   selectPreferredProject,
   statusFromStage,
   VIKA_BRIEF_FIELDS,
-  VIKA_CLOSURE_CORE_KEYS
+  VIKA_CLOSURE_CORE_KEYS,
+  VIKA_NARRATIVE_QUESTION,
+  VIKA_REQUIRED_FRONTS
 } from "./briefing";
 import {
   BRIEF_COMPLETO_TAG_REGEX,
@@ -42,9 +46,9 @@ import {
   isBriefSufficientForClosure,
   LOCK_SUCCESS_TAG_REGEX,
   sanitizeAssistantReply,
-  shouldForceClosure,
-  VIKA_NARRATIVE_QUESTIONS
+  shouldForceClosure
 } from "./briefing-assistant-ai";
+import { VIKA_NARRATIVE_QUESTION } from "./briefing";
 
 describe("briefing Vika data model", () => {
   it("expone los 13 campos obligatorios + narrativa", () => {
@@ -280,11 +284,10 @@ describe("briefing-assistant-ai (Vika)", () => {
     expect(prompt).toContain("UNA PREGUNTA A LA VEZ");
     expect(prompt).toContain("ANTI-PROMPT INJECTION");
     expect(prompt).toContain("EJEMPLOS SI NO ENTIENDE");
-    // IMPL-20260615-31: el itinerario de la conversacion ahora declara
-    // "14 PREGUNTAS TOTALES - 1 APERTURA + 1 CONDICIONAL + 13 FRENTES" y el
-    // System Prompt sigue conteniendo las dos tablas (NUCLEO 5 frentes +
-    // COMPLEMENTARIOS 8 frentes) que el modelo debe recorrer antes de cerrar.
-    expect(prompt).toContain("ITINERARIO DE LA CONVERSACIÓN (14 PREGUNTAS TOTALES - 1 APERTURA + 1 CONDICIONAL + 13 FRENTES)");
+    // IMPL-20260615-40: el itinerario declara "14 PREGUNTAS TOTALES -
+    // 1 APERTURA + 13 FRENTES" (sin condicional en el conteo) y la fase
+    // de narrativa es UNA SOLA pregunta fija.
+    expect(prompt).toContain("ITINERARIO DE LA CONVERSACIÓN (14 PREGUNTAS TOTALES - 1 APERTURA + 13 FRENTES)");
     expect(prompt).toContain("NUCLEO (5 frentes, cierre requiere que esten suficientemente cubiertos)");
     expect(prompt).toContain("FRENTES COMPLEMENTARIOS (8 frentes, DEBEN preguntarse para permitir el cierre)");
     // Lista explicita de los 13 frentes obligatorios (IMPL-20260615-24)
@@ -302,19 +305,22 @@ describe("briefing-assistant-ai (Vika)", () => {
     expect(prompt).toContain("11. objeciones");
     expect(prompt).toContain("12. publicidad_previa");
     expect(prompt).toContain("13. planes_futuro");
-    // Tags explicitos [FRONT_ASKED] y [FRONT_COMPLETED] (IMPL-20260615-24)
-    expect(prompt).toContain("MARCADO EXPLICITO DE FRENTES");
-    expect(prompt).toContain("[FRONT_ASKED: nombre_frente]");
-    expect(prompt).toContain("[FRONT_COMPLETED: nombre_frente]");
     // Regla de cierre: emitir JSON con las claves que tengan valor significativo
     expect(prompt).toContain("las claves que tengan valor significativo");
     expect(prompt).toContain("omite las vacias");
     // El viejo "CHECKLIST DE EXTRACCIÓN (13 PUNTOS OBLIGATORIOS)" ya NO debe existir.
     expect(prompt).not.toContain("CHECKLIST DE EXTRACCIÓN (13 PUNTOS OBLIGATORIOS)");
-    // Fase narrativa dual
-    expect(prompt).toContain("FASE DE NARRATIVA - 2 PREGUNTAS OBLIGATORIAS");
-    expect(prompt).toContain("¿Cómo te animaste a poner el negocio?");
-    expect(prompt).toContain("¿Qué ha sido lo más difícil?");
+    // IMPL-20260615-40: la fase narrativa es UNA SOLA pregunta fija.
+    // La regla de "2 preguntas obligatorias" ya NO debe existir.
+    expect(prompt).toContain("FASE DE NARRATIVA - 1 PREGUNTA FIJA OBLIGATORIA");
+    expect(prompt).toContain(VIKA_NARRATIVE_QUESTION);
+    expect(prompt).not.toContain("FASE DE NARRATIVA - 2 PREGUNTAS OBLIGATORIAS");
+    // La segunda pregunta ("¿Cómo te animaste?") ya NO debe existir en el prompt.
+    expect(prompt).not.toContain("¿Cómo te animaste a poner el negocio?");
+    // IMPL-20260615-40: la regla de cierre ahora es MAS explicita sobre la narrativa.
+    expect(prompt).toContain("PREGUNTA NARRATIVA ES EL ULTIMO FRENTE OBLIGATORIO");
+    expect(prompt).toContain("DESPUES de que respondan a esa pregunta, en tu SIGUIENTE turno DEBES cerrar");
+    expect(prompt).toContain("EL SIGUIENTE TURNO ES DE CIERRE");
     // Apertura canonica
     expect(prompt).toContain("¿De qué es tu negocio y qué es lo que más se vende?");
     // Historial
@@ -323,6 +329,12 @@ describe("briefing-assistant-ai (Vika)", () => {
     // No hay menciones a etapas (discovery/precision/commercial_fit) en el prompt de chat
     expect(prompt).not.toContain("Etapa actual:");
     expect(prompt).not.toContain("Frentes pendientes");
+    // IMPL-20260615-40: los tags [FRONT_ASKED]/[FRONT_COMPLETED] ya NO
+    // estan en el prompt (la deteccion ahora es por persistencia en summary
+    // y por la pregunta narrativa fija).
+    expect(prompt).not.toContain("MARCADO EXPLICITO DE FRENTES");
+    expect(prompt).not.toContain("[FRONT_ASKED: nombre_frente]");
+    expect(prompt).not.toContain("[FRONT_COMPLETED: nombre_frente]");
   });
 
   it("expone regex de deteccion de tag LOCK_SUCCESS y BRIEF_COMPLETO", () => {
@@ -698,11 +710,13 @@ describe("briefing - nucleo de suficiencia (IMPL-20260615-01)", () => {
     expect(isBriefSufficientForClosure(summary)).toBe(false);
   });
 
-  it("shouldForceClosure retorna true cuando los 13 frentes obligatorios estan preguntados (IMPL-20260615-29)", () => {
+  it("shouldForceClosure retorna true cuando los 13 frentes obligatorios estan preguntados Y la narrativa fue respondida (IMPL-20260615-40)", () => {
     // IMPL-20260615-29: la funcion se simplifico. Ahora SOLO verifica que
     // areAllRequiredFrontsAsked() cubra los 13 frentes. El argumento
     // lastAssistantMessage ya no es determinante (Vika decide via
     // [SYS_ACTION: LOCK_SUCCESS] cuando emitir el cierre).
+    // IMPL-20260615-40: ademas requiere que narrativeAnswer tenga valor
+    // significativo y que la pregunta narrativa haya sido hecha.
     const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
       giroYProductoHeroe: "Pizzeria",
       audience: "Duenos de negocio",
@@ -723,12 +737,14 @@ describe("briefing - nucleo de suficiencia (IMPL-20260615-01)", () => {
         "objeciones",
         "publicidad_previa",
         "planes_futuro"
-      ]
+      ],
+      narrativeQuestionAsked: VIKA_NARRATIVE_QUESTION,
+      narrativeAnswer: "Atender a los clientes y mantener la calidad constante"
     });
 
-    expect(shouldForceClosure(summary, VIKA_NARRATIVE_QUESTIONS[0])).toBe(true);
-    expect(shouldForceClosure(summary, VIKA_NARRATIVE_QUESTIONS[1])).toBe(true);
-    // IMPL-20260615-29: el argumento lastAssistantMessage ya no bloquea el cierre.
+    expect(shouldForceClosure(summary, VIKA_NARRATIVE_QUESTION)).toBe(true);
+    // El argumento lastAssistantMessage ya no bloquea el cierre si la
+    // narrativa esta persistida (IMPL-20260615-29, refinado en IMPL-20260615-40).
     expect(shouldForceClosure(summary, "Perfecto, gracias por la informacion.")).toBe(true);
   });
 
@@ -749,29 +765,96 @@ describe("briefing - nucleo de suficiencia (IMPL-20260615-01)", () => {
         "administracion_negocio",
         "objeciones",
         "planes_futuro"
-      ]
+      ],
+      narrativeQuestionAsked: VIKA_NARRATIVE_QUESTION,
+      narrativeAnswer: "Atender a los clientes y mantener la calidad constante"
     });
 
-    expect(shouldForceClosure(summary, VIKA_NARRATIVE_QUESTIONS[0])).toBe(false);
+    expect(shouldForceClosure(summary, VIKA_NARRATIVE_QUESTION)).toBe(false);
   });
 
   it("shouldForceClosure retorna false si frontsAsked esta vacio aunque el resumen tenga datos", () => {
     // IMPL-20260615-29: frontsAsked vacio -> false aunque el nucleo este
     // completo. La red de seguridad depende de los tags explicitos.
+    // IMPL-20260615-40: ademas la narrativa debe estar contestada.
     const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
       giroYProductoHeroe: "Pizzeria",
       audience: "Duenos de negocio",
       presupuesto: "$3,000 MXN",
       cta: "WhatsApp",
-      historiaYContexto: "Receta de la abuela"
+      historiaYContexto: "Receta de la abuela",
+      narrativeQuestionAsked: VIKA_NARRATIVE_QUESTION,
+      narrativeAnswer: "Atender a los clientes y mantener la calidad constante"
     });
 
-    expect(shouldForceClosure(summary, VIKA_NARRATIVE_QUESTIONS[0])).toBe(false);
+    expect(shouldForceClosure(summary, VIKA_NARRATIVE_QUESTION)).toBe(false);
   });
 
   it("shouldForceClosure retorna false con resumen null/undefined", () => {
-    expect(shouldForceClosure(null, VIKA_NARRATIVE_QUESTIONS[0])).toBe(false);
-    expect(shouldForceClosure(undefined, VIKA_NARRATIVE_QUESTIONS[0])).toBe(false);
+    expect(shouldForceClosure(null, VIKA_NARRATIVE_QUESTION)).toBe(false);
+    expect(shouldForceClosure(undefined, VIKA_NARRATIVE_QUESTION)).toBe(false);
+  });
+
+  it("shouldForceClosure retorna false si narrativeAnswer es null aunque los 13 frentes esten preguntados (IMPL-20260615-40)", () => {
+    // IMPL-20260615-40: la narrativa es el ULTIMO frente obligatorio. Sin
+    // respuesta significativa del cliente, NO cerramos aunque el resumen
+    // este completo en los 13 frentes.
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria",
+      audience: "Duenos de negocio",
+      presupuesto: "$3,000 MXN",
+      cta: "WhatsApp",
+      historiaYContexto: "Receta de la abuela",
+      frontsAsked: [...VIKA_REQUIRED_FRONTS],
+      narrativeQuestionAsked: VIKA_NARRATIVE_QUESTION,
+      narrativeAnswer: null
+    });
+
+    expect(shouldForceClosure(summary, VIKA_NARRATIVE_QUESTION)).toBe(false);
+  });
+
+  it("shouldForceClosure retorna false si narrativeAnswer es vacio o generico (IMPL-20260615-40)", () => {
+    const summaryWithEmpty = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria",
+      audience: "Duenos de negocio",
+      presupuesto: "$3,000 MXN",
+      cta: "WhatsApp",
+      historiaYContexto: "Receta de la abuela",
+      frontsAsked: [...VIKA_REQUIRED_FRONTS],
+      narrativeQuestionAsked: VIKA_NARRATIVE_QUESTION,
+      narrativeAnswer: ""
+    });
+
+    const summaryWithGeneric = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria",
+      audience: "Duenos de negocio",
+      presupuesto: "$3,000 MXN",
+      cta: "WhatsApp",
+      historiaYContexto: "Receta de la abuela",
+      frontsAsked: [...VIKA_REQUIRED_FRONTS],
+      narrativeQuestionAsked: VIKA_NARRATIVE_QUESTION,
+      narrativeAnswer: "si"
+    });
+
+    expect(shouldForceClosure(summaryWithEmpty, VIKA_NARRATIVE_QUESTION)).toBe(false);
+    expect(shouldForceClosure(summaryWithGeneric, VIKA_NARRATIVE_QUESTION)).toBe(false);
+  });
+
+  it("shouldForceClosure retorna false si la pregunta narrativa NO fue hecha (IMPL-20260615-40)", () => {
+    // Vika tiene los 13 frentes preguntados y la respuesta del cliente,
+    // pero nunca hizo la pregunta narrativa -> NO cerramos.
+    const summary = mergeStructuredBriefSummary(emptyStructuredBriefSummary(), {
+      giroYProductoHeroe: "Pizzeria",
+      audience: "Duenos de negocio",
+      presupuesto: "$3,000 MXN",
+      cta: "WhatsApp",
+      historiaYContexto: "Receta de la abuela",
+      frontsAsked: [...VIKA_REQUIRED_FRONTS],
+      narrativeQuestionAsked: null,
+      narrativeAnswer: "Atender a los clientes y mantener la calidad constante"
+    });
+
+    expect(shouldForceClosure(summary, "otro mensaje sin narrativa")).toBe(false);
   });
 
   it("generateBriefClosure omite claves sin valor significativo en el JSON de cierre", async () => {
