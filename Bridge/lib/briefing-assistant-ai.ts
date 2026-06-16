@@ -680,61 +680,14 @@ export function shouldForceClosure(
     return false;
   }
 
+  // IMPL-20260615-30: Confiamos en que Vika vea la tabla de frentes en su
+  // System Prompt y ella misma decida cuando ya no hay mas preguntas.
+  // Cuando emita el tag [SYS_ACTION: LOCK_SUCCESS] el backend confirma el cierre.
+  // Aqui solo verificamos que los frentes esten preguntados como red de seguridad.
   if (!areAllRequiredFrontsAsked(summary)) {
     return false;
   }
 
-  // IMPL-20260615-21: Si los 13 frentes estan, el cierre se activa cuando
-  // el ULTIMO mensaje del asistente fue una pregunta narrativa Y el cliente
-  // ya respondio (es decir, hay un mensaje del cliente DESPUES de la pregunta).
-  if (allMessages && allMessages.length >= 2) {
-    const assistantMessages = allMessages.filter((m) => m.authorRole === "assistant");
-    if (assistantMessages.length >= 1) {
-      const lastAssistant = assistantMessages[assistantMessages.length - 1];
-      const normalizeForMatch = (text: string): string =>
-        text.replace(/[\u00bf\u003F\u003F]/g, "").trim().toLowerCase();
-      const normalizedLastAssistant = normalizeForMatch(lastAssistant.messageText);
-      const hasNarrative = VIKA_NARRATIVE_QUESTIONS.some((question) =>
-        normalizedLastAssistant.includes(normalizeForMatch(question))
-      );
-      if (hasNarrative) {
-        // Verificar que el cliente ya respondio DESPUES de la pregunta narrativa.
-        // Buscamos si hay un mensaje del cliente posterior al ultimo del asistente.
-        const lastAssistantIndex = allMessages.findIndex(
-          (m) => m.messageText === lastAssistant.messageText
-        );
-        const hasClientResponseAfter =
-          lastAssistantIndex >= 0 &&
-          lastAssistantIndex < allMessages.length - 1 &&
-          allMessages.slice(lastAssistantIndex + 1).some((m) => m.authorRole === "client");
-        if (hasClientResponseAfter) {
-          return true;
-        }
-        // Si la pregunta narrativa es reciente pero el cliente no ha respondido,
-        // no cerramos todavia.
-        return false;
-      }
-    }
-  }
-
-  // Fallback: si el ultimo mensaje del asistente contiene una pregunta narrativa
-  // (caso donde Vika acaba de preguntar y el cliente aun no responde).
-  const normalizedLastMessage = (lastAssistantMessage ?? "").trim();
-  if (normalizedLastMessage) {
-    const normalizeForMatch = (text: string): string =>
-      text.replace(/[\u00bf\u003F\u003F]/g, "").trim().toLowerCase();
-    const normalizedForMatch = normalizeForMatch(normalizedLastMessage);
-    const hasNarrative = VIKA_NARRATIVE_QUESTIONS.some((question) =>
-      normalizedForMatch.includes(normalizeForMatch(question))
-    );
-    if (hasNarrative) {
-      // Si el ultimo mensaje es una pregunta narrativa, no cerramos todavia
-      // porque esperamos la respuesta del cliente.
-      return false;
-    }
-  }
-
-  // Si los 13 frentes estan y no hay pregunta narrativa pendiente, cerramos.
   return true;
 }
 
