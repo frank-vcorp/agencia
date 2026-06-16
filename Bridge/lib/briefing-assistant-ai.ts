@@ -228,7 +228,14 @@ export function extractJsonObject(rawText: string): string | null {
 }
 
 export function sanitizeAssistantReply(rawReply: string): string {
-  const trimmed = rawReply
+  // IMPL-20260615-28: Extraer tags internos de Vika ANTES de validar.
+  // Tags como [FRONT_ASKED: nombre] o [FRONT_COMPLETED: nombre] empiezan
+  // con [ y harian que el filtro los rechace como JSON.
+  const withoutTags = rawReply
+    .replace(/\[FRONT_ASKED:\s*[a-z_]+\s*\]/g, "")
+    .replace(/\[FRONT_COMPLETED:\s*[a-z_]+\s*\]/g, "");
+
+  const trimmed = withoutTags
     .replace(/```json/gi, "")
     .replace(/```/g, "")
     .replace(/\r\n/g, "\n")
