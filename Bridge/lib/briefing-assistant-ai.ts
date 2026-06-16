@@ -17,7 +17,9 @@
  * Respaldo: ARCH-20260612-01 — Checklist 13 puntos obligatorios + regla ejemplos dinámicos + fase narrativa dual.
  */
 import {
+  areAllRequiredFrontsAsked,
   buildFinalSummaryText,
+  detectFrontsAskedFromHistory,
   emptyStructuredBriefSummary,
   getBriefItinerarySufficiency,
   renderVikaProgressBlock,
@@ -342,17 +344,24 @@ FRENTES COMPLEMENTARIOS (3 frentes, se preguntan pero NO bloquean el cierre):
 - publicidad_previa: si intentó publicidad, qué y cómo le fue.
 - planes_futuro: planes para el negocio en 6-12 meses.
 
-INSTRUCCION DE PREGUNTAS:
-- Pregunta por todos los 8 frentes de manera natural durante la conversación.
-- Para los frentes del NUCLEO: busca información suficiente para considerar el frente cubierto (no necesariamente perfecto).
-- Para los frentes COMPLEMENTARIOS: debes hacer una pregunta específica por cada uno de los siguientes temas al menos una vez durante la conversación: persona_perfil, cómo te describirías como persona y líder; administracion_negocio, cómo manejas las operaciones diarias; madurez, cuánto tiempo llevas operando; logo, si tienes marca gráfica definida; objeciones, qué dudas tienen los clientes; publicidad_previa, si has hecho publicidad antes; planes_futuro, tus metas a 6-12 meses. Si la respuesta es vaga o el cliente no quiere profundizar, no insistas más de 2 veces y pasa al siguiente frente.
-- Anota lo que el cliente compartió, incluso si es parcial o poco detallado.
-- Si un frente del NUCLEO queda débil después de 2 intentos, marcalo como "pendiente de profundizar" y avanza; el cierre aún puede ocurrir si los otros 4 nucleos están fuertes.
-- El cierre depende exclusivamente de que los 5 frentes del NUCLEO estén suficientemente cubiertos (según el criterio de suficiencia en 'isBriefSufficientForClosure').
-- Nunca dejes de preguntar por un frente solo porque creas que ya lo tienes cubierto; permite que el cliente agregue información si lo desea.
+INSTRUCCION DE PREGUNTAS (OBLIGATORIA - IMPL-20260615-10):
+- DEBES preguntar por los 8 frentes OBLIGATORIOS antes de intentar cerrar la conversación.
+- Los 8 frentes obligatorios son:
+  1. giro_y_producto_heroe: que vende y que sale mas.
+  2. audience (diferenciador): a quien le habla y por que le compran a el.
+  3. presupuesto: monto mensual asignado o "$0 / Organico" si no hay.
+  4. cta_deseado: que accion quiere que haga la persona.
+  5. historia_y_contexto: el origen o la historia del negocio.
+  6. administracion_negocio: como administra el dia a dia, si tiene equipo.
+  7. objeciones: que dudas tienen los clientes antes de pagar.
+  8. planes_futuro: metas para el negocio en 6-12 meses.
+- Despues de hacer UNA pregunta por cada frente, agrega el nombre del frente al campo frontsAsked en el JSON de progreso.
+- Si la respuesta del cliente es vaga o no quiere profundizar, NO insistas mas de 2 veces. Despues de 2 intentos, anota lo que haya dicho (aunque sea ambiguo) y avanza al siguiente frente.
+- NO intentes cerrar NUNCA hasta que los 8 frentes esten en frontsAsked.
+- Aun cuando el nucleo (5 frentes) este cubierto, DEBES seguir preguntando los 3 complementarios restantes antes de cerrar.
 
 [REGLA DE CIERRE OBLIGATORIO]
-Cuando el bloque [PROGRESO ACTUAL DE LA CONVERSACIÓN] muestre los 5 frentes del NUCLEO cubiertos (✓),
+SOLO cuando el bloque [PROGRESO ACTUAL DE LA CONVERSACIÓN] muestre los 8 frentes obligatorios marcados como preguntados (incluyendo los 5 del NUCLEO cubiertos con suficiente informacion Y los 3 complementarios restantes preguntados),
 haz UNA pregunta abierta de la [FASE DE NARRATIVA]. Cuando el cliente responda,
 en tu siguiente turno despídete EXACTAMENTE con este texto (sin variaciones):
 
@@ -600,6 +609,10 @@ export function shouldForceClosure(
     return false;
   }
 
+  if (!areAllRequiredFrontsAsked(summary)) {
+    return false;
+  }
+
   const normalizedLastMessage = (lastAssistantMessage ?? "").trim();
 
   if (!normalizedLastMessage) {
@@ -645,8 +658,19 @@ export async function generateBriefChatReply(
       .reverse()
       .find((message) => message.authorRole === "assistant")?.messageText ?? null;
 
-  if (shouldForceClosure(input.summary, lastAssistantMessage)) {
-    return buildForcedClosureReply(input.summary as BriefSummary);
+  // IMPL-20260615-10: detectar automaticamente los frentes preguntados
+  // basandose en el historial de mensajes del asistente.
+  const detectedFronts = detectFrontsAskedFromHistory(input.messages ?? []);
+  const summaryWithDetectedFronts: BriefSummary = {
+    ...(input.summary as BriefSummary),
+    frontsAsked: [
+      ...(input.summary?.frontsAsked ?? []),
+      ...detectedFronts.filter((f) => !(input.summary?.frontsAsked ?? []).includes(f))
+    ]
+  };
+
+  if (shouldForceClosure(summaryWithDetectedFronts, lastAssistantMessage)) {
+    return buildForcedClosureReply(summaryWithDetectedFronts);
   }
 
   const apiKey = process.env.GEMINI_API_KEY?.trim();

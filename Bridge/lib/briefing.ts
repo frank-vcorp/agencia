@@ -114,6 +114,113 @@ export const VIKA_CLOSURE_CORE_KEYS: ReadonlyArray<{
 ];
 
 /**
+ * IMPL-20260615-10
+ * Respaldo: IMPL-20260615-10 — Forzar captura de los 8 frentes antes del cierre.
+ *
+ * Los 8 frentes comerciales que Vika DEBE preguntar antes de poder cerrar
+ * el chat. Si alguno no esta en `summary.frontsAsked`, el cierre se bloquea.
+ *
+ * 5 del nucleo + 3 complementarios principales (los mas importantes):
+ *  - giro_y_producto_heroe
+ *  - audience (diferenciador)
+ *  - presupuesto
+ *  - cta_deseado
+ *  - historia_y_contexto
+ *  - administracion_negocio (como maneja el dia a dia)
+ *  - objeciones (que dudas tienen los clientes)
+ *  - planes_futuro (metas a 6-12 meses)
+ */
+export const VIKA_REQUIRED_FRONTS: ReadonlyArray<string> = [
+  "giro_y_producto_heroe",
+  "audience",
+  "presupuesto",
+  "cta_deseado",
+  "historia_y_contexto",
+  "administracion_negocio",
+  "objeciones",
+  "planes_futuro"
+];
+
+/**
+ * IMPL-20260615-10
+ * Verifica si todos los 8 frentes obligatorios fueron preguntados.
+ * Retorna `true` solo si `frontsAsked` contiene los 8 frentes.
+ */
+export function areAllRequiredFrontsAsked(summary: StructuredBriefSummary): boolean {
+  const asked = summary.frontsAsked ?? [];
+  return VIKA_REQUIRED_FRONTS.every((front) => asked.includes(front));
+}
+
+/**
+ * IMPL-20260615-10
+ * Detecta automaticamente que frentes ya fueron preguntados por Vika
+ * basandose en el historial de mensajes del asistente.
+ *
+ * Usa palabras clave contextuales para identificar que frente se pregunto
+ * en cada mensaje. Si una palabra clave aparece en un mensaje del asistente,
+ * se marca ese frente como preguntado.
+ *
+ * Esto es un fallback para cuando Vika no actualiza explicitamente el campo
+ * `frontsAsked` en su respuesta.
+ */
+export function detectFrontsAskedFromHistory(
+  assistantMessages: ReadonlyArray<{ messageText: string }>
+): string[] {
+  const asked = new Set<string>();
+
+  const frontKeywords: Record<string, string[]> = {
+    giro_y_producto_heroe: [
+      "que vendes", "que vende", "producto", "ofreces", "servicio", "a que se dedica",
+      "que es tu negocio", "de que es tu negocio", "lo que mas se vende", "que sale mas"
+    ],
+    audience: [
+      "a quien le hablas", "a quien le vende", "cliente ideal", "publico", "audiencia",
+      "a quien le diriges", "por que te compran", "por que le compran", "tu cliente",
+      "diferenciador", "que te hace unico", "lo que te hace unico"
+    ],
+    presupuesto: [
+      "presupuesto", "cuanto cuentas", "cuanto tienes", "invertir", "mensual",
+      "con cuanto cuentas", "monto", "cuanto puedes invertir", "3000", "5000", "10000"
+    ],
+    cta_deseado: [
+      "que accion", "que quieres que haga", "contactar", "whatsapp", "llamar", "visitar",
+      "escribir por", "mensaje", "como te contactan", "accion del cliente", "cta"
+    ],
+    historia_y_contexto: [
+      "como empezaste", "como inicio", "origen", "historia del negocio", "como nacio",
+      "por que empezaste", "como empezo", "historia", "contexto", "como se fundo"
+    ],
+    administracion_negocio: [
+      "como manejas", "como administras", "equipo", "solo trabajas", "operaciones",
+      "dia a dia", "como operas", "quien te ayuda", "tienes empleados", "como gestionas",
+      "como trabajas", "tercerizas"
+    ],
+    objeciones: [
+      "objeciones", "dudas", "que duda", "que objecion", "preocupacion", "resistencia",
+      "que les preocupa", "que no te compran", "por que no compran", "que dudas tienen",
+      "que miedo tienen"
+    ],
+    planes_futuro: [
+      "planes", "metas", "futuro", "a futuro", "donde te ves", "en 6 meses", "en 12 meses",
+      "proyeccion", "objetivo a futuro", "planes para el negocio", "donde quieres llegar"
+    ]
+  };
+
+  for (const msg of assistantMessages) {
+    const text = (msg.messageText ?? "").toLowerCase();
+    if (!text) continue;
+
+    for (const [front, keywords] of Object.entries(frontKeywords)) {
+      if (keywords.some((kw) => text.includes(kw))) {
+        asked.add(front);
+      }
+    }
+  }
+
+  return Array.from(asked);
+}
+
+/**
  * IMPL-20260615-01
  * Respaldo: Bridge/context/SPECs/SPEC_ARCH-20260615-01_cierre_brief_por_itinerario_y_suficiencia_v1.md
  *
@@ -132,7 +239,7 @@ export function getBriefItinerarySufficiency(summary: StructuredBriefSummary): {
   let completedCore = 0;
 
   for (const coreKey of VIKA_CLOSURE_CORE_KEYS) {
-    const primaryValue = summary[coreKey.summaryKey] ?? "";
+    const primaryValue = String(summary[coreKey.summaryKey] ?? "");
     const hasPrimary = hasMeaningfulSummaryValue(coreKey.summaryKey, primaryValue);
 
     if (hasPrimary) {
@@ -141,7 +248,7 @@ export function getBriefItinerarySufficiency(summary: StructuredBriefSummary): {
     }
 
     if (coreKey.narrativePair) {
-      const pairValue = summary[coreKey.narrativePair] ?? "";
+      const pairValue = String(summary[coreKey.narrativePair] ?? "");
       const hasPair = hasMeaningfulSummaryValue(coreKey.narrativePair, pairValue);
       if (hasPair) {
         completedCore += 1;
@@ -207,10 +314,10 @@ const VIKA_CHECKLIST_TO_SUMMARY_KEY: ReadonlyArray<{
  */
 export function renderVikaProgressBlock(summary: StructuredBriefSummary): string {
   const completed = VIKA_CHECKLIST_TO_SUMMARY_KEY.filter(({ summaryKey }) =>
-    hasMeaningfulSummaryValue(summaryKey, summary[summaryKey])
+    hasMeaningfulSummaryValue(summaryKey, String(summary[summaryKey] ?? ""))
   );
   const pending = VIKA_CHECKLIST_TO_SUMMARY_KEY.filter(
-    ({ summaryKey }) => !hasMeaningfulSummaryValue(summaryKey, summary[summaryKey])
+    ({ summaryKey }) => !hasMeaningfulSummaryValue(summaryKey, String(summary[summaryKey] ?? ""))
   );
 
   return [
@@ -503,6 +610,16 @@ export type StructuredBriefSummary = {
   administracionNegocio: string;
   publicidadPrevia: string;
   planesFuturo: string;
+  /**
+   * IMPL-20260615-10
+   * Tracking de los frentes comerciales por los que Vika ya preguntó.
+   * El cierre NO procede hasta que los 8 frentes estén marcados aquí.
+   * Valores posibles: 'giro_y_producto_heroe', 'audience', 'presupuesto',
+   *   'cta_deseado', 'historia_y_contexto', 'persona_perfil',
+   *   'administracion_negocio', 'madurez', 'local_fisico', 'logo',
+   *   'objeciones', 'publicidad_previa', 'planes_futuro'
+   */
+  frontsAsked?: string[];
 };
 
 export type BriefMessage = {
@@ -732,7 +849,8 @@ export const emptyStructuredBriefSummary = (): StructuredBriefSummary => ({
   historiaNegocio: "",
   administracionNegocio: "",
   publicidadPrevia: "",
-  planesFuturo: ""
+  planesFuturo: "",
+  frontsAsked: []
 });
 
 export function normalizeSummary(input: Partial<StructuredBriefSummary> | null | undefined): StructuredBriefSummary {
@@ -917,7 +1035,7 @@ type StageQuestionConfig = {
   clarification: string;
 };
 
-const VISIBLE_QUESTION_BY_FIELD: Record<keyof StructuredBriefSummary, StageQuestionConfig | null> = {
+const VISIBLE_QUESTION_BY_FIELD: Partial<Record<keyof StructuredBriefSummary, StageQuestionConfig | null>> = {
   projectObjective: {
     key: "projectObjective",
     question: "¿Qué resultado concreto te gustaría conseguir con este proyecto?",
@@ -1276,7 +1394,7 @@ export function hasBackgroundStageSufficientInfo(
   summary: StructuredBriefSummary
 ): boolean {
   const hasAllStageFields = STAGE_FIELD_PRIORITY[stage].every((field) =>
-    hasMeaningfulSummaryValue(field, summary[field])
+    hasMeaningfulSummaryValue(field, String(summary[field] ?? ""))
   );
 
   if (!hasAllStageFields) {
@@ -1299,7 +1417,7 @@ export function getCurrentVisibleStageQuestion(
   summary: StructuredBriefSummary
 ): StageQuestionConfig | null {
   for (const fieldKey of STAGE_FIELD_PRIORITY[stage]) {
-    if (summary[fieldKey].trim()) {
+    if (String(summary[fieldKey] ?? "").trim()) {
       continue;
     }
 

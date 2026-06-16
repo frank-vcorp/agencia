@@ -29,7 +29,7 @@ import { getTenantIdentityContext } from "@/lib/identity";
 import { submitBriefAction } from "@/app/cliente/brief/[projectId]/actions";
 import { BriefChatBubbles, type ChatBubbleItem } from "@/components/brief-chat-bubbles";
 
-const VIKA_CHECKLIST_LABELS: Record<keyof StructuredBriefSummary, string> = {
+const VIKA_CHECKLIST_LABELS: Partial<Record<keyof StructuredBriefSummary, string>> = {
   giroYProductoHeroe: "Giro y producto heroe",
   personaPerfil: "Perfil del dueño",
   historiaNegocio: "Historia del negocio",
@@ -63,7 +63,8 @@ const VIKA_CHECKLIST_LABELS: Record<keyof StructuredBriefSummary, string> = {
   commercialFitReason: "Razon de encaje comercial",
   upsellSignal: "Senal de upsell o reconduccion",
   operatorReviewNote: "Nota para revision del operador",
-  clientFacingSummary: "Resumen para el cliente"
+  clientFacingSummary: "Resumen para el cliente",
+  frontsAsked: "Frentes preguntados (interno)"
 };
 
 const VIKA_CHECKLIST_FIELDS: Array<keyof StructuredBriefSummary> = [
@@ -445,7 +446,9 @@ export default async function BriefsPage() {
           <ul className="mt-5 space-y-2">
             {VIKA_CHECKLIST_FIELDS.map((field) => {
               const value = summary[field];
-              const filled = Boolean(value && value.trim().length > 0);
+              const filled = Boolean(
+                typeof value === "string" && value && value.trim().length > 0
+              );
               const isPresupuesto = field === "presupuesto";
               return (
                 <li
@@ -485,7 +488,9 @@ export default async function BriefsPage() {
             })}
             <li
               className={`flex items-center justify-between gap-3 rounded-[18px] px-4 py-3 ring-1 ${
-                summary[VIKA_NARRATIVE_FIELD] && summary[VIKA_NARRATIVE_FIELD].trim().length > 0
+                typeof summary[VIKA_NARRATIVE_FIELD] === "string" &&
+                summary[VIKA_NARRATIVE_FIELD] &&
+                summary[VIKA_NARRATIVE_FIELD].trim().length > 0
                   ? "bg-emerald-50 ring-emerald-200"
                   : "bg-white/80 ring-[color:var(--line)]"
               }`}
@@ -493,12 +498,14 @@ export default async function BriefsPage() {
               <div className="flex items-center gap-3">
                 <span
                   className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
-                    summary[VIKA_NARRATIVE_FIELD] && summary[VIKA_NARRATIVE_FIELD].trim().length > 0
+                typeof summary[VIKA_NARRATIVE_FIELD] === "string" &&
+                summary[VIKA_NARRATIVE_FIELD] &&
+                summary[VIKA_NARRATIVE_FIELD].trim().length > 0
                       ? "bg-emerald-600 text-white"
                       : "bg-stone-200 text-stone-500"
                   }`}
                 >
-                  {summary[VIKA_NARRATIVE_FIELD] && summary[VIKA_NARRATIVE_FIELD].trim().length > 0 ? "OK" : "—"}
+                  {typeof summary[VIKA_NARRATIVE_FIELD] === "string" && summary[VIKA_NARRATIVE_FIELD] && summary[VIKA_NARRATIVE_FIELD].trim().length > 0 ? "OK" : "—"}
                 </span>
                 <div>
                   <p className="text-sm font-medium">{VIKA_CHECKLIST_LABELS[VIKA_NARRATIVE_FIELD]}</p>
