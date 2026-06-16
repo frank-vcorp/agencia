@@ -192,6 +192,25 @@ La implementación del ciclo completo del activo ya estaba cerrada:
    - Checkpoint: `context/checkpoints/CHECKPOINT_IMPL-20260615-08_mejoramiento_brief_cliente_vika_v2.md`
    - Commit: `5b57222`
 
+### [x] Completado (endurecimiento del flujo de cierre del chat de Vika - junio 2026)
+
+1. **IMPL-20260615-27** - Aceptar `finishReason=MAX_TOKENS` para `gemini-flash-lite-latest` (Flash Lite puede cortar respuestas largas pero siguen siendo válidas) - commit `4803039`
+2. **IMPL-20260615-28** - Extraer tags `[FRONT_ASKED: x]` y `[FRONT_COMPLETED: x]` en `sanitizeAssistantReply` ANTES de validar la respuesta visible (antes los tags se trataban como JSON interno y se rechazaba toda la respuesta) - commit `2200fe1`
+3. **IMPL-20260615-29** - Simplificar `shouldForceClosure` quitando código residual de versiones anteriores (ya no requiere pregunta narrativa canónica para cerrar; Vika decide vía `[SYS_ACTION: LOCK_SUCCESS]`) - commit `fd8b39c`
+4. **IMPL-20260615-30** - Cambiar a `gemini-flash-lite-latest` (alias estable con mayor quota que `gemini-2.5-flash-lite`) - commit `942dc6c`
+5. **IMPL-20260615-31** - Hacer regla de cierre MÁS explícita en el System Prompt de Vika con numeración, recordatorio en MAYÚSCULAS, y triple énfasis con `===>>`/`<<===` - commit `bcb3a60`
+6. **IMPL-20260615-32** - **Bug crítico corregido en `normalizeSummary`:** la función descartaba silenciosamente el array `frontsAsked` al reconstruir el resumen desde `emptyStructuredBriefSummary()`. Esto rompía el tracking de frentes preguntados al persistir. Ahora se preservan arrays explícitamente. (En `lib/briefing.ts`)
+7. **IMPL-20260615-33** - **Tests automatizados del flujo de cierre** en `lib/briefing-closure.test.ts` (NUEVO, 22 tests). Cubre: 13 frentes obligatorios, `detectFrontsAskedFromHistory` (extracción, dedup, frentes inválidos), `areAllRequiredFrontsAsked`, `shouldForceClosure` (happy path, conversación a la mitad, null/undefined), `sanitizeAssistantReply` con tags, `MAX_TOKENS` aceptable, `normalizeSummary` preserva `frontsAsked`, y verificación de que el System Prompt contiene la regla de cierre explícita.
+8. **Tests existentes corregidos (3):** `lib/briefing.test.ts` actualizado para alinear aserciones con la nueva implementación (IMPL-20260615-29 y IMPL-20260615-31).
+9. **Validación final:**
+   - `pnpm run build` ✅ compila sin errores (23 rutas)
+   - `pnpm test lib/briefing.test.ts` ✅ 40/40 pasan
+   - `pnpm test lib/briefing-closure.test.ts` ✅ 22/22 pasan
+   - `pnpm test` (suite completa) 528 pasan / 13 fallan (los 13 son pre-existentes en `clients.test.ts`, `bridge-data.test.ts`, `designer-workspace.test.ts`, `mcp-tools.test.ts` — **no relacionados con Vika**)
+   - `npx tsx scripts/test-automatic-closure.ts` ✅ TEST PASADO
+10. **Reducción de fallos:** Antes 16 tests fallidos → ahora 13 (todos los 3 corregidos en este sprint son de Vika/briefing).
+11. **Checkpoint:** `context/checkpoints/CHECKPOINT_IMPL-20260615-27_a_33_endurecimiento_cierre_chat_vika_v1.md`
+
 ### [ ] Pendiente
 
 1. Bloqueador unico operativo: completar e2e final y registrar issue Jira vinculado al cierre (`estado actual: SIN-ISSUE`), con evidencia de QA e INFRA.

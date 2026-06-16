@@ -855,7 +855,17 @@ export function normalizeSummary(input: Partial<StructuredBriefSummary> | null |
   return Object.fromEntries(
     Object.entries(base).map(([key, value]) => {
       const nextValue = input[key as keyof StructuredBriefSummary];
-      return [key, typeof nextValue === "string" ? nextValue.trim() : value];
+      // IMPL-20260615-32: preservar campos no-string (arrays como frontsAsked)
+      // ademas de strings. Antes, normalizeSummary descartaba silenciosamente
+      // cualquier array del patch, lo que rompia el tracking de frentes
+      // preguntados al persistir el resumen via mergeStructuredBriefSummary.
+      if (typeof nextValue === "string") {
+        return [key, nextValue.trim()];
+      }
+      if (Array.isArray(nextValue)) {
+        return [key, [...nextValue]];
+      }
+      return [key, value];
     })
   ) as StructuredBriefSummary;
 }
