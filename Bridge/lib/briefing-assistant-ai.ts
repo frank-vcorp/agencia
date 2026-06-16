@@ -618,9 +618,15 @@ export function shouldForceClosure(
     return false;
   }
 
-  if (!isBriefSufficientForClosure(summary)) {
-    return false;
-  }
+  // IMPL-20260615-15: Condiciones para forzar el cierre deterministico.
+  // El cierre ocurre cuando:
+  //  1. Los 13 frentes obligatorios fueron preguntados (frontsAsked cubre los 13).
+  //  2. El ultimo mensaje del asistente contiene una pregunta narrativa canonica.
+  //
+  // NOTA: Ya no dependemos de `isBriefSufficientForClosure` aqui. La deteccion
+  // por palabras clave de los frentes preguntados (detectFrontsAskedFromHistory)
+  // es mas robusta que la deteccion de "valor significativo" en el summary,
+  // que puede fallar por sinomimos o lenguaje informal del cliente.
 
   if (!areAllRequiredFrontsAsked(summary)) {
     return false;
@@ -637,9 +643,23 @@ export function shouldForceClosure(
   const normalizeForMatch = (text: string): string =>
     text.replace(/[\u00bf\u003F\u003F]/g, "").trim().toLowerCase();
   const normalizedForMatch = normalizeForMatch(normalizedLastMessage);
-  return VIKA_NARRATIVE_QUESTIONS.some((question) =>
+  const hasNarrativeQuestion = VIKA_NARRATIVE_QUESTIONS.some((question) =>
     normalizedForMatch.includes(normalizeForMatch(question))
   );
+
+  if (!hasNarrativeQuestion) {
+    return false;
+  }
+
+  // Doble check: si la deteccion por palabras clave fallo para algun frente,
+  // pero la pregunta narrativa ya esta presente, aun asi permitimos el cierre
+  // si al menos 10 de los 13 frentes fueron preguntados (tolerancia minima).
+  const askedCount = (summary.frontsAsked ?? []).length;
+  if (askedCount >= 10) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
