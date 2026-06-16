@@ -156,7 +156,11 @@ export async function sendClientMessageAction(
 
   const sufficiencyAlreadyMet = shouldForceClosure(
     summaryForClosure as any,
-    previousAssistantMessage
+    previousAssistantMessage,
+    (currentVersion.messages ?? []).map((m) => ({
+      authorRole: m.authorRole,
+      messageText: m.messageText
+    }))
   );
 
   // IMPL-20260615-16: persistir frontsAsked detectado para que se mantenga

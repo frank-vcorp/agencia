@@ -612,26 +612,55 @@ export function isBriefSufficientForClosure(
  */
 export function shouldForceClosure(
   summary: BriefSummary | undefined | null,
-  lastAssistantMessage: string | null | undefined
+  lastAssistantMessage: string | null | undefined,
+  allMessages?: ReadonlyArray<{ authorRole: string; messageText: string }>
 ): boolean {
   if (!summary) {
     return false;
   }
 
-  // IMPL-20260615-18: Condiciones para forzar el cierre deterministico.
-  // El cierre ocurre cuando:
-  //  1. Los 13 frentes obligatorios fueron preguntados (frontsAsked cubre los 13).
-  //  2. NO requerimos pregunta narrativa final - si los 13 frentes estan,
-  //     cerramos directamente. La "narrativa" ya fue capturada en historia_y_contexto.
-  //
-  // Tolerancia: si solo 10-12 de los 13 fueron detectados, cerramos SOLO si
-  // el ultimo mensaje del asistente contiene una pregunta narrativa.
-
   if (!areAllRequiredFrontsAsked(summary)) {
     return false;
   }
 
-  // Si los 13 frentes estan, cerramos directamente sin requerir pregunta narrativa.
+  // IMPL-20260615-20: Si los 13 frentes estan, el cierre se activa cuando
+  // el penultimo mensaje del asistente fue una pregunta narrativa.
+  // Esto significa: Vika hizo la pregunta narrativa, el cliente respondio,
+  // y ahora es el turno de Vika de cerrar.
+  if (allMessages && allMessages.length >= 2) {
+    const assistantMessages = allMessages.filter((m) => m.authorRole === "assistant");
+    if (assistantMessages.length >= 2) {
+      const penultimateAssistant = assistantMessages[assistantMessages.length - 2];
+      const normalizeForMatch = (text: string): string =>
+        text.replace(/[\u00bf\u003F\u003F]/g, "").trim().toLowerCase();
+      const normalizedPenultimate = normalizeForMatch(penultimateAssistant.messageText);
+      const hasNarrative = VIKA_NARRATIVE_QUESTIONS.some((question) =>
+        normalizedPenultimate.includes(normalizeForMatch(question))
+      );
+      if (hasNarrative) {
+        return true;
+      }
+    }
+  }
+
+  // Fallback: si el ultimo mensaje del asistente contiene una pregunta narrativa
+  // (caso donde Vika acaba de preguntar y el cliente aun no responde).
+  const normalizedLastMessage = (lastAssistantMessage ?? "").trim();
+  if (normalizedLastMessage) {
+    const normalizeForMatch = (text: string): string =>
+      text.replace(/[\u00bf\u003F\u003F]/g, "").trim().toLowerCase();
+    const normalizedForMatch = normalizeForMatch(normalizedLastMessage);
+    const hasNarrative = VIKA_NARRATIVE_QUESTIONS.some((question) =>
+      normalizedForMatch.includes(normalizeForMatch(question))
+    );
+    if (hasNarrative) {
+      // Si el ultimo mensaje es una pregunta narrativa, no cerramos todavia
+      // porque esperamos la respuesta del cliente.
+      return false;
+    }
+  }
+
+  // Si los 13 frentes estan y no hay pregunta narrativa pendiente, cerramos.
   return true;
 }
 
@@ -680,7 +709,14 @@ export async function generateBriefChatReply(
     ]
   };
 
-  if (shouldForceClosure(summaryWithDetectedFronts, lastAssistantMessage)) {
+  if (shouldForceClosure(
+    summaryWithDetectedFronts,
+    lastAssistantMessage,
+    (input.messages ?? []).map((m) => ({
+      authorRole: m.authorRole,
+      messageText: m.messageText
+    }))
+  )) {
     return buildForcedClosureReply(summaryWithDetectedFronts);
   }
 
