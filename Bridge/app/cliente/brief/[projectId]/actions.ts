@@ -158,6 +158,15 @@ export async function sendClientMessageAction(
     previousAssistantMessage
   );
 
+  // IMPL-20260615-16: persistir frontsAsked detectado para que se mantenga
+  // entre turnos y no se pierda la trazabilidad de los frentes preguntados.
+  if (combinedFrontsAsked.length > existingFrontsAsked.length) {
+    await updateBriefSummary(
+      { briefId, versionId },
+      { frontsAsked: combinedFrontsAsked } as any
+    );
+  }
+
   if (sufficiencyAlreadyMet) {
     // Construimos la despedida canonica + JSON solo con claves con valor.
     const closureJson = extractClosureJsonFromSummary(currentVersion.structuredSummary);
