@@ -481,6 +481,10 @@ function buildPlainTextChatTurn(
 async function requestGeminiContent(prompt: string, apiKey: string, responseMimeType?: "application/json") {
   const model = "gemini-2.5-flash-lite";
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  console.log(`[vika-chat][gemini] llamando a modelo: ${model}`);
+  console.log(`[vika-chat][gemini] prompt length: ${prompt.length} chars`);
+
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -505,13 +509,20 @@ async function requestGeminiContent(prompt: string, apiKey: string, responseMime
     })
   });
 
+  console.log(`[vika-chat][gemini] response status: ${response.status} ${response.statusText}`);
+
   if (!response.ok) {
-    throw new Error("brief_chat_ai_failed");
+    const errorBody = await response.text();
+    console.error(`[vika-chat][gemini] ERROR ${response.status}: ${errorBody.substring(0, 500)}`);
+    throw new Error(`brief_chat_ai_failed: ${response.status}`);
   }
 
   const payload = (await response.json()) as GeminiGenerateContentResponse;
   const candidate = payload.candidates?.[0];
   const candidateText = candidate?.content?.parts?.map((part) => part.text ?? "").join("\n").trim() ?? "";
+
+  console.log(`[vika-chat][gemini] candidateText length: ${candidateText.length}`);
+  console.log(`[vika-chat][gemini] finishReason: ${candidate?.finishReason ?? "unknown"}`);
 
   return {
     candidate,
@@ -744,15 +755,23 @@ function buildForcedClosureReply(summary: BriefSummary): BriefChatReply {
 export async function generateBriefChatReply(
   input: GenerateBriefChatReplyInput
 ): Promise<BriefChatReply> {
+  console.log(`[vika-chat] === NUEVO TURNO ===`);
+  console.log(`[vika-chat] mensajes en historial: ${input.messages?.length ?? 0}`);
+  console.log(`[vika-chat] clientMessage length: ${input.clientMessage?.length ?? 0}`);
+
   // IMPL-20260611-06: cierre deterministico sin llamada a Gemini.
   const lastAssistantMessage =
     [...(input.messages ?? [])]
       .reverse()
       .find((message) => message.authorRole === "assistant")?.messageText ?? null;
 
+  console.log(`[vika-chat] ultimo mensaje asistente: ${lastAssistantMessage?.substring(0, 100) ?? "(none)"}...`);
+
   // IMPL-20260615-10: detectar automaticamente los frentes preguntados
   // basandose en el historial de mensajes del asistente.
   const detectedFronts = detectFrontsAskedFromHistory(input.messages ?? []);
+  console.log(`[vika-chat] frentes detectados via tags: ${JSON.stringify(detectedFronts)}`);
+
   const summaryWithDetectedFronts: BriefSummary = {
     ...(input.summary as BriefSummary),
     frontsAsked: [
@@ -761,20 +780,28 @@ export async function generateBriefChatReply(
     ]
   };
 
-  if (shouldForceClosure(
+  console.log(`[vika-chat] frontsAsked combinados: ${JSON.stringify(summaryWithDetectedFronts.frontsAsked)}`);
+
+  const shouldClose = shouldForceClosure(
     summaryWithDetectedFronts,
     lastAssistantMessage,
     (input.messages ?? []).map((m) => ({
       authorRole: m.authorRole,
       messageText: m.messageText
     }))
-  )) {
+  );
+  console.log(`[vika-chat] shouldForceClosure: ${shouldClose}`);
+
+  if (shouldClose) {
+    console.log(`[vika-chat] *** CERRANDO CHAT ***`);
     return buildForcedClosureReply(summaryWithDetectedFronts);
   }
 
   const apiKey = process.env.GEMINI_API_KEY?.trim();
+  console.log(`[vika-chat] GEMINI_API_KEY presente: ${apiKey ? "SI (len=" + apiKey.length + ")" : "NO"}`);
 
   if (!apiKey) {
+    console.error(`[vika-chat] ERROR: GEMINI_API_KEY no configurada`);
     return {
       visibleReply: BRIEF_CHAT_RECOVERY_REPLY,
       degraded: true
@@ -782,23 +809,30 @@ export async function generateBriefChatReply(
   }
 
   const visiblePrompt = buildBriefChatSystemPrompt(input.messages, input.clientMessage, input.summary);
+  console.log(`[vika-chat] prompt construido, length: ${visiblePrompt.length}`);
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
+      console.log(`[vika-chat] intento ${attempt + 1} de llamar a Gemini`);
       const visibleResult = await requestGeminiContent(visiblePrompt, apiKey);
       const plainTextTurn = buildPlainTextChatTurn(visibleResult.candidateText, visibleResult.candidate?.finishReason);
 
       if (plainTextTurn) {
+        console.log(`[vika-chat] respuesta Gemini OK, length: ${plainTextTurn.visibleReply.length}`);
         return {
           visibleReply: plainTextTurn.visibleReply,
           degraded: false
         };
+      } else {
+        console.warn(`[vika-chat] respuesta Gemini vacia o no valida`);
       }
-    } catch {
+    } catch (err) {
+      console.error(`[vika-chat] ERROR en intento ${attempt + 1}:`, err);
       // El segundo intento se ejecuta automaticamente en la siguiente iteracion.
     }
   }
 
+  console.error(`[vika-chat] TODOS LOS INTENTOS FALLARON, retornando recovery reply`);
   return {
     visibleReply: BRIEF_CHAT_RECOVERY_REPLY,
     degraded: true
