@@ -117,12 +117,6 @@ export const VIKA_CLOSING_HUMAN_TEXT =
  * se confunda o se la salte. La respuesta del cliente se persiste en
  * `summary.narrativeAnswer` y el cierre deterministico requiere que tenga
  * valor significativo (`hasMeaningfulNarrativeAnswer`).
- *
- * Reemplaza al array `VIKA_NARRATIVE_QUESTIONS` (2 preguntas) de IMPL-20260611-06,
- * que permitia variabilidad y provocaba que Vika no siempre la emitiera
- * como ultimo paso. La forma canonica exacta (sin acentos intencionalmente
- * removidos, signo ¿ invertido, sin espacios redundantes) es la fuente
- * de verdad para deteccion en `isNarrativeQuestionAskedInMessage`.
  */
 export { VIKA_NARRATIVE_QUESTION };
 
