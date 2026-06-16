@@ -43,6 +43,7 @@ import { revalidatePath } from "next/cache";
 import {
   appendBriefMessage,
   appendClientBriefMessage,
+  detectFrontsAskedFromHistory,
   getBriefByProjectId,
   inferBriefSummaryPatchFromClientMessage,
   mapVikaBriefDataToStructuredSummary,
@@ -57,7 +58,8 @@ import {
   extractJsonObject,
   generateBriefChatReply,
   generateBriefClosure,
-  isBriefSufficientForClosure
+  isBriefSufficientForClosure,
+  shouldForceClosure
 } from "@/lib/briefing-assistant-ai";
 
 /**
@@ -125,21 +127,36 @@ export async function sendClientMessageAction(
     }
   }
 
-  // IMPL-20260615-01: doble red de seguridad ANTES de llamar a Gemini.
-  // Si la suficiencia ya esta cumplida y el ultimo mensaje del asistente
-  // fue una pregunta narrativa, podemos cerrar sin gastar una llamada al
-  // modelo. Esto cubre el caso donde la IA "se queda callada" o donde el
+  // IMPL-20260615-15: doble red de seguridad ANTES de llamar a Gemini.
+  // Usamos la nueva logica de `shouldForceClosure` que combina:
+  //  1. Deteccion automatica de frentes preguntados del historial.
+  //  2. Match flexible de pregunta narrativa.
+  //  3. Tolerancia: cierra con 10+ frentes preguntados.
+  // Esto cubre el caso donde la IA "se queda callada" o donde el
   // resumen se lleno por la heuristica pero el modelo aun no respondio.
   const previousAssistantMessage = [...(currentVersion.messages ?? [])]
     .reverse()
     .find((message) => message.authorRole === "assistant")?.messageText ?? null;
 
-  const sufficiencyAlreadyMet =
-    isBriefSufficientForClosure(currentVersion.structuredSummary) &&
-    Boolean(previousAssistantMessage) &&
-    VIKA_NARRATIVE_QUESTIONS.some((question) =>
-      (previousAssistantMessage ?? "").includes(question.replace(/^\u00bf|\?$/g, "").trim())
-    );
+  // Calcular los frentes preguntados combinando los persistidos + los del historial
+  const allAssistantMessages = (currentVersion.messages ?? [])
+    .filter((message) => message.authorRole === "assistant")
+    .map((message) => ({ messageText: message.messageText }));
+  const detectedFronts = detectFrontsAskedFromHistory(allAssistantMessages);
+  const existingFrontsAsked = currentVersion.structuredSummary.frontsAsked ?? [];
+  const combinedFrontsAsked = Array.from(
+    new Set([...existingFrontsAsked, ...detectedFronts])
+  );
+
+  const summaryForClosure = {
+    ...currentVersion.structuredSummary,
+    frontsAsked: combinedFrontsAsked
+  };
+
+  const sufficiencyAlreadyMet = shouldForceClosure(
+    summaryForClosure as any,
+    previousAssistantMessage
+  );
 
   if (sufficiencyAlreadyMet) {
     // Construimos la despedida canonica + JSON solo con claves con valor.
