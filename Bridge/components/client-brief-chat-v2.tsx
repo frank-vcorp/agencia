@@ -38,7 +38,7 @@ type OptimisticClientMessage = BriefMessage & {
   structuredContent?: ClientMessageContent;
 };
 
-const VIKA_INTRO_TEXT = "Tengo 8 preguntas para entender tu negocio. \u00a1Empecemos!";
+const VIKA_INTRO_TEXT = "Voy a hacerte algunas preguntas para entender tu negocio. \u00a1Empecemos!";
 
 function closureHumanSummary(summary: StructuredBriefSummary): string {
   const lines = [
@@ -794,9 +794,9 @@ export function ClientBriefChatViewV2({ brief, projectId }: ClientBriefChatViewV
       <section className="panel rounded-[22px] px-4 py-3">
         <p className="text-sm font-semibold text-[color:var(--ink)]">Como trabajamos esta conversacion</p>
         <p className="mt-2 text-sm text-[color:var(--muted)]">
-          Vika te hara 8 preguntas para entender tu negocio y tu presupuesto. Puedes adjuntar imagenes,
-          PDFs o documentos para dar contexto adicional. Al cerrar el brief, nuestro equipo recibira el
-          resumen y te contactara por WhatsApp.
+          Vika te hara algunas preguntas sobre tu negocio, tus clientes y tu presupuesto. Cuando
+          considere que ya tenemos lo necesario para armar una propuesta util, cerramos el brief y
+          nuestro equipo te contacta por WhatsApp.
         </p>
       </section>
     </div>
