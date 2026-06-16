@@ -598,40 +598,12 @@ export default async function BriefsPage() {
         </article>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <article className="panel rounded-[30px] px-6 py-6">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">Estado de revision</p>
-          <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight">Historial del operador</h2>
-          <div className="mt-5 space-y-3">
-            {currentVersion.reviewEvents.length === 0 ? (
-              <div className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)] text-sm text-[color:var(--muted)]">
-                Aun no hay eventos de revision para esta version.
-              </div>
-            ) : (
-              currentVersion.reviewEvents.map((event) => (
-                <div key={event.id} className="rounded-[24px] bg-white/80 px-4 py-4 ring-1 ring-[color:var(--line)]">
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] uppercase tracking-[0.18em] text-[color:var(--muted)]">
-                    <span>{event.createdByLabel}</span>
-                    <span>{event.eventType.replaceAll("_", " ")}</span>
-                  </div>
-                  <p className="mt-2 text-sm leading-7">{event.note || "Sin nota adicional."}</p>
-                  <div className="mt-2 text-xs text-[color:var(--muted)]">
-                    {event.recommendedProductSlotKey ? `Slot: ${event.recommendedProductSlotKey} · ` : ""}
-                    {new Date(event.createdAt).toLocaleString("es-ES")}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </article>
-
-        <article className="panel rounded-[30px] px-6 py-6">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">Resumen para el cliente</p>
-          <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight">Mensaje final humano</h2>
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[color:var(--muted)]">
-            {summary.clientFacingSummary || "Aun no se ha generado un resumen para el cliente. Aparecera aqui cuando se cierre el brief."}
-          </p>
-        </article>
+      <section className="panel rounded-[30px] px-6 py-6">
+        <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">Resumen para el cliente</p>
+        <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight">Mensaje final humano</h2>
+        <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[color:var(--muted)]">
+          {summary.clientFacingSummary || "Aun no se ha generado un resumen para el cliente. Aparecera aqui cuando se cierre el brief."}
+        </p>
       </section>
 
       {/* ── Chat contextual del brief — IMPL-20260506-33 ──────────────────── */}
