@@ -138,9 +138,9 @@ export async function sendClientMessageAction(
     .reverse()
     .find((message) => message.authorRole === "assistant")?.messageText ?? null;
 
-  // IMPL-20260615-19: detectar frentes preguntados de TODOS los mensajes
-  // (asistente + cliente). Si el cliente menciona "tengo un logo" o "2 años",
-  // eso cubre esos frentes aunque Vika no haya preguntado explícitamente.
+  // IMPL-20260615-22: detectar frentes preguntados de TODOS los mensajes
+  // (asistente + cliente). Esto cubre el caso donde el cliente menciona
+  // "tengo un logo" o "2 años" y eso cuenta como frente preguntado.
   const allMessages = (currentVersion.messages ?? [])
     .map((message) => ({ messageText: message.messageText }));
   const detectedFronts = detectFrontsAskedFromHistory(allMessages);
@@ -148,6 +148,22 @@ export async function sendClientMessageAction(
   const combinedFrontsAsked = Array.from(
     new Set([...existingFrontsAsked, ...detectedFronts])
   );
+
+  // IMPL-20260615-22: PERSISTIR frontsAsked ANTES de evaluar el cierre.
+  // Esto asegura que si la conexion se interrumpe justo despues de esta
+  // linea, el siguiente intento del cliente ya tendra los frentes
+  // actualizados y podra detectar el cierre correctamente.
+  if (combinedFrontsAsked.length > existingFrontsAsked.length) {
+    await updateBriefSummary(
+      { briefId, versionId },
+      { frontsAsked: combinedFrontsAsked } as any
+    );
+    // Releer el brief con los frentes actualizados
+    brief = await getBriefByProjectId(projectId);
+    if (brief?.currentVersion && brief.currentVersion.id === versionId) {
+      currentVersion = brief.currentVersion;
+    }
+  }
 
   const summaryForClosure = {
     ...currentVersion.structuredSummary,
@@ -162,15 +178,6 @@ export async function sendClientMessageAction(
       messageText: m.messageText
     }))
   );
-
-  // IMPL-20260615-16: persistir frontsAsked detectado para que se mantenga
-  // entre turnos y no se pierda la trazabilidad de los frentes preguntados.
-  if (combinedFrontsAsked.length > existingFrontsAsked.length) {
-    await updateBriefSummary(
-      { briefId, versionId },
-      { frontsAsked: combinedFrontsAsked } as any
-    );
-  }
 
   if (sufficiencyAlreadyMet) {
     // Construimos la despedida canonica + JSON solo con claves con valor.
