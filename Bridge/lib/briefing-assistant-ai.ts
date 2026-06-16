@@ -623,22 +623,35 @@ export function shouldForceClosure(
     return false;
   }
 
-  // IMPL-20260615-20: Si los 13 frentes estan, el cierre se activa cuando
-  // el penultimo mensaje del asistente fue una pregunta narrativa.
-  // Esto significa: Vika hizo la pregunta narrativa, el cliente respondio,
-  // y ahora es el turno de Vika de cerrar.
+  // IMPL-20260615-21: Si los 13 frentes estan, el cierre se activa cuando
+  // el ULTIMO mensaje del asistente fue una pregunta narrativa Y el cliente
+  // ya respondio (es decir, hay un mensaje del cliente DESPUES de la pregunta).
   if (allMessages && allMessages.length >= 2) {
     const assistantMessages = allMessages.filter((m) => m.authorRole === "assistant");
-    if (assistantMessages.length >= 2) {
-      const penultimateAssistant = assistantMessages[assistantMessages.length - 2];
+    if (assistantMessages.length >= 1) {
+      const lastAssistant = assistantMessages[assistantMessages.length - 1];
       const normalizeForMatch = (text: string): string =>
         text.replace(/[\u00bf\u003F\u003F]/g, "").trim().toLowerCase();
-      const normalizedPenultimate = normalizeForMatch(penultimateAssistant.messageText);
+      const normalizedLastAssistant = normalizeForMatch(lastAssistant.messageText);
       const hasNarrative = VIKA_NARRATIVE_QUESTIONS.some((question) =>
-        normalizedPenultimate.includes(normalizeForMatch(question))
+        normalizedLastAssistant.includes(normalizeForMatch(question))
       );
       if (hasNarrative) {
-        return true;
+        // Verificar que el cliente ya respondio DESPUES de la pregunta narrativa.
+        // Buscamos si hay un mensaje del cliente posterior al ultimo del asistente.
+        const lastAssistantIndex = allMessages.findIndex(
+          (m) => m.messageText === lastAssistant.messageText
+        );
+        const hasClientResponseAfter =
+          lastAssistantIndex >= 0 &&
+          lastAssistantIndex < allMessages.length - 1 &&
+          allMessages.slice(lastAssistantIndex + 1).some((m) => m.authorRole === "client");
+        if (hasClientResponseAfter) {
+          return true;
+        }
+        // Si la pregunta narrativa es reciente pero el cliente no ha respondido,
+        // no cerramos todavia.
+        return false;
       }
     }
   }
