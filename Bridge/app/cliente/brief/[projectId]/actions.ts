@@ -138,11 +138,12 @@ export async function sendClientMessageAction(
     .reverse()
     .find((message) => message.authorRole === "assistant")?.messageText ?? null;
 
-  // Calcular los frentes preguntados combinando los persistidos + los del historial
-  const allAssistantMessages = (currentVersion.messages ?? [])
-    .filter((message) => message.authorRole === "assistant")
+  // IMPL-20260615-19: detectar frentes preguntados de TODOS los mensajes
+  // (asistente + cliente). Si el cliente menciona "tengo un logo" o "2 años",
+  // eso cubre esos frentes aunque Vika no haya preguntado explícitamente.
+  const allMessages = (currentVersion.messages ?? [])
     .map((message) => ({ messageText: message.messageText }));
-  const detectedFronts = detectFrontsAskedFromHistory(allAssistantMessages);
+  const detectedFronts = detectFrontsAskedFromHistory(allMessages);
   const existingFrontsAsked = currentVersion.structuredSummary.frontsAsked ?? [];
   const combinedFrontsAsked = Array.from(
     new Set([...existingFrontsAsked, ...detectedFronts])
