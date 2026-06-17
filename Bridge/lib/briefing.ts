@@ -2526,11 +2526,39 @@ export type BriefListItem = {
  * Variante enriquecida de `BriefListItem` con los nombres resueltos del
  * cliente y del proyecto (o `null` si no hay join). Se usa para mostrar
  * nombre legible en la tabla sin necesidad de un round-trip por fila.
+ *
+ * FIX-20260617-02
+ * Respaldo: CHK_2026-06-17_1330_incidente_build_vercel_fix_emails_v1.md
+ * Se agrega `createdAtLabel` con la fecha ya formateada en UTC estable
+ * para evitar hydration mismatch (React error #418) entre el render del
+ * servidor (timezone America/New_York en Vercel iad1) y el del cliente
+ * (timezone local del navegador).
  */
 export type EnrichedBriefListItem = BriefListItem & {
   clientName: string | null;
   projectName: string | null;
+  createdAtLabel: string;
 };
+
+/**
+ * FIX-20260617-02
+ * Respaldo: CHK_2026-06-17_1330_incidente_build_vercel_fix_emails_v1.md
+ *
+ * Formatea un timestamp ISO a un string `YYYY-MM-DD HH:mm UTC` fijo.
+ * Se usa en el server para pre-formatear la fecha del brief antes de
+ * pasarla al cliente, garantizando que el HTML del servidor y el render
+ * del cliente coincidan byte-a-byte (sin dependencia de `toLocaleString`
+ * ni del timezone del navegador).
+ */
+export function formatCreatedAtServer(iso: string): string {
+  const d = new Date(iso);
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mi = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi} UTC`;
+}
 
 /**
  * IMPL-20260616-01
@@ -2578,7 +2606,10 @@ export async function getBriefsByTenantEnriched(
   return briefs.map((brief) => ({
     ...brief,
     clientName: brief.client_id ? clientNameById.get(brief.client_id) ?? null : null,
-    projectName: brief.project_id ? projectNameById.get(brief.project_id) ?? null : null
+    projectName: brief.project_id ? projectNameById.get(brief.project_id) ?? null : null,
+    // FIX-20260617-02: pre-formatear la fecha en UTC estable para evitar
+    // hydration mismatch entre servidor y cliente.
+    createdAtLabel: formatCreatedAtServer(brief.created_at)
   }));
 }
 

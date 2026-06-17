@@ -8,6 +8,14 @@
  * `/briefs?id=<uuid>#edicion-resumen`) o eliminar (form con server action
  * + confirm nativo) cualquier fila sin necesidad de entrar primero por el
  * cliente.
+ *
+ * FIX-20260617-02
+ * Respaldo: CHK_2026-06-17_1330_incidente_build_vercel_fix_emails_v1.md
+ * Se elimina el formateo en runtime de la fecha (causa del hydration
+ * mismatch / React error #418) y se consume `createdAtLabel` ya
+ * pre-formateado en UTC desde el server. Se agrega
+ * `suppressHydrationWarning` a la celda de fecha como segunda red de
+ * seguridad.
  */
 "use client";
 
@@ -22,10 +30,6 @@ function truncateId(value: string | null): string {
     return "—";
   }
   return `${value.slice(0, 8)}…`;
-}
-
-function formatCreatedAt(iso: string): string {
-  return new Date(iso).toLocaleString("es-ES");
 }
 
 function formatStatusLabel(value: string): string {
@@ -91,8 +95,11 @@ export function BriefsListTable({
                     <td className="max-w-[200px] truncate border-b border-[color:var(--line)] px-3 py-2 text-sm">
                       {row.projectName ?? "Sin proyecto"}
                     </td>
-                    <td className="border-b border-[color:var(--line)] px-3 py-2 text-[11px] text-[color:var(--muted)]">
-                      {formatCreatedAt(row.created_at)}
+                    <td
+                      suppressHydrationWarning
+                      className="border-b border-[color:var(--line)] px-3 py-2 text-[11px] text-[color:var(--muted)]"
+                    >
+                      {row.createdAtLabel}
                     </td>
                     <td className="border-b border-[color:var(--line)] px-3 py-2 text-[11px] capitalize">
                       {formatStatusLabel(row.status)}
