@@ -14,7 +14,7 @@ import Link from "next/link";
 import {
   appendClientBriefMessage,
   createDerivedBriefVersion,
-  getBriefsByTenant,
+  getBriefsByTenantEnriched,
   getBriefWorkspace,
   getTenantIdBySlug,
   emptyStructuredBriefSummary,
@@ -34,6 +34,7 @@ import {
 import { submitBriefAction } from "@/app/cliente/brief/[projectId]/actions";
 import { executeDeleteBrief } from "@/lib/entity-delete";
 import { BriefChatBubbles, type ChatBubbleItem } from "@/components/brief-chat-bubbles";
+import { BriefsListTable } from "@/components/briefs-list-table";
 import { supabaseEnv } from "@/lib/supabase";
 
 const VIKA_CHECKLIST_LABELS: Partial<Record<keyof StructuredBriefSummary, string>> = {
@@ -282,7 +283,9 @@ export default async function BriefsPage({
   const currentVersion = brief?.currentVersion ?? null;
 
   // Listado completo de briefs del tenant — IMPL-20260615-39
-  const briefsList = tenantId ? await getBriefsByTenant(tenantId).catch(() => []) : [];
+  // IMPL-20260616-01: usar la version enriquecida con join de cliente y
+  // proyecto para alimentar la tabla global.
+  const enrichedBriefs = tenantId ? await getBriefsByTenantEnriched(tenantId).catch(() => []) : [];
 
   // Chat contextual del brief — IMPL-20260506-33
   const briefChat: EntityChat = brief ? await getBriefChat(brief.id) : { thread: null, messages: [] };
@@ -290,6 +293,7 @@ export default async function BriefsPage({
   if (!brief || !currentVersion) {
     return (
       <div className="space-y-6">
+        <BriefsListTable briefs={enrichedBriefs} deleteAction={deleteBriefAction} />
         <section className="panel rounded-[30px] px-6 py-6">
           <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">Brief persistido V1</p>
           <h1 className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-bold tracking-tight">Primer objeto operativo listo para iniciar</h1>
@@ -311,6 +315,11 @@ export default async function BriefsPage({
 
   return (
     <div className="space-y-6">
+      <BriefsListTable
+        briefs={enrichedBriefs}
+        activeBriefId={brief.id}
+        deleteAction={deleteBriefAction}
+      />
       <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <article className="panel rounded-[30px] px-6 py-6">
           <div className="flex flex-wrap items-start justify-between gap-4">

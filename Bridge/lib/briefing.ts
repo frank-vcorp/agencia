@@ -2497,6 +2497,128 @@ export async function getBriefsByTenant(tenantId: string): Promise<
 }
 
 /**
+ * IMPL-20260616-01
+ * Respaldo: ARCH-20260616-01 — listado de briefs en /briefs con cliente,
+ * proyecto, fecha y acciones.
+ *
+ * Tipo compartido de la fila de brief que consume el listado de la UI
+ * (`BriefsListSection` y `BriefsListTable`). Replica el shape que devuelve
+ * `getBriefsByTenant` para evitar acoplar la UI a un helper especifico.
+ */
+export type BriefListItem = {
+  id: string;
+  tenant_id: string;
+  client_id: string | null;
+  project_id: string | null;
+  status: string;
+  source_channel: string;
+  current_version_number: number;
+  active_version_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * IMPL-20260616-01
+ * Respaldo: ARCH-20260616-01 — listado de briefs en /briefs con cliente,
+ * proyecto, fecha y acciones.
+ *
+ * Variante enriquecida de `BriefListItem` con los nombres resueltos del
+ * cliente y del proyecto (o `null` si no hay join). Se usa para mostrar
+ * nombre legible en la tabla sin necesidad de un round-trip por fila.
+ */
+export type EnrichedBriefListItem = BriefListItem & {
+  clientName: string | null;
+  projectName: string | null;
+};
+
+/**
+ * IMPL-20260616-01
+ * Respaldo: ARCH-20260616-01 — listado de briefs en /briefs con cliente,
+ * proyecto, fecha y acciones.
+ *
+ * Devuelve los briefs del tenant enriquecidos con el nombre del cliente y
+ * del proyecto. Para evitar N+1, recolecta los `client_id` y `project_id`
+ * unicos y no nulos y hace UNA sola query a `clients` y UNA sola a
+ * `projects`. Si las queries de join fallan (p.ej. Supabase no
+ * configurado) los nombres se devuelven como `null` y el listado sigue
+ * renderizandose.
+ */
+export async function getBriefsByTenantEnriched(
+  tenantId: string
+): Promise<EnrichedBriefListItem[]> {
+  const briefs = await getBriefsByTenant(tenantId);
+
+  if (briefs.length === 0) {
+    return [];
+  }
+
+  const clientIds = Array.from(
+    new Set(briefs.map((b) => b.client_id).filter((id): id is string => Boolean(id)))
+  );
+  const projectIds = Array.from(
+    new Set(briefs.map((b) => b.project_id).filter((id): id is string => Boolean(id)))
+  );
+
+  const [clientRows, projectRows] = await Promise.all([
+    fetchClientsByIds(clientIds),
+    fetchProjectsByIds(projectIds)
+  ]);
+
+  const clientNameById = new Map<string, string>();
+  for (const row of clientRows) {
+    clientNameById.set(row.id, row.name);
+  }
+
+  const projectNameById = new Map<string, string>();
+  for (const row of projectRows) {
+    projectNameById.set(row.id, row.name);
+  }
+
+  return briefs.map((brief) => ({
+    ...brief,
+    clientName: brief.client_id ? clientNameById.get(brief.client_id) ?? null : null,
+    projectName: brief.project_id ? projectNameById.get(brief.project_id) ?? null : null
+  }));
+}
+
+async function fetchClientsByIds(ids: string[]): Promise<Array<{ id: string; name: string }>> {
+  if (ids.length === 0) {
+    return [];
+  }
+  const params = new URLSearchParams({
+    select: "id,name",
+    id: `in.(${ids.join(",")})`
+  });
+  try {
+    return await postgrest<Array<{ id: string; name: string }>>(
+      `clients?${params.toString()}`,
+      { method: "GET" }
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function fetchProjectsByIds(ids: string[]): Promise<Array<{ id: string; name: string }>> {
+  if (ids.length === 0) {
+    return [];
+  }
+  const params = new URLSearchParams({
+    select: "id,name",
+    id: `in.(${ids.join(",")})`
+  });
+  try {
+    return await postgrest<Array<{ id: string; name: string }>>(
+      `projects?${params.toString()}`,
+      { method: "GET" }
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
  * IMPL-20260526-02
  * Respaldo: context/SPECs/SPEC_ARCH-20260526-04_mcp_crud_logico_entidades_v1.md
  */
