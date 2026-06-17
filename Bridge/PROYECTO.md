@@ -142,6 +142,7 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 52. **Refactor de pre-registro cliente/vendedor a server action** (`IMPL-20260613-01`) implementado con `preregistroAction`, componente desacoplado `preregistro-form.tsx`, helper reutilizable `lib/preregistro.ts`, infraestructura de tests con vitest + jsdom + @testing-library/react. Checkpoint: `CHK_2026-06-13_1537_preregistro_cliente_vendedor.md`. Commit: `aeee48b`.
 53. **Listado global de briefs en `/briefs`** (`ARCH-20260616-01 / IMPL-20260616-01`) implementado con tabla de 8 columnas (Cliente, ID cliente, Proyecto, Fecha, Estado, vN, Canal, Acciones), helper `getBriefsByTenantEnriched` con join sin N+1, fila activa resaltada, editar navega a `?id=<uuid>#edicion-resumen`, eliminar con confirmación `window.confirm`. 46 briefs verificados con Playwright. Checkpoint: `CHECKPOINT_IMPL-20260616-01_listado_briefs_tabla_global_v1.md`. SPEC: `SPEC_ARCH-20260616-01_listado_briefs_tabla_global_v1.md`. Commit: `32b5969`.
 54. **Sesion 2026-06-17 cerrada con 6 commits pusheados a `origin/main`**: brand-kit, preregistro, tabla de briefs, docs narrativa fija, gitignore para `.playwright-mcp/`, SPEC formal del listado. Produccion sirviendo HTTP 200 en `https://vectoria-zeta.vercel.app/briefs`. Checkpoint: `CHK_2026-06-17_1325_cierre_sesion_publish_y_validacion_produccion.md`.
+55. **FIX-20260617-01 — Hotfix de build roto en Vercel**: 3 deploys consecutivos fallaron por `Type error: Cannot find module '@react-email/html'`. Causa: imports directos de subpaquetes `@react-email/*` cuando solo `@react-email/components` y `@react-email/render` son deps declaradas. Fix: unificar los 10 imports por archivo a un único import desde `@react-email/components`. Build local verde, deploy verificado HTTP 200. Checkpoint: `CHK_2026-06-17_1330_incidente_build_vercel_fix_emails_v1.md`. Commit: `a59afbb`.
 
 ### [/] En Progreso
 
@@ -222,6 +223,9 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 3. 5 tests preexistentes rotos en `lib/briefing-closure.test.ts` y `lib/briefing.test.ts` por `narrativeQuestionAsked: null` y `VIKA_NARRATIVE_QUESTION` duplicado (detectados en sesion 2026-06-17, no introducidos en esta sesion).
 4. Disparadores MCT reales en eventos de negocio (codigo listo, falta wirear).
 5. Paginacion y filtros de la tabla global de briefs cuando el tenant tenga >100 briefs (mencionado en `SPEC_ARCH-20260616-01` como trabajo futuro).
+6. Lint rule para detectar imports desde `@react-email/*` directos que no sean `@react-email/components` o `@react-email/render` (leccion aprendida de FIX-20260617-01).
+7. Agregar `pnpm install --frozen-lockfile` al pre-commit hook para evitar drift de lockfile entre local y CI.
+8. Auditar el resto del proyecto en busca de imports transitivos que podrian romperse en el proximo deploy.
 
 ## Ultimo Corte Cerrado
 
