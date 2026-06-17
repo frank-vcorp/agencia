@@ -46,7 +46,8 @@ interface BriefChatBubblesProps {
 
 const TIME_FORMATTER = new Intl.DateTimeFormat("es-MX", {
   hour: "2-digit",
-  minute: "2-digit"
+  minute: "2-digit",
+  timeZone: "UTC"
 });
 
 function formatTime(iso: string): string {
@@ -142,10 +143,10 @@ export function BriefChatBubbles({
             )}
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
-            {groups.map((group) => (
-              <ChatGroup key={group.id} group={group} />
-            ))}
+           <div className="flex flex-col gap-2">
+             {groups.map((group, index) => (
+               <ChatGroup key={group.id ?? `group-${index}`} group={group} />
+             ))}
           </div>
         )}
       </div>
@@ -180,13 +181,13 @@ function ChatGroup({ group }: { group: BubbleGroup }) {
             >
               {msg.text}
               {isLast ? (
-                <span
-                  className={`ml-2 align-baseline text-[10px] ${
-                    isRight ? "text-white/70" : "text-[color:var(--muted)]"
-                  }`}
-                >
-                  {formatTime(msg.createdAt)}
-                </span>
+                 <span suppressHydrationWarning
+                   className={`ml-2 align-baseline text-[10px] ${
+                     isRight ? "text-white/70" : "text-[color:var(--muted)]"
+                   }`}
+                 >
+                   {formatTime(msg.createdAt)}
+                 </span>
               ) : null}
             </div>
           );
