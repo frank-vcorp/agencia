@@ -3,16 +3,18 @@
  * Plantilla React Email — Evento: quotation.active
  * Respaldo: context/SPECs/SPEC_ARCH-20260510-09_modulo_comunicacion_transaccional_mct_v1.md
  */
-import { Html } from "@react-email/html";
-import { Head } from "@react-email/head";
-import { Preview } from "@react-email/preview";
-import { Body } from "@react-email/body";
-import { Container } from "@react-email/container";
-import { Section } from "@react-email/section";
-import { Heading } from "@react-email/heading";
-import { Text } from "@react-email/text";
-import { Button } from "@react-email/button";
-import { Hr } from "@react-email/hr";
+import {
+  Body,
+  Button,
+  Container,
+  Head,
+  Heading,
+  Hr,
+  Html,
+  Preview,
+  Section,
+  Text
+} from "@react-email/components";
 
 export type QuotationActiveEmailProps = {
   clientName: string;
