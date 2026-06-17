@@ -11,3 +11,5 @@ supabase/.temp
 mcp/dist/
 # Copias locales de clientes — artefactos de trabajo, no del repo
 context/clientes/
+# Artefactos locales de Playwright MCP (screenshots, logs, snapshots) — no del repo
+.playwright-mcp/
