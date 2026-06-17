@@ -138,6 +138,10 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 48. **Vika como agente operadora de Bridge** (`ARCH-20260513-15 / IMPL-20260513-15`) implementada en el root del workspace con 4 skills técnicas, definición MCP-first y checkpoint `CHECKPOINT_IMPL-20260513-15_vika_agente_v1.md`.
 49. **MCP Vika para sincronización local** (`ARCH-20260513-16 / IMPL-20260513-16`) implementado con soporte `project-folders` en `bridge_get_brief`, nueva tool `bridge_download_asset_files`, ruta `GET /api/v1/assets/[id]/files`, endurecimiento contra traversal y validación completa en `Bridge/mcp` con 33 tests verdes y build limpio.
 50. **Visibilidad operativa ligera Captura/Produccion** (`IMPL-20260513-17`) implementada en `/disenador`, `/activos` y `/activos/[id]` como etiqueta derivada sin cambiar modelo de datos, con build limpio y checkpoint conjunto `CHECKPOINT_IMPL-20260513-16_17_vika_mcp_y_visibilidad_operativa.md`.
+51. **Upload de logo de brand kit** (`IMPL-20260613-brand-kit`) implementado con `uploadBrandKitLogo` (validación MIME/tamaño, Supabase Storage), server action `uploadClientLogoAction` protegida por rol operador, componente `brand-kit-logo-uploader` con preview y 12 tests unitarios. Checkpoint: `CHK_2026-06-13_1525_brand_kit_logo_upload_v1.md`. Commit: `4e0b016`.
+52. **Refactor de pre-registro cliente/vendedor a server action** (`IMPL-20260613-01`) implementado con `preregistroAction`, componente desacoplado `preregistro-form.tsx`, helper reutilizable `lib/preregistro.ts`, infraestructura de tests con vitest + jsdom + @testing-library/react. Checkpoint: `CHK_2026-06-13_1537_preregistro_cliente_vendedor.md`. Commit: `aeee48b`.
+53. **Listado global de briefs en `/briefs`** (`ARCH-20260616-01 / IMPL-20260616-01`) implementado con tabla de 8 columnas (Cliente, ID cliente, Proyecto, Fecha, Estado, vN, Canal, Acciones), helper `getBriefsByTenantEnriched` con join sin N+1, fila activa resaltada, editar navega a `?id=<uuid>#edicion-resumen`, eliminar con confirmación `window.confirm`. 46 briefs verificados con Playwright. Checkpoint: `CHECKPOINT_IMPL-20260616-01_listado_briefs_tabla_global_v1.md`. SPEC: `SPEC_ARCH-20260616-01_listado_briefs_tabla_global_v1.md`. Commit: `32b5969`.
+54. **Sesion 2026-06-17 cerrada con 6 commits pusheados a `origin/main`**: brand-kit, preregistro, tabla de briefs, docs narrativa fija, gitignore para `.playwright-mcp/`, SPEC formal del listado. Produccion sirviendo HTTP 200 en `https://vectoria-zeta.vercel.app/briefs`. Checkpoint: `CHK_2026-06-17_1325_cierre_sesion_publish_y_validacion_produccion.md`.
 
 ### [/] En Progreso
 
@@ -215,6 +219,9 @@ La implementación del ciclo completo del activo ya estaba cerrada:
 
 1. Bloqueador unico operativo: completar e2e final y registrar issue Jira vinculado al cierre (`estado actual: SIN-ISSUE`), con evidencia de QA e INFRA.
 2. Ejecutar refinamiento UX/UI final del piloto al cerrar el bloqueador operativo de e2e/Jira.
+3. 5 tests preexistentes rotos en `lib/briefing-closure.test.ts` y `lib/briefing.test.ts` por `narrativeQuestionAsked: null` y `VIKA_NARRATIVE_QUESTION` duplicado (detectados en sesion 2026-06-17, no introducidos en esta sesion).
+4. Disparadores MCT reales en eventos de negocio (codigo listo, falta wirear).
+5. Paginacion y filtros de la tabla global de briefs cuando el tenant tenga >100 briefs (mencionado en `SPEC_ARCH-20260616-01` como trabajo futuro).
 
 ## Ultimo Corte Cerrado
 
