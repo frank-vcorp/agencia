@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { deleteClientAction } from "@/app/clientes/actions";
+import { BrandKitLogoUploader } from "@/components/brand-kit-logo-uploader";
 import { formatClientCreatedAt } from "@/lib/client-portal";
 import {
   CLIENT_STATUS_LABELS,
@@ -480,6 +481,15 @@ export function ClientDetailView({
             <p className="mt-1 text-sm leading-6">{client.notes}</p>
           </div>
         ) : null}
+
+        {/* IMPL-20260613-01: Brand Kit del cliente (logo) */}
+        <div className="mt-3" data-testid="brand-kit-section">
+          <BrandKitLogoUploader
+            clientId={client.id}
+            isOperator={isOperator}
+            brandKit={client.brandKit}
+          />
+        </div>
       </section>
 
       <nav className="flex flex-wrap items-center gap-1 rounded-full bg-white/70 p-1 ring-1 ring-[color:var(--line)]">

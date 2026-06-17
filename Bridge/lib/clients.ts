@@ -9,7 +9,8 @@ import {
   getClientById as getClientByIdAssets,
   getClientsByTenant,
   getProjectsByTenant,
-  getTenantIdBySlug
+  getTenantIdBySlug,
+  type BrandKit
 } from "./assets";
 import { isSupabaseConfigured, supabaseEnv } from "./supabase";
 
@@ -33,9 +34,14 @@ export type ClientSummary = {
  * Detalle extendido de un cliente para la vista `/cliente/[id]`.
  * Reutiliza los campos de ClientSummary y agrega tenantSlug para navegación.
  * IMPL-ARCH-20260612-05
+ *
+ * IMPL-20260613-01: agrega `brandKit` para que la vista pueda mostrar el logo
+ * actual sin un fetch extra. Puede ser null si el cliente aún no tiene
+ * Brand Kit configurado.
  */
 export type ClientDetail = ClientSummary & {
   tenantSlug: string;
+  brandKit: BrandKit | null;
 };
 
 export type ClientDirectory = {
@@ -169,7 +175,8 @@ export async function getClientById(clientId: string): Promise<ClientDetail | nu
     notes: row.notes,
     recentProjectId: null,
     createdAt: null,
-    tenantSlug: supabaseEnv.defaultTenant
+    tenantSlug: supabaseEnv.defaultTenant,
+    brandKit: row.brand_kit ?? null
   };
 }
 
