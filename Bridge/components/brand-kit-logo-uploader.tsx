@@ -60,6 +60,12 @@ export function BrandKitLogoUploader({
       setError("Solo operadores pueden subir logos.");
       return;
     }
+    // FIX-20260623-01: guard de tamano en cliente para evitar 413/400 de Vercel.
+    // Debe coincidir con BRAND_KIT_LOGO_MAX_BYTES en lib/client-brand-kit.ts.
+    if (file.size > 5 * 1024 * 1024) {
+      setError("El logo excede el límite de 5 MB. Reduce el tamaño e intenta de nuevo.");
+      return;
+    }
     setError(null);
 
     const fd = new FormData();

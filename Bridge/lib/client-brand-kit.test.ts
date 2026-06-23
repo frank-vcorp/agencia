@@ -186,6 +186,75 @@ describe("uploadBrandKitLogo", () => {
     ).rejects.toMatchObject({ code: "file_too_large" });
   });
 
+  // FIX-20260623-01: cubre el borde exacto del limite (5MB + 1 byte) y
+  // verifica que la validacion es fail-fast: no se hace NINGUNA llamada a
+  // fetch (ni tenant, ni client, ni storage, ni patch) cuando el archivo
+  // excede el tamano maximo.
+  it("FIX-20260623-01: rechaza file_too_large en 5MB+1 sin llamar a fetch", async () => {
+    await expect(
+      uploadBrandKitLogo({
+        clientId: CLIENT_ID,
+        file: makeFileLike("huge.png", "image/png", 5 * 1024 * 1024 + 1)
+      })
+    ).rejects.toBeInstanceOf(BrandKitLogoError);
+    await expect(
+      uploadBrandKitLogo({
+        clientId: CLIENT_ID,
+        file: makeFileLike("huge.png", "image/png", 5 * 1024 * 1024 + 1)
+      })
+    ).rejects.toMatchObject({ code: "file_too_large" });
+    // No se debe haber hecho ninguna llamada de red: la validacion corre
+    // antes de resolver tenant, buscar cliente o tocar Storage.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // FIX-20260623-01: el limite es INCLUSIVO (5MB exactos son validos).
+  // Verifica que el archivo de tamano maximo se sube correctamente a
+  // Supabase Storage y persiste en brand_kit.logos.
+  it("FIX-20260623-01: acepta archivos de exactamente 5MB (limite inclusivo)", async () => {
+    fetchMock
+      .mockReturnValueOnce(makeJsonResponse([{ id: TENANT_ID, slug: "vectoria" }])) // tenant lookup
+      .mockReturnValueOnce(
+        // client lookup (sin brand_kit previo)
+        makeJsonResponse([
+          {
+            id: CLIENT_ID,
+            name: "Acme",
+            legal_name: null,
+            status: "active",
+            primary_contact_name: null,
+            primary_contact_email: null,
+            primary_contact_whatsapp: null,
+            primary_contact_channel: null,
+            notes: null,
+            brand_kit: null
+          }
+        ])
+      )
+      .mockReturnValueOnce(makeTextResponse("", 200)) // storage upload
+      .mockReturnValueOnce(makeJsonResponse([{ id: CLIENT_ID }])); // patch brand_kit
+
+    const result = await uploadBrandKitLogo({
+      clientId: CLIENT_ID,
+      file: makeFileLike("max.png", "image/png", 5 * 1024 * 1024),
+      nombre: "Principal"
+    });
+
+    expect(result.logo.nombre).toBe("Principal");
+    expect(result.brand_kit.logos).toHaveLength(1);
+
+    // La llamada a Storage debe haber ocurrido (indice 2: tenant=0, client=1, storage=2).
+    const calls = fetchMock.mock.calls;
+    expect(calls).toHaveLength(4);
+    const storageCall = calls[2];
+    const storageUrl = String(storageCall[0]);
+    expect(storageUrl).toContain(
+      `/storage/v1/object/${BRAND_KIT_BUCKET}/${TENANT_ID}/${CLIENT_ID}/`
+    );
+    const storageInit = storageCall[1] as RequestInit;
+    expect(storageInit.method).toBe("POST");
+  });
+
   it("sube el archivo, devuelve URL publica y persiste en brand_kit.logos", async () => {
     fetchMock
       .mockReturnValueOnce(makeJsonResponse([{ id: TENANT_ID, slug: "vectoria" }])) // tenant lookup
